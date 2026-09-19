@@ -1,0 +1,404 @@
+# テーブル設計書
+
+## テーブル一覧
+
+テーブルは性質によって 2 種類に分かれる。マスタは繰り返し参照される基準データ、トランザクションは日々発生する取引の記録である。
+
+### マスタ系
+
+| テーブル | 内容 |
+| --- | --- |
+| `customers` | 得意先 |
+| `delivery_destinations` | 納入先 |
+| `materials` | 材質。材質ラインの指示と表示色を含む |
+| `products` | 商品（材質 × 板厚 × 形状） |
+| `prices` | 価格（5 条件の組み合わせごとの単価） |
+| `process_types` | 加工種別 |
+| `manufacturers` | メーカー |
+| `notices` | 注意事項。得意先・加工種別・その組み合わせに紐づく |
+| `stamps` | 現場用伝票に印字するスタンプ文言 |
+| `customer_stamps` | 得意先ごとに既定でチェックするスタンプ |
+| `users` | ユーザー。ロールを含む |
+
+### トランザクション系
+
+| テーブル | 内容 |
+| --- | --- |
+| `orders` | 受注ヘッダー |
+| `order_items` | 受注明細（材料） |
+| `order_item_processes` | 加工明細（材料に紐づく加工） |
+| `shipments` | 出荷実績 |
+| `shipment_items` | 出荷明細 |
+| `attachments` | 添付ファイル（注文書 PDF・DXF） |
+| `order_stamps` | 受注に付けたスタンプ |
+
+### Phase2 で追加予定
+
+`packages`（梱包）、`mill_sheets`（ミルシート）、`trading_companies`（商社）、`carriers`（運送会社）、`work_locations`（加工場所）、`order_comments`（納期変更・注文変更のやり取り）
+
+## マスタテーブル定義
+
+### customers（得意先）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `code` | text | 得意先コード（例: T04500） |
+| `name` | text | 得意先名 |
+| `contact_person` | text | 客先担当 |
+| `is_active` | boolean | 有効フラグ |
+| `created_at` / `updated_at` | timestamptz |  |
+
+注意事項は `notices` テーブルに切り出す。得意先マスタ内のテキスト欄として持つと、その受注に関係のない注意事項まですべて表示され、件数が増えるにつれ読み飛ばされるためである。
+
+### delivery\_destinations（納入先）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `code` | text | 納入先コード |
+| `name` | text | 納入先名 |
+| `address` | text | 住所 |
+| `area` | text | 持込地区 |
+| `is_active` | boolean | 有効フラグ |
+
+同一得意先でも案件ごとに納入先が変わるため、得意先とは独立したマスタとする。
+
+### materials（材質）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `name` | text | 材質名（SS400、SN490B、SN490C など） |
+| `line_mark` | text | 材質ラインの指示（青2本 など）。基本材質は NULL |
+| `display_color` | text | 現場用伝票での表示色。基本材質は NULL |
+| `is_active` | boolean | 有効フラグ |
+
+材質ラインは材質ごとに色と本数が決まっているため、マスタに登録して現場用伝票に印字する。「材質ライン要」とだけ印字するのではなく「材質ライン：青2本」のように具体的な指示を出すことで、現場が別途確認する手間をなくす。
+
+基本材質（SS400）は `line_mark` と `display_color` を NULL とする。印刷処理では材質名を条件分岐せず、`line_mark` が登録されていれば印字するという判定のみを行う。材質が増えた場合もマスタに 1 行追加すれば対応できる。
+
+### products（商品）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `material_id` | uuid | FK → `materials` |
+| `thickness` | numeric | 板厚（mm） |
+| `shape` | text | 形状。`定尺` / `大板` |
+| `is_active` | boolean | 有効フラグ |
+
+メーカーは含めない。受注時点では使用する板のメーカーが確定しないためである。形状は 1524 × 3048 以上をすべて大板として扱うため、具体的な寸法は保持しない。
+
+`material_id` + `thickness` + `shape` に一意制約を設ける。
+
+### prices（価格）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `material_id` | uuid | FK → `materials` |
+| `thickness` | numeric | 板厚 |
+| `shape` | text | 形状 |
+| `cutting_method` | text | 切断方法。`シャーリング` / `ガス` / `レーザー` / `プラズマ` / `定尺売り` |
+| `weight_class` | text | 重量区分。`2kg以下` / `2kg超` |
+| `unit_price` | numeric | 単価 |
+| `valid_from` | date | 適用開始日 |
+
+5 条件の組み合わせごとに 1 行を持つ。条件分岐をコードではなくデータとして保持することで、料金改定時はマスタの更新のみで対応できる。
+
+`定尺売り` は母材の価格のみで切断賃を含まない。
+
+### process\_types（加工種別）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `name` | text | 加工名（穴あけ、キリ孔、曲げ、開先、ショット、タップ孔、マーキング、ピアス孔、切り込みなど） |
+| `category` | text | 集計用の区分（アイトレ、SPL など） |
+| `is_active` | boolean | 有効フラグ |
+
+注意事項は `notices` テーブルに切り出す。
+
+`category` はショット加工量明細のような集計に使用する。
+
+### manufacturers（メーカー）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `code` | text | メーカーコード（例: 220、230） |
+| `name` | text | メーカー名（日本製鉄、中部鋼鈑、中山製鋼所など） |
+| `is_active` | boolean | 有効フラグ |
+
+### users（ユーザー）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK。Supabase Auth の user id |
+| `employee_no` | text | 社員番号 |
+| `name` | text | 氏名 |
+| `role` | text | ロール。`office` / `factory` / `admin` |
+| `is_active` | boolean | 有効フラグ |
+
+`factory`（現場）は MVP では運用しないが、ロールの枠組みとして定義しておく。
+
+### notices（注意事項）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `customer_id` | uuid | FK → `customers`。NULL 可 |
+| `process_type_id` | uuid | FK → `process_types`。NULL 可 |
+| `body` | text | 注意事項の本文 |
+| `priority` | integer | 表示順 |
+| `is_active` | boolean | 有効フラグ |
+
+得意先・加工種別のどちらを埋めるかで表示条件が決まる。
+
+| `customer_id` | `process_type_id` | 表示条件 |
+| --- | --- | --- |
+| あり | NULL | その得意先の受注すべてで表示 |
+| NULL | あり | その加工を選択したときすべてで表示 |
+| あり | あり | その得意先かつその加工のときのみ表示 |
+
+「A 社はレーザー加工のときだけ注意」と「A 社は常に精度に厳しい」を同一の仕組みで扱える。両方が NULL の行は作らない（チェック制約で禁止する）。
+
+注意事項を独立したテーブルとするのは、受注に関係のないものまで表示すると件数が増えるにつれ読み飛ばされ、注意喚起として機能しなくなるためである。条件付きの内容（板厚 9mm 以下なら可、など）は自動判定せずテキストとして表示する。
+
+### stamps（スタンプ文言）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `body` | text | 文言（雨濡れ厳禁 など） |
+| `display_order` | integer | 表示順 |
+| `is_active` | boolean | 有効フラグ |
+
+現場用伝票に印字する文言を登録しておき、受注入力時にチェックしたものを伝票に反映する。
+
+同じ文言を複数の得意先が指定するため、得意先との関連は `customer_stamps` で保持する。
+
+### customer\_stamps（得意先の既定スタンプ）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `customer_id` | uuid | FK → `customers` |
+| `stamp_id` | uuid | FK → `stamps` |
+
+ここに登録された文言は、その得意先の受注入力時に初期状態でチェックが入る。客先指定の文言を毎回選ぶ必要がなくなる。
+
+`customer_id` + `stamp_id` に一意制約を設ける。
+
+## トランザクションテーブル定義
+
+### orders（受注ヘッダー）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `order_no` | text | 受注番号。自動採番 |
+| `order_date` | date | 受注日 |
+| `customer_id` | uuid | FK → `customers` |
+| `delivery_destination_id` | uuid | FK → `delivery_destinations` |
+| `project_name` | text | 工事名 |
+| `due_date_type` | text | 納期種別。`確定` / `仮納期` / `後報` / `最短出荷` |
+| `due_date` | date | 納期。`後報` `最短出荷` では NULL |
+| `status` | text | `加工待ち` / `出荷待ち` / `配送依頼済み` / `完了` |
+| `created_by` | uuid | FK → `users`。起案者 |
+| `remarks` | text | 摘要 |
+| `field_note` | text | 現場用伝票に印字するフリーコメント |
+| `created_at` / `updated_at` | timestamptz |  |
+
+ステータスは受注ヘッダーに 1 つ持つ。実務では同一受注内の明細がまとめて加工・出荷されるため、明細単位の管理は行わない。
+
+納期は種別と日付の 2 つで保持する。日付の有無だけでは `後報`（待ち）と `最短出荷`（急ぎ）を区別できないためである。
+
+### order\_items（受注明細）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `order_id` | uuid | FK → `orders` |
+| `line_no` | integer | 行番号 |
+| `product_id` | uuid | FK → `products` |
+| `cutting_method` | text | 切断方法 |
+| `width` | numeric | 巾（mm） |
+| `length` | numeric | 長さ（mm） |
+| `quantity` | integer | 数量 |
+| `unit_weight` | numeric | 単位重量（1 枚あたり kg） |
+| `material_unit_price` | numeric | 母材単価。`prices` から自動取得 |
+| `sales_unit_price` | numeric | 売上単価 |
+| `manufacturer_specified_id` | uuid | FK → `manufacturers`。メーカー指定。NULL 可 |
+| `manufacturer_used_id` | uuid | FK → `manufacturers`。使用メーカー。加工時に入力 |
+| `mill_sheet_no` | text | ミルシート番号。加工時に入力 |
+| `package_count` | integer | 梱包数。製品ラベルの印刷枚数。入力者が手入力 |
+| `remarks` | text | 備考 |
+| `field_note` | text | この明細だけに適用するフリーコメント |
+
+メーカーは「指定」と「実績」で確定タイミングが異なるため別カラムとする。同一カラムで兼ねると、指定のない受注に実績が入った際に客先指定があったように見えてしまう。
+
+### order\_item\_processes（加工明細）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `order_item_id` | uuid | FK → `order_items` |
+| `line_no` | integer | 行番号 |
+| `process_type_id` | uuid | FK → `process_types` |
+| `spec` | text | 加工内容（例: キリ孔 1S/12 孔 38φ） |
+| `quantity` | integer | 加工数量 |
+| `unit_price` | numeric | 加工単価。MVP では手入力 |
+| `remarks` | text | 備考 |
+
+1 つの材料に複数の加工（穴あけ + 曲げ + ショット）が付くケースを表現するため、受注明細の子テーブルとする。加工指示書では加工が重量ゼロの別行として印字されるが、これは材料重量を二重に計上しないための表示上の処理である。
+
+重量建てで加工賃が決まる加工があるが、その重量は材料の重量と一致するため、加工明細に重量カラムは持たない。親の `order_items.unit_weight` を参照して算出する。同じ値を 2 箇所に保持すると、寸法修正時にずれる原因となる。
+
+### shipments（出荷実績）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `order_id` | uuid | FK → `orders` |
+| `shipment_no` | text | 送り状番号。自動採番 |
+| `shipped_date` | date | 出荷日 |
+| `created_by` | uuid | FK → `users` |
+| `created_at` | timestamptz |  |
+
+### shipment\_items（出荷明細）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `shipment_id` | uuid | FK → `shipments` |
+| `order_item_id` | uuid | FK → `order_items` |
+| `quantity` | integer | 出荷数量 |
+| `weight` | numeric | 出荷重量 |
+
+分割出荷は出荷実績を積み上げることで表現する。残数量はカラムを持たず「受注数量 − 出荷実績の合計」として算出する。
+
+### attachments（添付ファイル）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `order_id` | uuid | FK → `orders` |
+| `file_name` | text | ファイル名 |
+| `file_type` | text | `pdf` |
+| `storage_path` | text | Supabase Storage のパス |
+| `uploaded_by` | uuid | FK → `users` |
+| `created_at` | timestamptz |  |
+
+注文書は現場用伝票のチェック工程でアップロードする。事務側の手配ミスが疑われた際に、受注内容と注文書を突き合わせられるようにするためである。
+
+FAX で届いた注文書も、CAD データから出力した CSV を印刷したものも、同じようにスキャンして PDF として登録する。受注の経路による区別は設けない。
+
+### order\_stamps（受注に付けたスタンプ）
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `order_id` | uuid | FK → `orders` |
+| `stamp_id` | uuid | FK → `stamps` |
+
+受注ごとにチェックされたスタンプ文言を保持する。`order_id` + `stamp_id` に一意制約を設ける。
+
+材質による色分けと「材質ライン要」の印字は、材質の値から判定できるためデータとして保持せず、印刷処理側で判断する。
+
+## リレーション
+
+```
+customers ──┐
+            ├─< orders ──< order_items ──< order_item_processes
+delivery_   ┘      │            │                    │
+destinations       │            │                    └── process_types
+                   │            │
+                   │            ├── products ──> materials
+                   │            └── manufacturers （指定 / 実績の2方向）
+                   │
+                   ├─< shipments ──< shipment_items ──> order_items
+                   ├─< attachments
+                   ├─< order_stamps ──> stamps
+                   └── users （created_by）
+
+customers ──< customer_stamps >── stamps
+notices   ──> customers / process_types （どちらか、または両方）
+prices    ──> materials （板厚・形状・切断方法・重量区分と組み合わせて参照）
+```
+
+### 主な関連
+
+| 親 | 子 | 関係 | 説明 |
+| --- | --- | --- | --- |
+| `orders` | `order_items` | 1 : N | 1 受注に複数の材料明細 |
+| `order_items` | `order_item_processes` | 1 : N | 1 材料に複数の加工 |
+| `orders` | `shipments` | 1 : N | 分割出荷のため複数回 |
+| `shipments` | `shipment_items` | 1 : N | 1 回の出荷で複数明細 |
+| `order_items` | `shipment_items` | 1 : N | 1 明細が複数回に分けて出荷される |
+| `orders` | `attachments` | 1 : N | 注文書 PDF・DXF |
+
+### 参照の考え方
+
+`prices` は `products` への外部キーを持たず、材質・板厚・形状の値で照合する。価格は切断方法と重量区分も条件に含むため、商品と 1 対 1 で対応しないためである。
+
+`order_items` は `manufacturers` を 2 方向から参照する。`manufacturer_specified_id`（受注時の客先指定）と `manufacturer_used_id`（加工時の実績）は性質が異なるため、別々の外部キーとして持つ。
+
+## 設計上の補足
+
+### 計算で求める項目
+
+以下はカラムとして保持せず、必要時に算出する。保存すると元データの修正時に古い値が残り、整合性が崩れるためである。
+
+| 項目 | 算出方法 |
+| --- | --- |
+| 残数量 | 受注数量 − 出荷実績の合計 |
+| 重量区分 | 単位重量が 2kg 以下かで判定 |
+| 明細金額 | 単価 × 数量 |
+| 受注合計 | 明細金額の合計 |
+
+単位重量は板厚・巾・長さ・材質から算出できるため、入力者に選択させず自動判定する。
+
+### 制約
+
+- `products` の `material_id` + `thickness` + `shape` に一意制約
+- `prices` の 5 条件の組み合わせに一意制約（`valid_from` を含む）
+- `shipment_items.quantity` に正数チェック
+- 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
+- `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須
+
+### RLS 方針
+
+ロールごとに行・列レベルのアクセス制御を Supabase の RLS で定義する。クライアント側の表示制御のみに依存しない。
+
+| テーブル | office（事務） | factory（現場） | admin（管理者） |
+| --- | --- | --- | --- |
+| `orders` | 参照・登録・更新 | 参照・ステータス更新のみ | すべて |
+| `order_items` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
+| `prices` | 参照不可 | 参照不可 | すべて |
+| マスタ各種 | 参照 | 参照 | すべて |
+
+単価情報については、現場ロールが参照できないことを DB レベルで保証する。ビューを分けるか列レベルの制御を用いるかは実装時に検討する。
+
+### Phase2 での拡張ポイント
+
+**梱包（`packages`）**
+
+製品ラベルは梱包単位（板厚ごと、加工ごと、100 枚を目安に 1 梱包）で発行する。梱包数は例外や現場判断が入るため自動計算せず、手動登録とする想定。
+
+**ミルシート（`mill_sheets`）・商社（`trading_companies`）**
+
+商社はミルシートが届くまで判明しないため、商品マスタではなく取引側に保持する。複数の受注番号をまとめて 1 枚の証明書にする構造のため、受注との関連は N : N になる見込み。
+
+**やり取りの記録（`order_comments`）**
+
+納期変更・注文変更のやり取りを記録する。MVP では納期変更履歴を持たないが、物件（工事名）単位の工程一覧を実装する際に、備考またはチャット形式で一体的に設計する。
+
+**在庫連携**
+
+既存の在庫管理 Excel は「材質 × 板厚」でシートを分け、内部でメーカー別に在庫を管理している。`products` の粒度（材質 × 板厚 × 形状）と整合するため、材質・板厚で照合すれば「SS400 22mm が在庫薄」といった表示を実現できる。メーカー指定がある受注では、指定メーカーに絞った在庫を表示する。
+
+**拠点間の横持ち**
+
+複数拠点を持つ事業所では、拠点間で材料を移動する「横持ち」が発生する。MVP は単一拠点の鋼板切断部門に閉じているため扱わないが、拠点間連携を実装する際は出荷実績に発地・着地の情報が必要になる。
