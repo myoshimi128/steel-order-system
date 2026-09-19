@@ -223,7 +223,7 @@
 | `order_id` | uuid | FK → `orders` |
 | `line_no` | integer | 行番号 |
 | `product_id` | uuid | FK → `products` |
-| `cutting_method` | text | 切断方法 |
+| `cutting_method` | text | 切断方法。`シャーリング` / `ガス` / `レーザー` / `プラズマ` / `定尺売り`。`prices.cutting_method` と同じ値域 |
 | `width` | numeric | 巾（mm） |
 | `length` | numeric | 長さ（mm） |
 | `quantity` | integer | 数量 |
@@ -376,10 +376,33 @@ prices    ──> materials （板厚・形状・切断方法・重量区分と�
 | --- | --- | --- | --- |
 | `orders` | 参照・登録・更新 | 参照・ステータス更新のみ | すべて |
 | `order_items` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
+| `order_item_processes` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
+| `shipments` / `shipment_items` | 参照・登録・更新 | 参照不可 | すべて |
+| `attachments` | 参照・登録・更新 | 参照不可 | すべて |
+| `order_stamps` | 参照・登録・更新 | 参照 | すべて |
+| `users` | 参照 | 参照 | すべて |
 | `prices` | 参照不可 | 参照不可 | すべて |
 | マスタ各種 | 参照 | 参照 | すべて |
 
-単価情報については、現場ロールが参照できないことを DB レベルで保証する。ビューを分けるか列レベルの制御を用いるかは実装時に検討する。
+`order_item_processes` / `shipments` / `shipment_items` / `attachments` / `order_stamps` / `users` は元の設計時点では個別に定めていなかったテーブルである。`orders` `order_items` `prices` `マスタ各種` に適用した考え方（現場の業務範囲は「加工指示の閲覧」に限られる、単価情報は現場に見せない）を、各テーブルの性質に当てはめて追加した。
+
+- `order_item_processes` の `unit_price`（加工単価）は `order_items` の単価列と同じ性質の情報のため、同様に現場からは隠す。
+- `shipments` / `shipment_items`（送り状）と `attachments`（注文書ファイル）は、送り状発行・ファイル管理のいずれも事務の業務であり現場の業務範囲に含まれないため、現場は参照不可とする。
+- `order_stamps` は現場用伝票にそのまま印字される内容であり、単価情報のような機密性もないため、現場にも参照を許可する。
+- `users` は起案者・出荷担当者などの氏名表示にどのロールからも参照できる必要があるため参照は全ロールに許可し、登録・更新は管理者のみとする。
+
+### 列単位のアクセス制御の実装方法
+
+単価情報（`order_items` の `material_unit_price` / `sales_unit_price`、`order_item_processes` の `unit_price`）については、現場ロールが参照できないことを DB レベルで保証する。RLS の `USING` / `WITH CHECK` は行単位の制御しかできず列単位のマスキングはできないため、以下の方式を採る。
+
+- 実テーブルへの直接 `select` は office/admin にのみ許可し、factory 向けのポリシーは作らない（ポリシーがない操作は RLS のデフォルトで拒否される）。
+- 単価列を除いたビュー（`order_items_factory_view` / `order_item_processes_factory_view`）を作成し、`security_invoker = false`（ビュー所有者の権限で実行）にすることで実テーブルの RLS を越えて中身を読み、単価列だけを除いて返す。factory を含む `authenticated` ロールにはこのビューへの `select` 権限のみを付与する。
+
+`orders` の「factory は参照・ステータス更新のみ」も同様に列単位の制御が必要になる。RLS の UPDATE ポリシーは更新前後の行をそれぞれ独立にしか検証できず列同士を比較できないため、`status` 列以外が変更された場合に例外を発生させる `before update` トリガー（`restrict_orders_update_for_factory`）で強制する。
+
+ロール判定には `public.users.role` を参照するヘルパー関数 `current_user_role()` を用いる。`users` テーブル自体も RLS 対象であるため、ポリシー評価中に `users` を参照すると RLS ポリシーが再帰的に評価されてしまう。これを避けるため、この関数は `security definer`（関数所有者の権限で実行）として定義し、RLS を経由せずに `role` を読み取る。
+
+実装は `supabase/migrations/20260919130000_create_rls_policies.sql` を参照。
 
 ### Phase2 での拡張ポイント
 
