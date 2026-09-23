@@ -45,11 +45,13 @@
 | `id` | uuid | PK |
 | `code` | text | 得意先コード（例: T04500） |
 | `name` | text | 得意先名 |
-| `contact_person` | text | 客先担当 |
+| `sales_rep` | text | 営業担当。自社側の担当者名 |
 | `is_active` | boolean | 有効フラグ |
 | `created_at` / `updated_at` | timestamptz |  |
 
 注意事項は `notices` テーブルに切り出す。得意先マスタ内のテキスト欄として持つと、その受注に関係のない注意事項まですべて表示され、件数が増えるにつれ読み飛ばされるためである。
+
+`sales_rep` は自社側の営業担当者名を保持する。客先側の窓口担当者（客先担当）は受注ごとに異なるため得意先マスタには持たず、`orders.customer_contact` として受注ヘッダー側に持つ。
 
 ### delivery\_destinations（納入先）
 
@@ -201,6 +203,7 @@
 | `order_no` | text | 受注番号。自動採番 |
 | `order_date` | date | 受注日 |
 | `customer_id` | uuid | FK → `customers` |
+| `customer_contact` | text | 客先担当。得意先側の窓口担当者。受注ごとに異なるため得意先マスタではなく受注側に持つ |
 | `delivery_destination_id` | uuid | FK → `delivery_destinations` |
 | `project_name` | text | 工事名 |
 | `due_date_type` | text | 納期種別。`確定` / `仮納期` / `後報` / `最短出荷` |
