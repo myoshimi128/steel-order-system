@@ -4,14 +4,21 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import type { Database } from '@/lib/database.types'
 
 // Server Components・Server Actions・Route Handlers から呼び出して使う
 // cookies() が非同期関数のため、この関数自体も async にしている
+//
+// createServerClient<Database>(...) のように型引数を渡すことで、
+// .from('customers') のテーブル名や .select('code, name') の列名、
+// 外部キーの埋め込み取得（例: materials(name)）の戻り値の形まで
+// lib/database.types.ts の内容から推論されるようになる。
+// この型ファイルはテーブル定義を変更するたびに `npm run db:types` で再生成する。
 export async function createClient() {
   // Next.js が管理している、今のリクエストの Cookie を取得する
   const cookieStore = await cookies()
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {

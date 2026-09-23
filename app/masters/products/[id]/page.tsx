@@ -38,7 +38,13 @@ export default async function EditProductPage(
   return (
     <main className="mx-auto max-w-md px-6 py-8">
       <h1 className="mb-6 text-lg font-semibold">商品の編集</h1>
-      <ProductForm mode="edit" product={product} materials={materials ?? []} />
+      <ProductForm
+        mode="edit"
+        // shape は DB 上 text 列（CHECK 制約で定尺/大板に限定）のため、
+        // 生成された型では string にしかならない。値自体は制約が保証している
+        product={{ ...product, shape: product.shape as '定尺' | '大板' }}
+        materials={materials ?? []}
+      />
     </main>
   )
 }

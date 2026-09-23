@@ -3,7 +3,7 @@
 
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase-server'
-import type { CurrentUser } from '@/lib/current-user'
+import type { CurrentUser, UserRole } from '@/lib/current-user'
 
 // React の cache() で包むと、同じリクエストの中で何度呼び出してもデータ取得は1回だけになる
 // （layout と page の両方で呼んでも二重にクエリが飛ばない）
@@ -37,6 +37,9 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     id: user.id,
     email: user.email ?? '',
     name: profile.name,
-    role: profile.role,
+    // users.role は DB 上は text 列（CHECK 制約で office/factory/admin に限定）で
+    // Postgres の enum 型ではないため、生成された型では string にしかならない。
+    // 値そのものは CHECK 制約が保証しているので、ここで UserRole にキャストする。
+    role: profile.role as UserRole,
   }
 })

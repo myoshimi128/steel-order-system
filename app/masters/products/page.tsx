@@ -11,11 +11,14 @@ export default async function ProductsPage() {
 
   const supabase = await createClient()
   // materials(name) は products.material_id → materials.id の外部キーを使った
-  // Supabase の埋め込み取得（一覧のために材質名だけ一緒に取ってくる）。
-  // Database型を生成していないため実際は1件でも配列型で返る（materials[0]）
+  // Supabase の埋め込み取得。以前は Database 型を渡していなかったため、
+  // TypeScript が埋め込み結果を配列型と誤って推論し、実際は単一オブジェクトで
+  // 返ってくることと食い違って材質名が表示されない不具合になっていた。
+  // lib/database.types.ts を生成して createClient に渡した今は、この関係が
+  // 多対一（1商品につき材質1件）だと型からも正しく分かるため埋め込みに戻している。
   const { data: products, error } = await supabase
     .from('products')
-    .select('id, thickness, shape, is_active, materials(name)')
+    .select('id, material_id, thickness, shape, is_active, materials(name)')
     .order('thickness')
 
   return (
@@ -54,7 +57,7 @@ export default async function ProductsPage() {
               key={product.id}
               className="border-b border-neutral-100 dark:border-neutral-800"
             >
-              <td className="py-2 pr-4">{product.materials[0]?.name ?? ''}</td>
+              <td className="py-2 pr-4">{product.materials?.name ?? ''}</td>
               <td className="py-2 pr-4">{product.thickness}</td>
               <td className="py-2 pr-4">{product.shape}</td>
               <td className="py-2 pr-4">

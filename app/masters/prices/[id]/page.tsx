@@ -40,7 +40,24 @@ export default async function EditPricePage(
   return (
     <main className="mx-auto max-w-md px-6 py-8">
       <h1 className="mb-6 text-lg font-semibold">価格の編集</h1>
-      <PriceForm mode="edit" price={price} materials={materials ?? []} />
+      <PriceForm
+        mode="edit"
+        // shape / cutting_method / weight_class は DB 上 text 列（CHECK 制約で
+        // 値を限定）のため、生成された型では string にしかならない。
+        // 値自体は制約が保証している
+        price={{
+          ...price,
+          shape: price.shape as '定尺' | '大板',
+          cutting_method: price.cutting_method as
+            | 'シャーリング'
+            | 'ガス'
+            | 'レーザー'
+            | 'プラズマ'
+            | '定尺売り',
+          weight_class: price.weight_class as '2kg以下' | '2kg超',
+        }}
+        materials={materials ?? []}
+      />
     </main>
   )
 }

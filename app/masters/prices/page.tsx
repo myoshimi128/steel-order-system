@@ -19,6 +19,11 @@ export default async function PricesPage() {
   }
 
   const supabase = await createClient()
+  // materials(name) は prices.material_id → materials.id の外部キーを使った
+  // Supabase の埋め込み取得。lib/database.types.ts を createClient に渡したことで
+  // 多対一（1価格行につき材質1件）だと型からも正しく推論されるようになったため、
+  // products/page.tsx と同様に埋め込み取得に戻している
+  // （経緯は products/page.tsx のコメント参照）。
   const { data: prices, error } = await supabase
     .from('prices')
     .select(
@@ -63,7 +68,7 @@ export default async function PricesPage() {
               key={price.id}
               className="border-b border-neutral-100 dark:border-neutral-800"
             >
-              <td className="py-2 pr-4">{price.materials[0]?.name ?? ''}</td>
+              <td className="py-2 pr-4">{price.materials?.name ?? ''}</td>
               <td className="py-2 pr-4">{price.thickness}</td>
               <td className="py-2 pr-4">{price.shape}</td>
               <td className="py-2 pr-4">{price.cutting_method}</td>
