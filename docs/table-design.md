@@ -120,7 +120,7 @@
 | `plate_type_id` | uuid | FK → `plate_types` |
 | `material_id` | uuid | FK → `materials`。NULL は SS400 ベースの共通単価 |
 | `thickness_min` / `thickness_max` | numeric | 板厚グループの範囲 |
-| `cutting_method` | text | シャー / ガス / レーザー / プラズマ |
+| `cutting_method` | text | シャーリング / ガス / レーザー / プラズマ |
 | `cutting_type` | text | 寸法切 / アイトレ |
 | `unit_price` | numeric | kg 単価。NULL は都度見積もり（別途） |
 | `valid_from` | date | 適用開始日 |
@@ -187,6 +187,7 @@
 | `applies_thickness_extra` | boolean | 板厚エキストラを適用するか |
 | `applies_large_plate_extra` | boolean | 大板加算を適用するか |
 | `always_piece_price` | boolean | 常に枚単価で表示するか（ベタ丸・ドーナツ） |
+| `is_active` | boolean | 有効フラグ |
 
 ### special\_product\_prices（特殊製品単価）
 
@@ -213,6 +214,7 @@
 | `manufacturer_id` | uuid | FK → `manufacturers` |
 | `thickness` | numeric | 板厚 |
 | `unit_weight` | numeric | 単位質量（kg/m²） |
+| `is_active` | boolean | 有効フラグ |
 
 縞板の重量計算に使用する。単位質量はメーカーによって異なるため、メーカーごとに保持する。縞板は縞目の見た目が異なるため受注時に客先へメーカーを確認しており、受注時点で確定する。
 
@@ -330,7 +332,7 @@
 | `order_id` | uuid | FK → `orders` |
 | `line_no` | integer | 行番号 |
 | `product_id` | uuid | FK → `products` |
-| `cutting_method` | text | 切断方法。定尺売りの場合は NULL |
+| `cutting_method` | text | 切断方法。`シャーリング` / `ガス` / `レーザー` / `プラズマ`。`cutting_prices.cutting_method` と同じ値域。定尺売りの場合は NULL |
 | `cutting_type` | text | 寸法切 / アイトレ |
 | `special_product_type_id` | uuid | 特殊製品の場合に指定。通常の切断は NULL |
 | `steel_making` | text | 電炉材 / 高炉材。受注時に確定し、後から変更可 |
@@ -467,7 +469,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 
 ### 参照の考え方
 
-`prices` は `products` への外部キーを持たず、材質・板厚・形状の値で照合する。価格は切断方法と重量区分も条件に含むため、商品と 1 対 1 で対応しないためである。
+価格系テーブル（`cutting_prices` `standard_plate_prices` `special_product_prices` `material_extras` `thickness_extras` `large_plate_extras` `unit_weights`）は `products` への外部キーを持たず、種類・材質・板厚などの値で照合する。単価は切断方法や特殊製品種別など商品以外の条件も含むため、商品と 1 対 1 で対応しないためである。
 
 `order_items` は `manufacturers` を 2 方向から参照する。`manufacturer_specified_id`（受注時の客先指定）と `manufacturer_used_id`（加工時の実績）は性質が異なるため、別々の外部キーとして持つ。
 
@@ -490,8 +492,8 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 
 ### 制約
 
-- `products` の `material_id` + `thickness` + `shape` に一意制約
-- `prices` の 5 条件の組み合わせに一意制約（`valid_from` を含む）
+- `products` の `plate_type_id` + `material_id` + `thickness` + `shape` に一意制約
+- 価格系テーブル（`cutting_prices` `standard_plate_prices` `special_product_prices` など）は、それぞれの条件の組み合わせに一意制約（`valid_from` を含む）。詳細は各テーブルの説明を参照
 - `shipment_items.quantity` に正数チェック
 - 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
 - `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須
@@ -504,10 +506,34 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | --- | --- | --- | --- |
 | `orders` | 参照・登録・更新 | 参照・ステータス更新のみ | すべて |
 | `order_items` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
-| `prices` | 参照不可 | 参照不可 | すべて |
-| マスタ各種 | 参照 | 参照 | すべて |
+| `order_item_processes` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
+| `shipments` / `shipment_items` | 参照・登録・更新 | 参照不可 | すべて |
+| `attachments` | 参照・登録・更新 | 参照不可 | すべて |
+| `order_stamps` | 参照・登録・更新 | 参照 | すべて |
+| `users` | 参照 | 参照 | すべて |
+| 価格系マスタ（`cutting_prices` `material_extras` `thickness_extras` `large_plate_extras` `standard_plate_prices` `special_product_prices`） | 参照不可 | 参照不可 | すべて |
+| マスタ各種（`plate_types` `special_product_types` `unit_weights` を含む） | 参照 | 参照 | すべて |
 
-単価情報については、現場ロールが参照できないことを DB レベルで保証する。ビューを分けるか列レベルの制御を用いるかは実装時に検討する。
+`order_item_processes` / `shipments` / `shipment_items` / `attachments` / `order_stamps` / `users` は元の設計時点では個別に定めていなかったテーブルである。`orders` `order_items` `マスタ各種` に適用した考え方（現場の業務範囲は「加工指示の閲覧」に限られる、単価情報は現場に見せない）を、各テーブルの性質に当てはめて追加した。
+
+- `order_item_processes` の `unit_price`（加工単価）は `order_items` の単価列と同じ性質の情報のため、同様に現場からは隠す。
+- `shipments` / `shipment_items`（送り状）と `attachments`（注文書ファイル）は、送り状発行・ファイル管理のいずれも事務の業務であり現場の業務範囲に含まれないため、現場は参照不可とする。
+- `order_stamps` は現場用伝票にそのまま印字される内容であり、単価情報のような機密性もないため、現場にも参照を許可する。
+- `users` は起案者・出荷担当者などの氏名表示にどのロールからも参照できる必要があるため参照は全ロールに許可し、登録・更新は管理者のみとする。
+- 価格体系の再設計（切断単価・各種エキストラ・定尺単価・特殊製品単価）により `prices` は廃止されたが、単価情報を現場に見せないという方針自体は変わらないため、価格系の新テーブルすべてに同じ制限を引き継ぐ。`plate_types`（種類）・`special_product_types`（特殊製品種別）・`unit_weights`（単位質量）は単価そのものではなく分類・物理量の参照データのため、他のマスタ同様に全ロール参照可とする。
+
+### 列単位のアクセス制御の実装方法
+
+単価情報（`order_items` の `cutting_unit_price` / `sales_unit_price`、`order_item_processes` の `unit_price`）については、現場ロールが参照できないことを DB レベルで保証する。RLS の `USING` / `WITH CHECK` は行単位の制御しかできず列単位のマスキングはできないため、以下の方式を採る。
+
+- 実テーブルへの直接 `select` は office/admin にのみ許可し、factory 向けのポリシーは作らない（ポリシーがない操作は RLS のデフォルトで拒否される）。
+- 単価列を除いたビュー（`order_items_factory_view` / `order_item_processes_factory_view`）を作成し、`security_invoker = false`（ビュー所有者の権限で実行）にすることで実テーブルの RLS を越えて中身を読み、単価列だけを除いて返す。factory を含む `authenticated` ロールにはこのビューへの `select` 権限のみを付与する。
+
+`orders` の「factory は参照・ステータス更新のみ」も同様に列単位の制御が必要になる。RLS の UPDATE ポリシーは更新前後の行をそれぞれ独立にしか検証できず列同士を比較できないため、`status` 列以外が変更された場合に例外を発生させる `before update` トリガー（`restrict_orders_update_for_factory`）で強制する。
+
+ロール判定には `public.users.role` を参照するヘルパー関数 `current_user_role()` を用いる。`users` テーブル自体も RLS 対象であるため、ポリシー評価中に `users` を参照すると RLS ポリシーが再帰的に評価されてしまう。これを避けるため、この関数は `security definer`（関数所有者の権限で実行）として定義し、RLS を経由せずに `role` を読み取る。
+
+実装は `supabase/migrations/20260919130000_create_rls_policies.sql`（orders/order_items/マスタ各種）、`supabase/migrations/20260924100100_create_pricing_tables_rls_policies.sql`（価格系新テーブル）を参照。
 
 ### Phase2 での拡張ポイント
 
