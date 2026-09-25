@@ -18,15 +18,19 @@ export default async function NewProductPage() {
   }
 
   const supabase = await createClient()
-  const { data: materials } = await supabase
-    .from('materials')
-    .select('id, name')
-    .order('name')
+  const [{ data: plateTypes }, { data: materials }] = await Promise.all([
+    supabase.from('plate_types').select('id, name').order('name'),
+    supabase.from('materials').select('id, name').order('name'),
+  ])
 
   return (
     <main className="mx-auto max-w-md px-6 py-8">
       <h1 className="mb-6 text-lg font-semibold">商品の新規登録</h1>
-      <ProductForm mode="create" materials={materials ?? []} />
+      <ProductForm
+        mode="create"
+        plateTypes={plateTypes ?? []}
+        materials={materials ?? []}
+      />
     </main>
   )
 }

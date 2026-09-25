@@ -10,6 +10,7 @@ type Material = {
   name: string
   line_mark: string | null
   display_color: string | null
+  has_dedicated_price: boolean
   is_active: boolean
 }
 
@@ -74,6 +75,15 @@ export function MaterialForm(props: MaterialFormProps) {
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="has_dedicated_price"
+          defaultChecked={material?.has_dedicated_price}
+        />
+        専用単価を持つ（切断単価マスタで材質を指定した行を使う）
+      </label>
 
       {props.mode === 'edit' && (
         <label className="flex items-center gap-2 text-sm">

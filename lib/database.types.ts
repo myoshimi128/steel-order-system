@@ -122,6 +122,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cutting_prices: {
+        Row: {
+          cutting_method: string
+          cutting_type: string
+          id: string
+          material_id: string | null
+          plate_type_id: string
+          thickness_max: number
+          thickness_min: number
+          unit_price: number | null
+          valid_from: string
+        }
+        Insert: {
+          cutting_method: string
+          cutting_type: string
+          id?: string
+          material_id?: string | null
+          plate_type_id: string
+          thickness_max: number
+          thickness_min: number
+          unit_price?: number | null
+          valid_from: string
+        }
+        Update: {
+          cutting_method?: string
+          cutting_type?: string
+          id?: string
+          material_id?: string | null
+          plate_type_id?: string
+          thickness_max?: number
+          thickness_min?: number
+          unit_price?: number | null
+          valid_from?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cutting_prices_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cutting_prices_plate_type_id_fkey"
+            columns: ["plate_type_id"]
+            isOneToOne: false
+            referencedRelation: "plate_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_destinations: {
         Row: {
           address: string | null
@@ -149,6 +200,24 @@ export type Database = {
         }
         Relationships: []
       }
+      large_plate_extras: {
+        Row: {
+          extra_price: number
+          id: string
+          thickness: number
+        }
+        Insert: {
+          extra_price: number
+          id?: string
+          thickness: number
+        }
+        Update: {
+          extra_price?: number
+          id?: string
+          thickness?: number
+        }
+        Relationships: []
+      }
       manufacturers: {
         Row: {
           code: string
@@ -170,9 +239,39 @@ export type Database = {
         }
         Relationships: []
       }
+      material_extras: {
+        Row: {
+          blast_furnace_extra: number
+          extra_price: number
+          id: string
+          material_id: string
+        }
+        Insert: {
+          blast_furnace_extra: number
+          extra_price: number
+          id?: string
+          material_id: string
+        }
+        Update: {
+          blast_furnace_extra?: number
+          extra_price?: number
+          id?: string
+          material_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_extras_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: true
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       materials: {
         Row: {
           display_color: string | null
+          has_dedicated_price: boolean
           id: string
           is_active: boolean
           line_mark: string | null
@@ -180,6 +279,7 @@ export type Database = {
         }
         Insert: {
           display_color?: string | null
+          has_dedicated_price?: boolean
           id?: string
           is_active?: boolean
           line_mark?: string | null
@@ -187,6 +287,7 @@ export type Database = {
         }
         Update: {
           display_color?: string | null
+          has_dedicated_price?: boolean
           id?: string
           is_active?: boolean
           line_mark?: string | null
@@ -293,60 +394,84 @@ export type Database = {
       }
       order_items: {
         Row: {
-          cutting_method: string
+          actual_weight: number | null
+          cutting_method: string | null
+          cutting_type: string | null
+          cutting_unit_price: number | null
           field_note: string | null
           id: string
+          inner_diameter: number | null
           length: number | null
           line_no: number
           manufacturer_specified_id: string | null
           manufacturer_used_id: string | null
-          material_unit_price: number | null
+          material_weight: number | null
           mill_sheet_no: string | null
           order_id: string
+          outer_diameter: number | null
           package_count: number | null
+          price_unit: string | null
           product_id: string
           quantity: number
           remarks: string | null
           sales_unit_price: number | null
-          unit_weight: number | null
+          special_product_type_id: string | null
+          square_weight: number | null
+          steel_making: string | null
           width: number | null
         }
         Insert: {
-          cutting_method: string
+          actual_weight?: number | null
+          cutting_method?: string | null
+          cutting_type?: string | null
+          cutting_unit_price?: number | null
           field_note?: string | null
           id?: string
+          inner_diameter?: number | null
           length?: number | null
           line_no: number
           manufacturer_specified_id?: string | null
           manufacturer_used_id?: string | null
-          material_unit_price?: number | null
+          material_weight?: number | null
           mill_sheet_no?: string | null
           order_id: string
+          outer_diameter?: number | null
           package_count?: number | null
+          price_unit?: string | null
           product_id: string
           quantity: number
           remarks?: string | null
           sales_unit_price?: number | null
-          unit_weight?: number | null
+          special_product_type_id?: string | null
+          square_weight?: number | null
+          steel_making?: string | null
           width?: number | null
         }
         Update: {
-          cutting_method?: string
+          actual_weight?: number | null
+          cutting_method?: string | null
+          cutting_type?: string | null
+          cutting_unit_price?: number | null
           field_note?: string | null
           id?: string
+          inner_diameter?: number | null
           length?: number | null
           line_no?: number
           manufacturer_specified_id?: string | null
           manufacturer_used_id?: string | null
-          material_unit_price?: number | null
+          material_weight?: number | null
           mill_sheet_no?: string | null
           order_id?: string
+          outer_diameter?: number | null
           package_count?: number | null
+          price_unit?: string | null
           product_id?: string
           quantity?: number
           remarks?: string | null
           sales_unit_price?: number | null
-          unit_weight?: number | null
+          special_product_type_id?: string | null
+          square_weight?: number | null
+          steel_making?: string | null
           width?: number | null
         }
         Relationships: [
@@ -376,6 +501,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_special_product_type_id_fkey"
+            columns: ["special_product_type_id"]
+            isOneToOne: false
+            referencedRelation: "special_product_types"
             referencedColumns: ["id"]
           },
         ]
@@ -489,46 +621,26 @@ export type Database = {
           },
         ]
       }
-      prices: {
+      plate_types: {
         Row: {
-          cutting_method: string
+          applies_material_extra: boolean
           id: string
-          material_id: string
-          shape: string
-          thickness: number
-          unit_price: number
-          valid_from: string
-          weight_class: string
+          is_active: boolean
+          name: string
         }
         Insert: {
-          cutting_method: string
+          applies_material_extra?: boolean
           id?: string
-          material_id: string
-          shape: string
-          thickness: number
-          unit_price: number
-          valid_from: string
-          weight_class: string
+          is_active?: boolean
+          name: string
         }
         Update: {
-          cutting_method?: string
+          applies_material_extra?: boolean
           id?: string
-          material_id?: string
-          shape?: string
-          thickness?: number
-          unit_price?: number
-          valid_from?: string
-          weight_class?: string
+          is_active?: boolean
+          name?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "prices_material_id_fkey"
-            columns: ["material_id"]
-            isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       process_types: {
         Row: {
@@ -555,21 +667,24 @@ export type Database = {
         Row: {
           id: string
           is_active: boolean
-          material_id: string
+          material_id: string | null
+          plate_type_id: string
           shape: string
           thickness: number
         }
         Insert: {
           id?: string
           is_active?: boolean
-          material_id: string
+          material_id?: string | null
+          plate_type_id: string
           shape: string
           thickness: number
         }
         Update: {
           id?: string
           is_active?: boolean
-          material_id?: string
+          material_id?: string | null
+          plate_type_id?: string
           shape?: string
           thickness?: number
         }
@@ -579,6 +694,13 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_plate_type_id_fkey"
+            columns: ["plate_type_id"]
+            isOneToOne: false
+            referencedRelation: "plate_types"
             referencedColumns: ["id"]
           },
         ]
@@ -671,6 +793,87 @@ export type Database = {
           },
         ]
       }
+      special_product_prices: {
+        Row: {
+          has_shot: boolean
+          id: string
+          plate_type_id: string
+          special_product_type_id: string
+          thickness_max: number
+          thickness_min: number
+          unit_price: number
+          valid_from: string
+        }
+        Insert: {
+          has_shot?: boolean
+          id?: string
+          plate_type_id: string
+          special_product_type_id: string
+          thickness_max: number
+          thickness_min: number
+          unit_price: number
+          valid_from: string
+        }
+        Update: {
+          has_shot?: boolean
+          id?: string
+          plate_type_id?: string
+          special_product_type_id?: string
+          thickness_max?: number
+          thickness_min?: number
+          unit_price?: number
+          valid_from?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_product_prices_plate_type_id_fkey"
+            columns: ["plate_type_id"]
+            isOneToOne: false
+            referencedRelation: "plate_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_product_prices_special_product_type_id_fkey"
+            columns: ["special_product_type_id"]
+            isOneToOne: false
+            referencedRelation: "special_product_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      special_product_types: {
+        Row: {
+          always_piece_price: boolean
+          applies_large_plate_extra: boolean
+          applies_thickness_extra: boolean
+          id: string
+          is_active: boolean
+          min_weight: number | null
+          name: string
+          weight_basis: string
+        }
+        Insert: {
+          always_piece_price?: boolean
+          applies_large_plate_extra?: boolean
+          applies_thickness_extra?: boolean
+          id?: string
+          is_active?: boolean
+          min_weight?: number | null
+          name: string
+          weight_basis: string
+        }
+        Update: {
+          always_piece_price?: boolean
+          applies_large_plate_extra?: boolean
+          applies_thickness_extra?: boolean
+          id?: string
+          is_active?: boolean
+          min_weight?: number | null
+          name?: string
+          weight_basis?: string
+        }
+        Relationships: []
+      }
       stamps: {
         Row: {
           body: string
@@ -691,6 +894,111 @@ export type Database = {
           is_active?: boolean
         }
         Relationships: []
+      }
+      standard_plate_prices: {
+        Row: {
+          id: string
+          material_id: string | null
+          plate_size: string
+          plate_type_id: string
+          thickness: number
+          unit_price: number
+          valid_from: string
+        }
+        Insert: {
+          id?: string
+          material_id?: string | null
+          plate_size: string
+          plate_type_id: string
+          thickness: number
+          unit_price: number
+          valid_from: string
+        }
+        Update: {
+          id?: string
+          material_id?: string | null
+          plate_size?: string
+          plate_type_id?: string
+          thickness?: number
+          unit_price?: number
+          valid_from?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standard_plate_prices_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "standard_plate_prices_plate_type_id_fkey"
+            columns: ["plate_type_id"]
+            isOneToOne: false
+            referencedRelation: "plate_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      thickness_extras: {
+        Row: {
+          extra_price: number
+          id: string
+          thickness: number
+        }
+        Insert: {
+          extra_price: number
+          id?: string
+          thickness: number
+        }
+        Update: {
+          extra_price?: number
+          id?: string
+          thickness?: number
+        }
+        Relationships: []
+      }
+      unit_weights: {
+        Row: {
+          id: string
+          is_active: boolean
+          manufacturer_id: string
+          plate_type_id: string
+          thickness: number
+          unit_weight: number
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          manufacturer_id: string
+          plate_type_id: string
+          thickness: number
+          unit_weight: number
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          manufacturer_id?: string
+          plate_type_id?: string
+          thickness?: number
+          unit_weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_weights_manufacturer_id_fkey"
+            columns: ["manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_weights_plate_type_id_fkey"
+            columns: ["plate_type_id"]
+            isOneToOne: false
+            referencedRelation: "plate_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {

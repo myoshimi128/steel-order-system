@@ -12,7 +12,7 @@ export default async function MaterialsPage() {
   const supabase = await createClient()
   const { data: materials, error } = await supabase
     .from('materials')
-    .select('id, name, line_mark, display_color, is_active')
+    .select('id, name, line_mark, display_color, has_dedicated_price, is_active')
     .order('name')
 
   return (
@@ -41,6 +41,7 @@ export default async function MaterialsPage() {
             <th className="py-2 pr-4">材質名</th>
             <th className="py-2 pr-4">材質ライン</th>
             <th className="py-2 pr-4">表示色</th>
+            <th className="py-2 pr-4">専用単価</th>
             <th className="py-2 pr-4">状態</th>
             {isAdmin && <th className="py-2 pr-4" />}
           </tr>
@@ -54,6 +55,9 @@ export default async function MaterialsPage() {
               <td className="py-2 pr-4">{material.name}</td>
               <td className="py-2 pr-4">{material.line_mark ?? ''}</td>
               <td className="py-2 pr-4">{material.display_color ?? ''}</td>
+              <td className="py-2 pr-4">
+                {material.has_dedicated_price ? 'あり' : 'なし'}
+              </td>
               <td className="py-2 pr-4">
                 {material.is_active ? '有効' : '無効'}
               </td>

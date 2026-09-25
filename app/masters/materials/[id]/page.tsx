@@ -24,7 +24,7 @@ export default async function EditMaterialPage(
   const supabase = await createClient()
   const { data: material } = await supabase
     .from('materials')
-    .select('id, name, line_mark, display_color, is_active')
+    .select('id, name, line_mark, display_color, has_dedicated_price, is_active')
     .eq('id', id)
     .single()
 

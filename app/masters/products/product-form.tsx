@@ -1,24 +1,33 @@
 'use client'
 
 // 新規登録・編集の両方で使う入力フォーム。
-// material_id は select で選ぶため、一覧ページ側で materials マスタを取得して渡してもらう。
+// plate_type_id・material_id は select で選ぶため、一覧ページ側で
+// plate_types・materials マスタを取得して渡してもらう。
 
 import { useActionState } from 'react'
 import { createProduct, updateProduct, type ProductFormState } from './actions'
 
+type PlateTypeOption = { id: string; name: string }
 type MaterialOption = { id: string; name: string }
 
 type Product = {
   id: string
-  material_id: string
+  plate_type_id: string
+  // 無規格（ボンデ・ミガキ）は材質を持たないため null になりうる
+  material_id: string | null
   thickness: number
   shape: '定尺' | '大板'
   is_active: boolean
 }
 
 type ProductFormProps =
-  | { mode: 'create'; materials: MaterialOption[] }
-  | { mode: 'edit'; materials: MaterialOption[]; product: Product }
+  | { mode: 'create'; plateTypes: PlateTypeOption[]; materials: MaterialOption[] }
+  | {
+      mode: 'edit'
+      plateTypes: PlateTypeOption[]
+      materials: MaterialOption[]
+      product: Product
+    }
 
 export function ProductForm(props: ProductFormProps) {
   const action =
@@ -36,19 +45,39 @@ export function ProductForm(props: ProductFormProps) {
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
+        <label htmlFor="plate_type_id" className="text-sm">
+          種類
+        </label>
+        <select
+          id="plate_type_id"
+          name="plate_type_id"
+          required
+          defaultValue={product?.plate_type_id ?? ''}
+          className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          <option value="" disabled>
+            選択してください
+          </option>
+          {props.plateTypes.map((plateType) => (
+            <option key={plateType.id} value={plateType.id}>
+              {plateType.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
         <label htmlFor="material_id" className="text-sm">
           材質
         </label>
         <select
           id="material_id"
           name="material_id"
-          required
           defaultValue={product?.material_id ?? ''}
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         >
-          <option value="" disabled>
-            選択してください
-          </option>
+          {/* ボンデ・ミガキなど無規格の商品は材質を持たないため、空欄（NULL）を選べるようにする */}
+          <option value="">（材質なし）</option>
           {props.materials.map((material) => (
             <option key={material.id} value={material.id}>
               {material.name}
