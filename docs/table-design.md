@@ -14,7 +14,7 @@
 | `products` | 商品（種類 × 材質 × 板厚 × 形状） |
 | `plate_types` | 種類（普通板 / 縞板 / ボンデ / ミガキ） |
 | `cutting_prices` | 切断単価 |
-| `material_extras` | 材質エキストラ（材質 × 製鋼法） |
+| `material_extras` | 材質エキストラ・高炉材加算（材質ごとに1行） |
 | `thickness_extras` | 板厚エキストラ |
 | `large_plate_extras` | 大板加算 |
 | `standard_plate_prices` | 定尺単価 |
@@ -80,11 +80,16 @@
 | `name` | text | 材質名（SS400、SN490B、SN490C など） |
 | `line_mark` | text | 材質ラインの指示（青2本 など）。基本材質は NULL |
 | `display_color` | text | 現場用伝票での表示色。基本材質は NULL |
+| `has_dedicated_price` | boolean | 専用単価（`cutting_prices` に材質を指定した行）を持つか |
 | `is_active` | boolean | 有効フラグ |
 
 材質ラインは材質ごとに色と本数が決まっているため、マスタに登録して現場用伝票に印字する。「材質ライン要」とだけ印字するのではなく「材質ライン：青2本」のように具体的な指示を出すことで、現場が別途確認する手間をなくす。
 
 基本材質（SS400）は `line_mark` と `display_color` を NULL とする。印刷処理では材質名を条件分岐せず、`line_mark` が登録されていれば印字するという判定のみを行う。材質が増えた場合もマスタに 1 行追加すれば対応できる。
+
+`has_dedicated_price` は、切断単価の材質選択（マスタ管理画面のプルダウン）を「専用単価を持つ材質のみ」に絞り込むために使う。専用単価を持たない材質は SS400 ベースの単価に材質エキストラを加算して求めるため、プルダウンには出さない。
+
+`name` に一意制約を設ける。
 
 ### products（商品）
 
@@ -97,7 +102,7 @@
 | `shape` | text | 形状。`定尺` / `大板` |
 | `is_active` | boolean | 有効フラグ |
 
-メーカーは含めない。受注時点では使用する板のメーカーが確定しないためである（縞板のみ受注時に確定するが、これは受注明細側で保持する）。形状は 1524 × 3048 以上をすべて大板として扱うため、具体的な寸法は保持しない。ボンデ・ミガキは無規格のため `material_id` を NULL とする。
+メーカーは含めない。受注時点では使用する板のメーカーが確定しないためである（縞板のみ受注時に確定するが、これは受注明細側で保持する）。形状は定尺（5'x10'＝1524 × 3048）を超えるサイズを大板とするため、具体的な寸法は保持しない。ボンデ・ミガキは無規格のため `material_id` を NULL とする。
 
 `plate_type_id` + `material_id` + `thickness` + `shape` に一意制約を設ける。
 
@@ -111,6 +116,8 @@
 | `is_active` | boolean | 有効フラグ |
 
 縞板・ボンデ・ミガキは種類固有の単価を持ち、材質エキストラを適用しない。ボンデ・ミガキは無規格のため材質を持たない。
+
+`name` に一意制約を設ける。
 
 ### cutting\_prices（切断単価）
 
@@ -127,9 +134,9 @@
 
 板厚グループの区切りは種類と切断方法によって異なる（シャーは 1.6 / 2.3 / 3.2〜12、ガスは 3.2〜12 / 14〜25 / 28 / 32 …）。共通の区分を設けず、行として保持する。
 
-`material_id` が NULL の行は SS400 ベースとして全材質で共有し、材質エキストラを加算する。`material_id` を指定した行は SN400C・SM400A・TMCP325C・TMCP385C など専用単価を持つ材質に使用し、材質エキストラは加算しない。単価を引く際はまず材質指定の行を探し、なければ NULL の行を使う。
+`material_id` が NULL の行は SS400 ベースとして全材質で共有し、`material_extras.extra_price`（材質エキストラ）を加算する。`material_id` を指定した行は SN400C・SM400A・TMCP325C・TMCP385C など専用単価（`materials.has_dedicated_price` が true）を持つ材質に使用し、材質エキストラは加算しない。単価を引く際はまず材質指定の行を探し、なければ NULL の行を使う。
 
-専用単価の材質も高炉材加算は共通で適用するため、マスタには電炉材ベースの値を保持する。
+`material_extras.blast_furnace_extra`（高炉材加算）は、材質エキストラとは別に、受注（`order_items.steel_making`）が高炉材の場合にどちらの行を使っても加算する。
 
 ### material\_extras（材質エキストラ）
 
@@ -137,10 +144,12 @@
 | --- | --- | --- |
 | `id` | uuid | PK |
 | `material_id` | uuid | FK → `materials` |
-| `steel_making` | text | 電炉材 / 高炉材 |
-| `extra_price` | numeric | 加算値 |
+| `extra_price` | numeric | 材質エキストラ。SS400ベースの単価にこの材質を使う場合の加算 |
+| `blast_furnace_extra` | numeric | 高炉材加算。受注が高炉材の場合の加算値（通常 +10、SS400 は 0） |
 
-材質と製鋼法の組み合わせごとに加算値を保持する。高炉材は電炉材に +10 が基本だが、SS400 には適用しないなどの例外があるため、条件分岐をコードに書かず組み合わせを行として持つ。
+材質ごとに1行を持つ（`material_id` に一意制約）。高炉材加算は電炉材に +10 が基本だが、SS400 には適用しないなどの例外があるため、条件分岐をコードに書かず材質ごとの値として持つ。
+
+専用単価（`materials.has_dedicated_price` が true）を持つ材質も、高炉材加算は共通で適用するため行を持つ（`extra_price` は使われないため 0、`blast_furnace_extra` は 10）。適用ルールは `cutting_prices` の説明を参照。
 
 ### thickness\_extras（板厚エキストラ）
 
@@ -188,6 +197,8 @@
 | `applies_large_plate_extra` | boolean | 大板加算を適用するか |
 | `always_piece_price` | boolean | 常に枚単価で表示するか（ベタ丸・ドーナツ） |
 | `is_active` | boolean | 有効フラグ |
+
+`name` に一意制約を設ける。
 
 ### special\_product\_prices（特殊製品単価）
 
@@ -451,7 +462,7 @@ notices   ──> customers / process_types （どちらか、または両方）
 cutting_prices        ──> plate_types / materials（NULL = SS400ベース）
 standard_plate_prices ──> plate_types / materials
 special_product_prices ──> special_product_types / plate_types
-material_extras       ──> materials（× 製鋼法）
+material_extras       ──> materials（材質ごとに1行）
 thickness_extras / large_plate_extras  板厚で照合
 unit_weights          ──> plate_types / manufacturers（× 板厚）
 ```
@@ -494,6 +505,8 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 
 - `products` の `plate_type_id` + `material_id` + `thickness` + `shape` に一意制約
 - 価格系テーブル（`cutting_prices` `standard_plate_prices` `special_product_prices` など）は、それぞれの条件の組み合わせに一意制約（`valid_from` を含む）。詳細は各テーブルの説明を参照
+- `material_extras.material_id` に一意制約（材質ごとに1行）
+- `plate_types` `materials` `special_product_types` は `name` に一意制約
 - `shipment_items.quantity` に正数チェック
 - 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
 - `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須

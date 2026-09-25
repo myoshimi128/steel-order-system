@@ -2,10 +2,10 @@ import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase-server'
 
-// 価格マスタの一覧。
-// 仕入単価を含むため admin 以外は参照不可（docs/table-design.md RLS方針）。
+// 切断単価マスタの一覧。
+// 単価情報のため admin 以外は参照不可（docs/table-design.md RLS方針）。
 // office/factory は RLS でも select できないため、一覧自体をここで出さない。
-export default async function PricesPage() {
+export default async function CuttingPricesPage() {
   const user = await getCurrentUser()
 
   if (user?.role !== 'admin') {
@@ -19,24 +19,19 @@ export default async function PricesPage() {
   }
 
   const supabase = await createClient()
-  // materials(name) は prices.material_id → materials.id の外部キーを使った
-  // Supabase の埋め込み取得。lib/database.types.ts を createClient に渡したことで
-  // 多対一（1価格行につき材質1件）だと型からも正しく推論されるようになったため、
-  // products/page.tsx と同様に埋め込み取得に戻している
-  // （経緯は products/page.tsx のコメント参照）。
-  const { data: prices, error } = await supabase
-    .from('prices')
+  const { data: cuttingPrices, error } = await supabase
+    .from('cutting_prices')
     .select(
-      'id, thickness, shape, cutting_method, weight_class, unit_price, valid_from, materials(name)'
+      'id, thickness_min, thickness_max, cutting_method, cutting_type, unit_price, valid_from, plate_types(name), materials(name)'
     )
     .order('valid_from', { ascending: false })
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
+    <main className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">価格マスタ</h1>
+        <h1 className="text-lg font-semibold">切断単価マスタ</h1>
         <Link
-          href="/masters/prices/new"
+          href="/masters/cutting-prices/new"
           className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white dark:bg-white dark:text-neutral-900"
         >
           ＋ 新規登録
@@ -52,32 +47,36 @@ export default async function PricesPage() {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-300 text-left dark:border-neutral-700">
+            <th className="py-2 pr-4">種類</th>
             <th className="py-2 pr-4">材質</th>
-            <th className="py-2 pr-4">板厚（mm）</th>
-            <th className="py-2 pr-4">形状</th>
+            <th className="py-2 pr-4">板厚範囲（mm）</th>
             <th className="py-2 pr-4">切断方法</th>
-            <th className="py-2 pr-4">重量区分</th>
+            <th className="py-2 pr-4">寸法切／アイトレ</th>
             <th className="py-2 pr-4">単価</th>
             <th className="py-2 pr-4">適用開始日</th>
             <th className="py-2 pr-4" />
           </tr>
         </thead>
         <tbody>
-          {prices?.map((price) => (
+          {cuttingPrices?.map((price) => (
             <tr
               key={price.id}
               className="border-b border-neutral-100 dark:border-neutral-800"
             >
-              <td className="py-2 pr-4">{price.materials?.name ?? ''}</td>
-              <td className="py-2 pr-4">{price.thickness}</td>
-              <td className="py-2 pr-4">{price.shape}</td>
+              <td className="py-2 pr-4">{price.plate_types?.name ?? ''}</td>
+              <td className="py-2 pr-4">
+                {price.materials?.name ?? 'SS400ベース'}
+              </td>
+              <td className="py-2 pr-4">
+                {price.thickness_min}〜{price.thickness_max}
+              </td>
               <td className="py-2 pr-4">{price.cutting_method}</td>
-              <td className="py-2 pr-4">{price.weight_class}</td>
-              <td className="py-2 pr-4">{price.unit_price}</td>
+              <td className="py-2 pr-4">{price.cutting_type}</td>
+              <td className="py-2 pr-4">{price.unit_price ?? '都度見積もり'}</td>
               <td className="py-2 pr-4">{price.valid_from}</td>
               <td className="py-2 pr-4">
                 <Link
-                  href={`/masters/prices/${price.id}`}
+                  href={`/masters/cutting-prices/${price.id}`}
                   className="text-blue-600 hover:underline dark:text-blue-400"
                 >
                   編集
@@ -88,9 +87,9 @@ export default async function PricesPage() {
         </tbody>
       </table>
 
-      {prices?.length === 0 && (
+      {cuttingPrices?.length === 0 && (
         <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
-          登録された価格がありません
+          登録された切断単価がありません
         </p>
       )}
     </main>

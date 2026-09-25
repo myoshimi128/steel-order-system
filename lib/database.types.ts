@@ -241,28 +241,28 @@ export type Database = {
       }
       material_extras: {
         Row: {
+          blast_furnace_extra: number
           extra_price: number
           id: string
           material_id: string
-          steel_making: string
         }
         Insert: {
+          blast_furnace_extra: number
           extra_price: number
           id?: string
           material_id: string
-          steel_making: string
         }
         Update: {
+          blast_furnace_extra?: number
           extra_price?: number
           id?: string
           material_id?: string
-          steel_making?: string
         }
         Relationships: [
           {
             foreignKeyName: "material_extras_material_id_fkey"
             columns: ["material_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "materials"
             referencedColumns: ["id"]
           },
@@ -271,6 +271,7 @@ export type Database = {
       materials: {
         Row: {
           display_color: string | null
+          has_dedicated_price: boolean
           id: string
           is_active: boolean
           line_mark: string | null
@@ -278,6 +279,7 @@ export type Database = {
         }
         Insert: {
           display_color?: string | null
+          has_dedicated_price?: boolean
           id?: string
           is_active?: boolean
           line_mark?: string | null
@@ -285,6 +287,7 @@ export type Database = {
         }
         Update: {
           display_color?: string | null
+          has_dedicated_price?: boolean
           id?: string
           is_active?: boolean
           line_mark?: string | null

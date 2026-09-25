@@ -1,10 +1,11 @@
 import { getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase-server'
-import { ProductForm } from '../product-form'
+import { getProductCatalog } from '@/lib/product-catalog'
+import { StandardPlatePriceForm } from '../standard-plate-price-form'
 
-// 商品の新規登録画面。admin 以外は DB 側の RLS でも拒否されるが、
+// 定尺単価の新規登録画面。admin 以外は DB 側の RLS でも拒否されるが、
 // フォーム自体を出さないことで無駄な失敗操作をさせない。
-export default async function NewProductPage() {
+export default async function NewStandardPlatePricePage() {
   const user = await getCurrentUser()
 
   if (user?.role !== 'admin') {
@@ -18,18 +19,21 @@ export default async function NewProductPage() {
   }
 
   const supabase = await createClient()
-  const [{ data: plateTypes }, { data: materials }] = await Promise.all([
-    supabase.from('plate_types').select('id, name').order('name'),
-    supabase.from('materials').select('id, name').order('name'),
-  ])
+  const [{ data: plateTypes }, { data: materials }, products] =
+    await Promise.all([
+      supabase.from('plate_types').select('id, name').order('name'),
+      supabase.from('materials').select('id, name').order('name'),
+      getProductCatalog(),
+    ])
 
   return (
     <main className="mx-auto max-w-md px-6 py-8">
-      <h1 className="mb-6 text-lg font-semibold">商品の新規登録</h1>
-      <ProductForm
+      <h1 className="mb-6 text-lg font-semibold">定尺単価の新規登録</h1>
+      <StandardPlatePriceForm
         mode="create"
         plateTypes={plateTypes ?? []}
         materials={materials ?? []}
+        products={products}
       />
     </main>
   )

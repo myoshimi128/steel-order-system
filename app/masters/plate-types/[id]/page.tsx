@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase-server'
-import { MaterialForm } from '../material-form'
+import { PlateTypeForm } from '../plate-type-form'
 
-// 材質の編集画面。admin 以外は DB 側の RLS でも拒否されるが、
+// 種類の編集画面。admin 以外は DB 側の RLS でも拒否されるが、
 // フォーム自体を出さないことで無駄な失敗操作をさせない。
-export default async function EditMaterialPage(
-  props: PageProps<'/masters/materials/[id]'>
+export default async function EditPlateTypePage(
+  props: PageProps<'/masters/plate-types/[id]'>
 ) {
   const { id } = await props.params
   const user = await getCurrentUser()
@@ -22,20 +22,20 @@ export default async function EditMaterialPage(
   }
 
   const supabase = await createClient()
-  const { data: material } = await supabase
-    .from('materials')
-    .select('id, name, line_mark, display_color, has_dedicated_price, is_active')
+  const { data: plateType } = await supabase
+    .from('plate_types')
+    .select('id, name, applies_material_extra, is_active')
     .eq('id', id)
     .single()
 
-  if (!material) {
+  if (!plateType) {
     notFound()
   }
 
   return (
     <main className="mx-auto max-w-md px-6 py-8">
-      <h1 className="mb-6 text-lg font-semibold">材質の編集</h1>
-      <MaterialForm mode="edit" material={material} />
+      <h1 className="mb-6 text-lg font-semibold">種類の編集</h1>
+      <PlateTypeForm mode="edit" plateType={plateType} />
     </main>
   )
 }

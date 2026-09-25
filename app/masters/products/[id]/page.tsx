@@ -22,14 +22,16 @@ export default async function EditProductPage(
   }
 
   const supabase = await createClient()
-  const [{ data: product }, { data: materials }] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, material_id, thickness, shape, is_active')
-      .eq('id', id)
-      .single(),
-    supabase.from('materials').select('id, name').order('name'),
-  ])
+  const [{ data: product }, { data: plateTypes }, { data: materials }] =
+    await Promise.all([
+      supabase
+        .from('products')
+        .select('id, plate_type_id, material_id, thickness, shape, is_active')
+        .eq('id', id)
+        .single(),
+      supabase.from('plate_types').select('id, name').order('name'),
+      supabase.from('materials').select('id, name').order('name'),
+    ])
 
   if (!product) {
     notFound()
@@ -43,6 +45,7 @@ export default async function EditProductPage(
         // shape は DB 上 text 列（CHECK 制約で定尺/大板に限定）のため、
         // 生成された型では string にしかならない。値自体は制約が保証している
         product={{ ...product, shape: product.shape as '定尺' | '大板' }}
+        plateTypes={plateTypes ?? []}
         materials={materials ?? []}
       />
     </main>

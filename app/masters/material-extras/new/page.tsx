@@ -1,10 +1,10 @@
 import { getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase-server'
-import { PriceForm } from '../price-form'
+import { MaterialExtraForm } from '../material-extra-form'
 
-// 価格の新規登録画面。admin 以外は DB 側の RLS でも拒否されるが、
+// 材質エキストラの新規登録画面。admin 以外は DB 側の RLS でも拒否されるが、
 // フォーム自体を出さないことで無駄な失敗操作をさせない。
-export default async function NewPricePage() {
+export default async function NewMaterialExtraPage() {
   const user = await getCurrentUser()
 
   if (user?.role !== 'admin') {
@@ -25,8 +25,8 @@ export default async function NewPricePage() {
 
   return (
     <main className="mx-auto max-w-md px-6 py-8">
-      <h1 className="mb-6 text-lg font-semibold">価格の新規登録</h1>
-      <PriceForm mode="create" materials={materials ?? []} />
+      <h1 className="mb-6 text-lg font-semibold">材質エキストラの新規登録</h1>
+      <MaterialExtraForm mode="create" materials={materials ?? []} />
     </main>
   )
 }

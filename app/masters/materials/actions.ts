@@ -57,10 +57,19 @@ export async function createMaterial(
     return { error: parsed.error }
   }
 
+  const hasDedicatedPrice = formData.get('has_dedicated_price') === 'on'
+
   const supabase = await createClient()
-  const { error } = await supabase.from('materials').insert(parsed.values)
+  const { error } = await supabase.from('materials').insert({
+    ...parsed.values,
+    has_dedicated_price: hasDedicatedPrice,
+  })
 
   if (error) {
+    // 23505 = unique_violation。materials.name の一意制約
+    if (error.code === '23505') {
+      return { error: 'この材質名は既に登録されています' }
+    }
     return { error: `登録に失敗しました: ${error.message}` }
   }
 
@@ -79,15 +88,23 @@ export async function updateMaterial(
     return { error: parsed.error }
   }
 
+  const hasDedicatedPrice = formData.get('has_dedicated_price') === 'on'
   const isActive = formData.get('is_active') === 'on'
 
   const supabase = await createClient()
   const { error } = await supabase
     .from('materials')
-    .update({ ...parsed.values, is_active: isActive })
+    .update({
+      ...parsed.values,
+      has_dedicated_price: hasDedicatedPrice,
+      is_active: isActive,
+    })
     .eq('id', materialId)
 
   if (error) {
+    if (error.code === '23505') {
+      return { error: 'この材質名は既に登録されています' }
+    }
     return { error: `更新に失敗しました: ${error.message}` }
   }
 
