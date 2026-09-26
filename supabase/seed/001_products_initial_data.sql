@@ -17,7 +17,7 @@
 --
 -- 表のセル読み取りは手作業でのOCR/目視確認によるため、下記1点は読み取りが
 -- 曖昧だった。適用前に元の在庫表と突き合わせて確認することを推奨する。
---   ・SN490B の定尺（中山製鋼所）欄
+--   ・SN490B の定尺（メーカーA）欄
 --
 -- 定尺（5'x10'＝1524×3048）を超えるサイズは大板として扱う
 -- （docs/table-design.md products の説明を参照）。SM490A の 5'x20'（1524x6096）は
@@ -101,7 +101,7 @@ from (values
   ('TMCP385C', 36), ('TMCP385C', 40), ('TMCP385C', 45), ('TMCP385C', 50)
 ) as t(material_name, thickness);
 
--- --- 普通板・定尺（中山製鋼所） ---
+-- --- 普通板・定尺（メーカーA） ---
 insert into public.products (plate_type_id, material_id, thickness, shape)
 select
   (select id from public.plate_types where name = '普通板'),
