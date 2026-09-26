@@ -29,6 +29,8 @@ type ParsedCuttingPriceForm =
         cutting_type: CuttingType
         unit_price: number | null
         valid_from: string
+        has_light_tier: boolean
+        small_piece_quote_required: boolean
       }
     }
   | { ok: false; error: string }
@@ -100,6 +102,9 @@ function readCuttingPriceForm(formData: FormData): ParsedCuttingPriceForm {
       cutting_type: cuttingType as CuttingType,
       unit_price: unitPrice,
       valid_from: validFrom,
+      // チェックボックスはチェックされているときだけ 'on' が送信される
+      has_light_tier: formData.get('has_light_tier') === 'on',
+      small_piece_quote_required: formData.get('small_piece_quote_required') === 'on',
     },
   }
 }

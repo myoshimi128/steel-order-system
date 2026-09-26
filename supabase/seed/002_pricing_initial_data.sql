@@ -10,6 +10,9 @@
 --   ・縞板の単位質量は、鋼材メーカー2社が公開している製品カタログの値
 --
 -- 前提: 001_products_initial_data.sql で plate_types / materials / products が投入済みであること。
+--       マイグレーション 20260926100000_add_price_tier_flags.sql（最低保証重量のフラグ列）と
+--       20260926110000_splice_weight_basis_and_irregular_cut_flag.sql（アイトレ別途のフラグ列）が
+--       適用済みであること。
 -- このスクリプトは空の価格系テーブルに対して一度だけ実行する想定（ON CONFLICT 処理は入れていない）。
 --
 -- ------------------------------------------------------------
@@ -20,9 +23,9 @@
 --
 -- 2. 単価表の「別途」は、すべて「2k以下」の行（ガス・プラズマの28mm以上）にだけ現れ、
 --    同じ条件の「2k以上」には kg単価がある。cutting_prices には重量区分の列がないため
---    kg単価と NULL を同じキーで両方は登録できない。そのため kg単価のみ登録し、
---    「2kg未満は別途見積もり」という扱いは今回は表現していない（単価計算ロジックの実装時に対応する）。
---    後で区別できるよう、別途の境目（25mm以下 / 28mm以上）で板厚グループは分けて登録している。
+--    kg単価と NULL を同じキーで両方は登録できない。そのため kg単価を登録したうえで、
+--    28mm以上の行に small_piece_quote_required = true（1枚2kg未満は別途見積もり）を立てる。
+--    そのために、別途の境目（25mm以下 / 28mm以上）で板厚グループを分けて登録している。
 --
 -- 3. 単価表では28mm以上の単価が板厚ごとに +1 ずつ上がっている（例: ガス寸法切 175→176→177…）。
 --    これは板厚エキストラ（28:+1, 32:+2, 36:+3 …）に分解でき、全ての表で矛盾なく一致する。
@@ -35,15 +38,18 @@
 --    SN400C・SM400A は切断方法によらず同一単価のため、各切断方法に同額で登録する。
 --
 -- ------------------------------------------------------------
--- 単価計算ロジック実装時の注意（このデータでは表現していない事項）
+-- 最低保証重量に関するフラグ（計算ロジックは lib/pricing を参照）
 -- ------------------------------------------------------------
---   ・1.5kg 保証の段があるのは、SS400ベースの切断単価行（material_id が NULL の行）のシャーとレーザー。
+--   ・cutting_prices.has_light_tier（1.5kg の段があるか）:
+--     SS400ベースの切断単価行（material_id が NULL の行）のシャーとレーザーのみ true。
 --     SS400 だけでなく、SN400B・SM490A・SN490B・SN490C のように材質エキストラで計算する材質にも適用される。
---     専用単価を持つ特殊鋼（SN400C・SM400A・TMCP325C・TMCP385C）には適用しない。
+--     専用単価を持つ特殊鋼（SN400C・SM400A・TMCP325C・TMCP385C）の行は false。
+--   ・cutting_prices.small_piece_quote_required（1枚2kg未満は別途見積もり）:
+--     SS400ベースのガス・プラズマで 28mm 以上の行のみ true（上記2を参照）。
+--   ・special_product_types.has_light_tier: ベタ丸・ドーナツのみ true。
 --   ・保証重量は、エキストラをすべて加算した後の kg単価に掛ける
 --     （材質エキストラ・高炉材加算も 1.5kg 分・2kg 分として掛かる）。
 --     1.5kg 保証の枚単価は 5円単位で切り捨てる（例: kg単価 185 → 185 × 1.5 = 277.5 → 275）。
---   ・28mm 以上で 2kg 未満の場合は別途見積もり（ガス・プラズマ。上記2を参照）。
 
 
 -- ============================================================
@@ -55,13 +61,20 @@
 -- --- 普通板・SS400ベース（material_id = NULL） ---
 -- 単価表の見出し「SS400（電炉材・ベース単価）規格EX+K/1.3込み」の表。
 -- material_id を NULL にした行は全材質で共有し、SS400 以外は材質エキストラを加算して使う。
+-- 最低保証重量のフラグは切断方法・板厚から決まるため、values に列を並べず式で求める。
+--   has_light_tier             : シャーリング・レーザーの行
+--   small_piece_quote_required : ガス・プラズマで 28mm 以上の行
+-- （この節以外の cutting_prices の行は、どちらも既定値の false）
 insert into public.cutting_prices
-  (plate_type_id, material_id, thickness_min, thickness_max, cutting_method, cutting_type, unit_price, valid_from)
+  (plate_type_id, material_id, thickness_min, thickness_max, cutting_method, cutting_type, unit_price, valid_from,
+   has_light_tier, small_piece_quote_required)
 select
   (select id from public.plate_types where name = '普通板'),
   null,
   thickness_min, thickness_max, cutting_method, cutting_type, unit_price,
-  date '2026-05-21'
+  date '2026-05-21',
+  cutting_method in ('シャーリング', 'レーザー'),
+  cutting_method in ('ガス', 'プラズマ') and thickness_min >= 28
 from (values
   -- シャー切断
   (1.6, 1.6, 'シャーリング', '寸法切', 180),
@@ -358,17 +371,20 @@ from (values ('3x6'), ('4x8'), ('5x10')) as s(plate_size);
 -- special_product_types（特殊製品種別）
 -- ============================================================
 -- 各フラグは docs/basic-design.md「特殊製品の単価」の表に従う。
---   スプライス: 実重量・3kg保証。板厚エキストラ・大板加算は適用しない（該当板厚は別途見積もり）
+--   スプライス: 角重量・3kg保証。板厚エキストラ・大板加算は適用しない（該当板厚は別途見積もり）。
+--               寸法切を前提としたセット価格のため、アイトレは別途見積もり
+--               （請求は角重量が基本。寸法切では角重量と実重量は同じ値になる）
 --   ササラ    : 使用材の重量（手入力）。板厚エキストラ・大板加算は適用しない
---   ベタ丸    : 角重量。板厚エキストラ・大板加算を適用。常に枚単価で表示
+--   ベタ丸    : 角重量。板厚エキストラ・大板加算を適用。常に枚単価で表示。1.5kg の段あり
 --   ドーナツ  : ベタ丸と同じ
 insert into public.special_product_types
-  (name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price)
+  (name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price,
+   has_light_tier, irregular_cut_quote_required)
 values
-  ('スプライス', '実重量',     3,    false, false, false),
-  ('ササラ',     '使用材重量', null, false, false, false),
-  ('ベタ丸',     '角重量',     null, true,  true,  true),
-  ('ドーナツ',   '角重量',     null, true,  true,  true);
+  ('スプライス', '角重量',     3,    false, false, false, false, true),
+  ('ササラ',     '使用材重量', null, false, false, false, false, false),
+  ('ベタ丸',     '角重量',     null, true,  true,  true,  true,  false),
+  ('ドーナツ',   '角重量',     null, true,  true,  true,  true,  false);
 
 
 -- ============================================================

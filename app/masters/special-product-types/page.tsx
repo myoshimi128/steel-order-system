@@ -13,7 +13,7 @@ export default async function SpecialProductTypesPage() {
   const { data: specialProductTypes, error } = await supabase
     .from('special_product_types')
     .select(
-      'id, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, is_active'
+      'id, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_active'
     )
     .order('name')
 
@@ -46,6 +46,8 @@ export default async function SpecialProductTypesPage() {
             <th className="py-2 pr-4">板厚エキストラ</th>
             <th className="py-2 pr-4">大板加算</th>
             <th className="py-2 pr-4">常に枚単価</th>
+            <th className="py-2 pr-4">1.5kgの段</th>
+            <th className="py-2 pr-4">アイトレ</th>
             <th className="py-2 pr-4">状態</th>
             {isAdmin && <th className="py-2 pr-4" />}
           </tr>
@@ -67,6 +69,10 @@ export default async function SpecialProductTypesPage() {
               </td>
               <td className="py-2 pr-4">
                 {type.always_piece_price ? 'はい' : 'いいえ'}
+              </td>
+              <td className="py-2 pr-4">{type.has_light_tier ? 'あり' : 'なし'}</td>
+              <td className="py-2 pr-4">
+                {type.irregular_cut_quote_required ? '別途見積もり' : '単価どおり'}
               </td>
               <td className="py-2 pr-4">{type.is_active ? '有効' : '無効'}</td>
               {isAdmin && (

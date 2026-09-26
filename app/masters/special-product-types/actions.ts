@@ -76,6 +76,9 @@ export async function createSpecialProductType(
   const appliesLargePlateExtra =
     formData.get('applies_large_plate_extra') === 'on'
   const alwaysPiecePrice = formData.get('always_piece_price') === 'on'
+  const hasLightTier = formData.get('has_light_tier') === 'on'
+  const irregularCutQuoteRequired =
+    formData.get('irregular_cut_quote_required') === 'on'
 
   const supabase = await createClient()
   const { error } = await supabase.from('special_product_types').insert({
@@ -83,6 +86,8 @@ export async function createSpecialProductType(
     applies_thickness_extra: appliesThicknessExtra,
     applies_large_plate_extra: appliesLargePlateExtra,
     always_piece_price: alwaysPiecePrice,
+    has_light_tier: hasLightTier,
+    irregular_cut_quote_required: irregularCutQuoteRequired,
   })
 
   if (error) {
@@ -112,6 +117,9 @@ export async function updateSpecialProductType(
   const appliesLargePlateExtra =
     formData.get('applies_large_plate_extra') === 'on'
   const alwaysPiecePrice = formData.get('always_piece_price') === 'on'
+  const hasLightTier = formData.get('has_light_tier') === 'on'
+  const irregularCutQuoteRequired =
+    formData.get('irregular_cut_quote_required') === 'on'
   const isActive = formData.get('is_active') === 'on'
 
   const supabase = await createClient()
@@ -122,6 +130,8 @@ export async function updateSpecialProductType(
       applies_thickness_extra: appliesThicknessExtra,
       applies_large_plate_extra: appliesLargePlateExtra,
       always_piece_price: alwaysPiecePrice,
+      has_light_tier: hasLightTier,
+      irregular_cut_quote_required: irregularCutQuoteRequired,
       is_active: isActive,
     })
     .eq('id', specialProductTypeId)

@@ -22,7 +22,7 @@ export default async function CuttingPricesPage() {
   const { data: cuttingPrices, error } = await supabase
     .from('cutting_prices')
     .select(
-      'id, thickness_min, thickness_max, cutting_method, cutting_type, unit_price, valid_from, plate_types(name), materials(name)'
+      'id, thickness_min, thickness_max, cutting_method, cutting_type, unit_price, valid_from, has_light_tier, small_piece_quote_required, plate_types(name), materials(name)'
     )
     .order('valid_from', { ascending: false })
 
@@ -53,6 +53,8 @@ export default async function CuttingPricesPage() {
             <th className="py-2 pr-4">切断方法</th>
             <th className="py-2 pr-4">寸法切／アイトレ</th>
             <th className="py-2 pr-4">単価</th>
+            <th className="py-2 pr-4">1.5kgの段</th>
+            <th className="py-2 pr-4">2kg未満</th>
             <th className="py-2 pr-4">適用開始日</th>
             <th className="py-2 pr-4" />
           </tr>
@@ -73,6 +75,10 @@ export default async function CuttingPricesPage() {
               <td className="py-2 pr-4">{price.cutting_method}</td>
               <td className="py-2 pr-4">{price.cutting_type}</td>
               <td className="py-2 pr-4">{price.unit_price ?? '都度見積もり'}</td>
+              <td className="py-2 pr-4">{price.has_light_tier ? 'あり' : 'なし'}</td>
+              <td className="py-2 pr-4">
+                {price.small_piece_quote_required ? '別途見積もり' : '保証重量'}
+              </td>
               <td className="py-2 pr-4">{price.valid_from}</td>
               <td className="py-2 pr-4">
                 <Link

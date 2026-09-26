@@ -33,6 +33,8 @@ type CuttingPrice = {
   cutting_type: '寸法切' | 'アイトレ'
   unit_price: number | null
   valid_from: string
+  has_light_tier: boolean
+  small_piece_quote_required: boolean
 }
 
 type CuttingPriceFormProps = {
@@ -256,6 +258,25 @@ export function CuttingPriceForm(props: CuttingPriceFormProps) {
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
+
+      {/* 最低保証重量に関するフラグ（docs/basic-design.md「最低保証重量」） */}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="has_light_tier"
+          defaultChecked={cuttingPrice?.has_light_tier}
+        />
+        1.5kg の段あり（1.5kg 未満は kg単価 × 1.5）
+      </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="small_piece_quote_required"
+          defaultChecked={cuttingPrice?.small_piece_quote_required}
+        />
+        1枚 2kg 未満は別途見積もり
+      </label>
 
       {state?.error && (
         <p className="text-sm text-red-600 dark:text-red-400">

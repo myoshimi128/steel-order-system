@@ -126,9 +126,11 @@ export type Database = {
         Row: {
           cutting_method: string
           cutting_type: string
+          has_light_tier: boolean
           id: string
           material_id: string | null
           plate_type_id: string
+          small_piece_quote_required: boolean
           thickness_max: number
           thickness_min: number
           unit_price: number | null
@@ -137,9 +139,11 @@ export type Database = {
         Insert: {
           cutting_method: string
           cutting_type: string
+          has_light_tier?: boolean
           id?: string
           material_id?: string | null
           plate_type_id: string
+          small_piece_quote_required?: boolean
           thickness_max: number
           thickness_min: number
           unit_price?: number | null
@@ -148,9 +152,11 @@ export type Database = {
         Update: {
           cutting_method?: string
           cutting_type?: string
+          has_light_tier?: boolean
           id?: string
           material_id?: string | null
           plate_type_id?: string
+          small_piece_quote_required?: boolean
           thickness_max?: number
           thickness_min?: number
           unit_price?: number | null
@@ -846,7 +852,9 @@ export type Database = {
           always_piece_price: boolean
           applies_large_plate_extra: boolean
           applies_thickness_extra: boolean
+          has_light_tier: boolean
           id: string
+          irregular_cut_quote_required: boolean
           is_active: boolean
           min_weight: number | null
           name: string
@@ -856,7 +864,9 @@ export type Database = {
           always_piece_price?: boolean
           applies_large_plate_extra?: boolean
           applies_thickness_extra?: boolean
+          has_light_tier?: boolean
           id?: string
+          irregular_cut_quote_required?: boolean
           is_active?: boolean
           min_weight?: number | null
           name: string
@@ -866,7 +876,9 @@ export type Database = {
           always_piece_price?: boolean
           applies_large_plate_extra?: boolean
           applies_thickness_extra?: boolean
+          has_light_tier?: boolean
           id?: string
+          irregular_cut_quote_required?: boolean
           is_active?: boolean
           min_weight?: number | null
           name?: string

@@ -25,7 +25,7 @@ export default async function EditSpecialProductTypePage(
   const { data: specialProductType } = await supabase
     .from('special_product_types')
     .select(
-      'id, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, is_active'
+      'id, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_active'
     )
     .eq('id', id)
     .single()
