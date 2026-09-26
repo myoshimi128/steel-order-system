@@ -17,6 +17,8 @@ type SpecialProductType = {
   applies_thickness_extra: boolean
   applies_large_plate_extra: boolean
   always_piece_price: boolean
+  has_light_tier: boolean
+  irregular_cut_quote_required: boolean
   is_active: boolean
 }
 
@@ -116,6 +118,27 @@ export function SpecialProductTypeForm(props: SpecialProductTypeFormProps) {
           defaultChecked={specialProductType?.always_piece_price}
         />
         常に枚単価で表示する
+      </label>
+
+      {/* 最低保証重量に 1.5kg の段があるか（ベタ丸・ドーナツ）。
+          最低保証重量を入力した種別（スプライス）は、この段ではなく最低保証重量が使われる */}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="has_light_tier"
+          defaultChecked={specialProductType?.has_light_tier}
+        />
+        1.5kg の段あり（1.5kg 未満は kg単価 × 1.5）
+      </label>
+
+      {/* 寸法切を前提とした単価の種別（スプライス）は、アイトレなら別途見積もりにする */}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="irregular_cut_quote_required"
+          defaultChecked={specialProductType?.irregular_cut_quote_required}
+        />
+        アイトレは別途見積もり
       </label>
 
       {props.mode === 'edit' && (
