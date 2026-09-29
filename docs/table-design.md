@@ -27,6 +27,7 @@
 | `stamps` | 現場用伝票に印字するスタンプ文言 |
 | `customer_stamps` | 得意先ごとに既定でチェックするスタンプ |
 | `users` | ユーザー。ロールを含む |
+| `delivery_methods` | 配達方法（宵積み / 2便 / 置場引取 など）。**未作成** |
 
 ### トランザクション系
 
@@ -51,11 +52,13 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `code` | text | 得意先コード（例: T04500） |
+| `code` | text | 得意先コード。数字のみ（例: 1001）。受注登録画面でテンキー入力するため |
 | `name` | text | 得意先名 |
-| `contact_person` | text | 客先担当 |
+| `sales_rep` | text | 自社側の営業担当者名 |
 | `is_active` | boolean | 有効フラグ |
 | `created_at` / `updated_at` | timestamptz |  |
+
+客先側の窓口担当者（客先担当）は受注ごとに異なるため、得意先マスタではなく `orders.customer_contact` に持つ。
 
 注意事項は `notices` テーブルに切り出す。得意先マスタ内のテキスト欄として持つと、その受注に関係のない注意事項まですべて表示され、件数が増えるにつれ読み飛ばされるためである。
 
@@ -64,7 +67,7 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `code` | text | 納入先コード |
+| `code` | text | 納入先コード。数字のみ。受注登録画面でテンキー入力するため |
 | `name` | text | 納入先名 |
 | `address` | text | 住所 |
 | `area` | text | 持込地区 |
@@ -91,6 +94,8 @@
 
 `name` に一意制約を設ける。
 
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を追加する方針とする（**未作成**。後述「受注登録画面のための追加方針」を参照）。
+
 ### products（商品）
 
 | カラム | 型 | 説明 |
@@ -115,9 +120,11 @@
 | `applies_material_extra` | boolean | 材質エキストラを適用するか（普通板のみ true） |
 | `is_active` | boolean | 有効フラグ |
 
-縞板・ボンデ・ミガキは種類固有の単価を持ち、材質エキストラを適用しない。ボンデ・ミガキは無規格のため材質を持たない。
+縞板・ボンデ・ミガキは種類固有の単価を持ち、材質エキストラを適用しない。ボンデ・ミガキは無規格のため材質を持たない。`applies_material_extra` が false の種類では、受注明細の製鋼法（`order_items.steel_making`）を指定しない（NULL）。
 
 `name` に一意制約を設ける。
+
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を追加する方針とする（0 普通板 / 1 縞板 / 2 ボンデ / 3 ミガキ。**未作成**）。
 
 ### cutting\_prices（切断単価）
 
@@ -214,6 +221,15 @@
 
 `name` に一意制約を設ける。
 
+受注登録画面のため、次の列を追加する方針とする（**未作成**。後述「受注登録画面のための追加方針」を参照）。
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `number` | integer | 番号（一意）。受注登録画面の区分の番号として使う。区分の定数（1 寸法切 / 2 アイトレ / 3 定尺 / 9 加工）と重ならない値にする |
+| `is_splice_order_type` | boolean | スプライス専用の受注で使う種別か（スプライスのみ true）。true の種別は通常の受注の区分の一覧に出さない。true の行は 1 行だけとする（部分一意インデックス） |
+
+スプライス専用の受注の明細に使う種別を、種別名ではなく `is_splice_order_type` で特定する。種別名で分岐しない方針に合わせるためである。
+
 ### special\_product\_prices（特殊製品単価）
 
 | カラム | 型 | 説明 |
@@ -221,7 +237,7 @@
 | `id` | uuid | PK |
 | `special_product_type_id` | uuid | FK → `special_product_types` |
 | `plate_type_id` | uuid | FK → `plate_types` |
-| `has_shot` | boolean | ショット加工の有無（スプライスのみ使用） |
+| `has_shot` | boolean | ショット加工の有無（スプライスのみ使用。受注の `orders.splice_shot` で引き当てる） |
 | `thickness_min` / `thickness_max` | numeric | 板厚区分 |
 | `unit_price` | numeric | kg 単価 |
 | `valid_from` | date | 適用開始日 |
@@ -255,6 +271,8 @@
 注意事項は `notices` テーブルに切り出す。
 
 `category` はショット加工量明細のような集計に使用する。
+
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を追加する方針とする（例: 11 キリ孔、14 ショット。**未作成**）。
 
 ### manufacturers（メーカー）
 
@@ -325,6 +343,20 @@
 
 `customer_id` + `stamp_id` に一意制約を設ける。
 
+### delivery\_methods（配達方法）※未作成
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `number` | integer | 番号（一意）。受注登録画面の配達の番号として使う |
+| `name` | text | 配達方法名（宵積み、2便、置場引取、営業配達、横持ち、宅急便、フリー） |
+| `requires_note` | boolean | 選んだときに文字の入力欄を出すか（フリーのみ true） |
+| `is_active` | boolean | 有効フラグ |
+
+配達方法は今後増える可能性があるため、定数ではなくマスタで持つ。初期データは 0 宵積み / 2 2便 / 3 置場引取 / 4 営業配達 / 5 横持ち / 6 宅急便 / 9 フリー。
+
+「フリー」を名前で判定せず `requires_note` で判定する。受注に保存するのは配達方法（`orders.delivery_method_id`）と、フリー入力の文字（`orders.delivery_method_note`）である。
+
 ## トランザクションテーブル定義
 
 ### orders（受注ヘッダー）
@@ -333,9 +365,10 @@
 | --- | --- | --- |
 | `id` | uuid | PK |
 | `order_no` | text | 受注番号。自動採番 |
-| `order_date` | date | 受注日 |
-| `customer_id` | uuid | FK → `customers` |
-| `delivery_destination_id` | uuid | FK → `delivery_destinations` |
+| `order_date` | date | 受注日。登録日を初期値とし、必要な場合のみ変更する |
+| `customer_id` | uuid | FK → `customers`。売り先（得意先） |
+| `customer_contact` | text | 担当者（客先担当）。得意先側の窓口担当者 |
+| `delivery_destination_id` | uuid | FK → `delivery_destinations`。入れ先（納入先） |
 | `project_name` | text | 工事名 |
 | `due_date_type` | text | 納期種別。`確定` / `仮納期` / `後報` / `最短出荷` |
 | `due_date` | date | 納期。`後報` `最短出荷` では NULL |
@@ -344,6 +377,26 @@
 | `remarks` | text | 摘要 |
 | `field_note` | text | 現場用伝票に印字するフリーコメント |
 | `created_at` / `updated_at` | timestamptz |  |
+| `is_splice` | boolean | スプライス専用の受注か。既定 false。画面では番号の欄（0 通常 / 1 スプライス）で入力する（**未作成**） |
+| `deleted_at` | timestamptz | 論理削除した日時。NULL は有効な受注（**未作成**） |
+| `joint_no` | text | 継手番号（4〜6 文字）。スプライス専用の受注のみ（**未作成**） |
+| `splice_shot` | boolean | ショット加工の有無。スプライス専用の受注のみ。明細の仕入単価（`special_product_prices.has_shot`）の引き当てと、「ショット加工」の印字に使う（**未作成**） |
+| `delivery_method_id` | uuid | FK → `delivery_methods`。配達（**未作成**） |
+| `delivery_method_note` | text | 配達がフリーのときに入力する文字（**未作成**） |
+
+**スプライス専用の受注**
+
+スプライスは通常の明細と混ざることがないため、受注単位（`is_splice`）で切り替える。スプライス専用の受注では、明細はすべて `special_product_types.is_splice_order_type` が true の種別になり、ショットの有無も受注単位（`splice_shot`）で持つ。
+
+`splice_shot` が true の受注は、現場用伝票に「ショット加工」を目立つ位置に印字する。これは `order_stamps` には保存せず `splice_shot` から印字する。ショットの有無とスタンプを別々に持つと、両者が食い違うおそれがあるためである。
+
+チェック制約として、`is_splice` が false のときは `joint_no` と `splice_shot` を NULL とし、true のときは `joint_no`（4〜6 文字）と `splice_shot` を必須とする。
+
+**論理削除**
+
+受注の削除（受注登録画面の処理区分 2 削除）は論理削除とし、行は消さずに `deleted_at` に削除日時を入れる。`deleted_at` が入った受注は、受注一覧・現場用伝票・送り状発行などの対象から外す。誤って削除した場合の確認や、過去の受注番号の追跡ができるようにするためである。
+
+出荷実績（`shipments`）がある受注は削除できない。画面で削除を止めるだけでなく、`deleted_at` を設定する更新を DB 側でも拒否する（`before update` トリガー。未作成）。
 
 ステータスは受注ヘッダーに 1 つ持つ。実務では同一受注内の明細がまとめて加工・出荷されるため、明細単位の管理は行わない。
 
@@ -358,30 +411,37 @@
 | `line_no` | integer | 行番号 |
 | `product_id` | uuid | FK → `products` |
 | `cutting_method` | text | 切断方法。`シャーリング` / `ガス` / `レーザー` / `プラズマ`。`cutting_prices.cutting_method` と同じ値域。定尺売りの場合は NULL |
-| `cutting_type` | text | 寸法切 / アイトレ |
-| `special_product_type_id` | uuid | 特殊製品の場合に指定。通常の切断は NULL |
-| `steel_making` | text | 電炉材 / 高炉材。受注時に確定し、後から変更可 |
-| `width` | numeric | 巾（mm） |
-| `length` | numeric | 長さ（mm） |
+| `cutting_type` | text | 寸法切 / アイトレ。定尺売り・特殊製品は NULL（ただしスプライス専用の受注の明細は、画面の切断区分を保存する） |
+| `special_product_type_id` | uuid | 特殊製品の場合に指定。通常の切断・定尺売りは NULL |
+| `plate_size` | text | 定尺サイズ。`3x6` / `4x8` / `5x10`。定尺売りの場合のみ指定（**未作成**。受注登録の実装時にマイグレーションで追加する） |
+| `steel_making` | text | 電炉材 / 高炉材。受注時に確定し、後から変更可。画面の初期値は電炉材。定尺売り、または種類が材質エキストラを適用しない（`plate_types.applies_material_extra` が false）場合は NULL |
+| `width` | numeric | 巾（mm）。ササラは使用材の寸法 |
+| `length` | numeric | 長さ（mm）。ササラは使用材の寸法 |
 | `outer_diameter` | numeric | 外径（mm）。ベタ丸・ドーナツで使用 |
 | `inner_diameter` | numeric | 内径（mm）。ドーナツで使用 |
 | `quantity` | integer | 数量 |
 | `square_weight` | numeric | 角重量（1 枚あたり kg）。単価計算の根拠 |
-| `actual_weight` | numeric | 実重量（1 枚あたり kg）。配送依頼用。アイトレは手入力 |
-| `material_weight` | numeric | 使用材の重量（kg）。ササラで手入力 |
-| `cutting_unit_price` | numeric | 切断単価（各エキストラ加算後）。マスタから自動計算 |
-| `sales_unit_price` | numeric | 売上単価 |
+| `actual_weight` | numeric | 実重量（1 枚あたり kg）。配送依頼用。寸法から求まるもの（寸法切・ベタ丸・ドーナツ）は自動計算、アイトレなどは送り状発行の画面で必要な行だけ手入力 |
+| `material_weight` | numeric | 使用材の重量（1 枚あたり kg）。ササラで使用。使用材の寸法から自動計算 |
+| `cutting_unit_price` | numeric | 仕入単価（各エキストラ加算後。枚単価の場合は保証重量を掛けた後の値）。マスタから自動計算。別途見積もりは NULL（単価未定）で登録し、受注の修正で入力 |
+| `sales_unit_price` | numeric | 売上単価。MVP では使用しない（Phase2 の営業システム連携で扱う） |
 | `price_unit` | text | kg / 枚。角重量から自動判定（ベタ丸・ドーナツは常に枚） |
-| `manufacturer_specified_id` | uuid | FK → `manufacturers`。メーカー指定。NULL 可 |
+| `manufacturer_specified_id` | uuid | FK → `manufacturers`。メーカー指定。指定なしは NULL。縞板は必須 |
 | `manufacturer_used_id` | uuid | FK → `manufacturers`。使用メーカー。加工時に入力 |
 | `mill_sheet_no` | text | ミルシート番号。加工時に入力 |
-| `package_count` | integer | 梱包数。製品ラベルの印刷枚数。入力者が手入力 |
+| `package_count` | integer | 梱包数。製品ラベルの印刷枚数。受注後のラベル発行メニューで手入力 |
 | `remarks` | text | 備考 |
 | `field_note` | text | この明細だけに適用するフリーコメント |
 
 メーカーは「指定」と「実績」で確定タイミングが異なるため別カラムとする。同一カラムで兼ねると、指定のない受注に実績が入った際に客先指定があったように見えてしまう。縞板のみ、縞目の見た目が異なるため受注時に客先へ確認しており、`manufacturer_specified_id` が単位質量の参照にも使われる。
 
-重量は角重量と実重量を分けて保持する。請求は角重量で行い（材料としては四角で消費するため）、配送依頼には実重量を用いる。寸法切は両者が一致し、アイトレは実重量を手入力、ベタ丸・ドーナツは外径・内径から両方を算出する。
+重量は角重量と実重量を分けて保持する。請求は角重量で行い（材料としては四角で消費するため）、配送依頼には実重量を用いる。寸法切は両者が一致し、ベタ丸・ドーナツは外径・内径から両方を算出する。アイトレの実重量は受注入力では扱わず、送り状発行の画面で必要な行だけ手入力する。
+
+画面の「区分」（寸法切 / アイトレ / 定尺 / 加工 / ササラ / ベタ丸 / ドーナツ）は 1 つの番号の欄だが、保存時は `cutting_method`・`cutting_type`・`special_product_type_id`・`plate_size` に振り分ける（加工は `order_item_processes` の行になる）。スプライスは区分ではなく受注単位（`orders.is_splice`）で扱う。振り分けの対応は screen-design.md「受注登録画面」を参照。
+
+`product_id` は必須のため、商品マスタに該当がない板厚（取り扱いのない板厚）の明細は登録できない。受注登録画面では警告を出して登録させない。
+
+`cutting_unit_price` が NULL の明細は「単価未定」（別途見積もりで単価が未入力）を表す。受注一覧の絞り込みに使う。
 
 `price_unit` は 1 枚あたりの角重量から自動判定する。1.5kg 未満・2kg 未満はいずれも枚単価となり、kg 単価に最低保証重量を掛けて算出する。
 
@@ -395,12 +455,13 @@
 | `process_type_id` | uuid | FK → `process_types` |
 | `spec` | text | 加工内容（例: キリ孔 1S/12 孔 38φ） |
 | `quantity` | integer | 加工数量 |
-| `unit_price` | numeric | 加工単価。MVP では手入力 |
-| `remarks` | text | 備考 |
+| `price_unit` | text | 単価の単位。`個` / `kg`。既定は `個`（**未作成**） |
+| `unit_price` | numeric | 加工の仕入単価。MVP では手入力 |
+| `remarks` | text | 摘要 |
 
 1 つの材料に複数の加工（穴あけ + 曲げ + ショット）が付くケースを表現するため、受注明細の子テーブルとする。加工指示書では加工が重量ゼロの別行として印字されるが、これは材料重量を二重に計上しないための表示上の処理である。
 
-重量建てで加工賃が決まる加工があるが、その重量は材料の重量と一致するため、加工明細に重量カラムは持たない。親の `order_items.unit_weight` を参照して算出する。同じ値を 2 箇所に保持すると、寸法修正時にずれる原因となる。
+加工の仕入金額は `price_unit` で求め方が変わる。`個` は「仕入単価 × 数量」、`kg` は「仕入単価 × 母材の合計重量」とする。重量建ての加工の重量は材料の重量と一致するため、加工明細に重量カラムは持たない。親の `order_items` の重量（単価の根拠にした重量。`square_weight`、ササラは `material_weight`）と数量から算出する。同じ値を 2 箇所に保持すると、寸法修正時にずれる原因となる。
 
 ### shipments（出荷実績）
 
@@ -467,6 +528,7 @@ destinations       │            │                    └── process_types
                    ├─< shipments ──< shipment_items ──> order_items
                    ├─< attachments
                    ├─< order_stamps ──> stamps
+                   ├── delivery_methods （配達。未作成）
                    └── users （created_by）
 
 customers ──< customer_stamps >── stamps
@@ -500,6 +562,29 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 
 ## 設計上の補足
 
+### 受注登録画面のための追加方針
+
+受注登録画面（screen-design.md）をテンキーだけで入力できるコード入力にするため、次の変更を行う。マイグレーションは受注登録の実装時に作成する（現時点では **未作成**）。
+
+| 対象 | 変更 |
+| --- | --- |
+| `plate_types` / `materials` / `special_product_types` / `process_types` | 番号の列 `number`（integer、一意）を追加 |
+| `special_product_types` | `is_splice_order_type`（スプライス専用の受注で使う種別か）を追加 |
+| `delivery_methods` | 配達方法マスタを新規作成 |
+| `orders` | `is_splice` / `joint_no` / `splice_shot` / `delivery_method_id` / `delivery_method_note` / `deleted_at` を追加 |
+| `order_item_processes` | `price_unit`（個 / kg）を追加 |
+| `customers` / `delivery_destinations` | `code` を数字のみに制限するチェック制約を追加（既存データが数字のみであることを確認してから） |
+| 価格マスタの行を取り出す関数 | 明細の条件に該当する価格マスタの行だけを返す `security definer` の関数を作成（後述「価格マスタの権限と単価計算」） |
+| 受注の削除の制限 | 出荷実績がある受注の論理削除を拒否するトリガーを作成（`orders` の「論理削除」を参照） |
+| `order_items` | `plate_size`（定尺サイズ）を追加 |
+
+番号の持ち方は、選択肢の性質で分ける。
+
+- 今後増える可能性がある選択肢（種類・材質・特殊製品種別・加工種別・配達方法）は、マスタの `number` 列で持つ
+- 固定の選択肢（処理区分・切断方法・区分・製鋼法・納期種別・定尺サイズ）の番号は、アプリ側の定数で持つ。DB に保存するのは番号ではなく値（例: `cutting_method` は `ガス`）とし、番号は画面の入力にだけ使う
+
+メーカーは既存の `manufacturers.code`（メーカーコード）を番号として使う。「0 指定なし」はマスタの行ではなく、`manufacturer_specified_id` を NULL にすることを表す。
+
 ### 計算で求める項目
 
 以下はカラムとして保持せず、必要時に算出する。保存すると元データの修正時に古い値が残り、整合性が崩れるためである。
@@ -509,9 +594,10 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | 残数量 | 受注数量 − 出荷実績の合計 |
 | 重量区分（保証重量） | 1 枚あたりの重量と単価の行のフラグ（`has_light_tier` など）で判定。basic-design.md「最低保証重量」を参照 |
 | 明細金額 | 枚単価 × 数量、または kg 単価 × 合計重量。円未満は切り上げ（basic-design.md「明細金額」を参照） |
-| 受注合計 | 明細金額の合計 |
+| 加工の金額 | 個: 単価 × 数量、kg: 単価 × 母材の合計重量。円未満は切り上げ |
+| 受注合計 | 材料の明細金額と加工の金額の合計 |
 
-角重量・実重量は寸法と材質（縞板は単位質量）から算出できるため、入力者に選択させず自動計算する。ただしアイトレの実重量とササラの使用材重量は形状が一定でないため手入力とする。
+角重量・実重量は寸法と材質（縞板は単位質量）から算出できるため、入力者に選択させず自動計算する。ササラの使用材重量も、入力された使用材の寸法から自動計算する。ただしアイトレの実重量は形状が一定でないため、送り状発行の画面で必要な行だけ手入力する。
 
 1 枚あたりの重量は丸めずに保証重量の判定・単価計算に使う。合計重量は 1 枚あたりの重量に枚数を掛けた後、小数第 2 位までに四捨五入する（切り捨ては行わない）。
 
@@ -521,6 +607,9 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - 価格系テーブル（`cutting_prices` `standard_plate_prices` `special_product_prices` など）は、それぞれの条件の組み合わせに一意制約（`valid_from` を含む）。詳細は各テーブルの説明を参照
 - `material_extras.material_id` に一意制約（材質ごとに1行）
 - `plate_types` `materials` `special_product_types` は `name` に一意制約
+- `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約（未作成）
+- `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス。未作成）
+- `orders` のスプライス関連の列（`is_splice` / `joint_no` / `splice_shot`）の整合性チェック（未作成。`orders` の説明を参照）
 - `shipment_items.quantity` に正数チェック
 - 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
 - `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須
@@ -538,8 +627,8 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `attachments` | 参照・登録・更新 | 参照不可 | すべて |
 | `order_stamps` | 参照・登録・更新 | 参照 | すべて |
 | `users` | 参照 | 参照 | すべて |
-| 価格系マスタ（`cutting_prices` `material_extras` `thickness_extras` `large_plate_extras` `standard_plate_prices` `special_product_prices`） | 参照不可 | 参照不可 | すべて |
-| マスタ各種（`plate_types` `special_product_types` `unit_weights` を含む） | 参照 | 参照 | すべて |
+| 価格系マスタ（`cutting_prices` `material_extras` `thickness_extras` `large_plate_extras` `standard_plate_prices` `special_product_prices`） | 参照不可（価格マスタの行を取り出す関数で、明細の計算に必要な行だけ取得可） | 参照不可 | すべて |
+| マスタ各種（`plate_types` `special_product_types` `unit_weights` `delivery_methods` を含む） | 参照 | 参照 | すべて |
 
 `order_item_processes` / `shipments` / `shipment_items` / `attachments` / `order_stamps` / `users` は元の設計時点では個別に定めていなかったテーブルである。`orders` `order_items` `マスタ各種` に適用した考え方（現場の業務範囲は「加工指示の閲覧」に限られる、単価情報は現場に見せない）を、各テーブルの性質に当てはめて追加した。
 
@@ -548,6 +637,29 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `order_stamps` は現場用伝票にそのまま印字される内容であり、単価情報のような機密性もないため、現場にも参照を許可する。
 - `users` は起案者・出荷担当者などの氏名表示にどのロールからも参照できる必要があるため参照は全ロールに許可し、登録・更新は管理者のみとする。
 - 価格体系の再設計（切断単価・各種エキストラ・定尺単価・特殊製品単価）により `prices` は廃止されたが、単価情報を現場に見せないという方針自体は変わらないため、価格系の新テーブルすべてに同じ制限を引き継ぐ。`plate_types`（種類）・`special_product_types`（特殊製品種別）・`unit_weights`（単位質量）は単価そのものではなく分類・物理量の参照データのため、他のマスタ同様に全ロール参照可とする。
+
+### 価格マスタの権限と単価計算
+
+価格系マスタは仕入単価そのものであるため、一覧・登録・更新は引き続き管理者のみとする（事務・現場は直接参照できない）。
+
+一方、受注登録では事務ロールが仕入単価を自動計算する必要がある。そこで、**価格マスタの行を取り出す部分だけ** をデータベースの関数にし、**計算は `lib/pricing/` で行う** 役割分担とする。
+
+| 役割 | 担当 | 内容 |
+| --- | --- | --- |
+| 行の取り出し | DB の関数（`security definer`） | 明細の条件に該当する価格マスタの行だけを返す |
+| 単価の計算 | `lib/pricing/`（TypeScript） | 取り出した行から、最新行の選択・エキストラの加算・保証重量の判定などを行う |
+
+DB の関数は `security definer`（関数所有者の権限で実行）とし、関数の中だけ価格マスタを読めるようにする。事務ロールにはこの関数の実行権限だけを付与する。関数は明細 1 行分の条件（種類・材質・板厚・形状・切断方法・切断区分・特殊製品種別・ショットの有無・定尺サイズ・受注日）を受け取り、次の行だけを返す。
+
+- 切断単価（`cutting_prices`）: 種類・切断方法・切断区分・板厚が一致する行。材質指定の行と SS400 ベース（材質 NULL）の行の両方
+- 材質エキストラ（`material_extras`）: 指定した材質の行
+- 板厚エキストラ・大板加算（`thickness_extras` / `large_plate_extras`）: 指定した板厚の行
+- 定尺単価（`standard_plate_prices`）: 種類・材質・板厚・定尺サイズが一致する行
+- 特殊製品単価（`special_product_prices`）: 特殊製品種別・種類・ショットの有無・板厚が一致する行
+
+いずれも適用開始日が受注日以前の行に絞って返す。返す形は `lib/pricing` の `PricingMasters`（`lib/pricing/types.ts`）に合わせ、そのまま計算関数に渡せるようにする。複数の行から最新の行を選ぶ処理や、材質指定の行がなければ SS400 ベースの行を使う判断は、`lib/pricing` 側で行う。
+
+これにより、事務ロールは明細の計算に必要な行だけを取得でき、価格マスタの一覧（単価表そのもの）は見られない状態を DB レベルで保証する。計算ルールは `lib/pricing` の 1 か所だけに置くため、SQL へ二重に実装しない。
 
 ### 列単位のアクセス制御の実装方法
 
