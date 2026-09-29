@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { isDigitsOnly } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
 export type DeliveryDestinationFormState = { error: string } | undefined
@@ -32,6 +33,11 @@ function readDeliveryDestinationForm(
 
   if (typeof code !== 'string' || !code.trim()) {
     return { ok: false, error: '納入先コードを入力してください' }
+  }
+  // 受注登録画面でテンキーだけで入力できるよう、コードは数字のみとする
+  // （DB 側でも delivery_destinations_code_digits_check で同じ制限をかけている）
+  if (!isDigitsOnly(code.trim())) {
+    return { ok: false, error: '納入先コードは数字のみで入力してください' }
   }
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '納入先名を入力してください' }

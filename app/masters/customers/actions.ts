@@ -8,6 +8,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { isDigitsOnly } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
 export type CustomerFormState = { error: string } | undefined
@@ -26,6 +27,11 @@ function readCustomerForm(formData: FormData): ParsedCustomerForm {
 
   if (typeof code !== 'string' || !code.trim()) {
     return { ok: false, error: '得意先コードを入力してください' }
+  }
+  // 受注登録画面でテンキーだけで入力できるよう、コードは数字のみとする
+  // （DB 側でも customers_code_digits_check で同じ制限をかけている）
+  if (!isDigitsOnly(code.trim())) {
+    return { ok: false, error: '得意先コードは数字のみで入力してください' }
   }
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '得意先名を入力してください' }

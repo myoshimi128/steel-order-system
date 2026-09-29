@@ -3,6 +3,7 @@
 // 新規登録・編集の両方で使う入力フォーム。customer-form.tsx と同じ構造。
 
 import { useActionState } from 'react'
+import { NumberField } from '@/components/masters/number-field'
 import {
   createProcessType,
   updateProcessType,
@@ -11,6 +12,8 @@ import {
 
 type ProcessType = {
   id: string
+  // 番号のない既存行があるため NULL を許す（編集時に入力してもらう）
+  number: number | null
   name: string
   category: string | null
   is_active: boolean
@@ -35,6 +38,8 @@ export function ProcessTypeForm(props: ProcessTypeFormProps) {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      <NumberField defaultValue={processType?.number} />
+
       <div className="flex flex-col gap-1">
         <label htmlFor="name" className="text-sm">
           加工名

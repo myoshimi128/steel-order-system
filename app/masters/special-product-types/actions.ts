@@ -6,6 +6,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import {
+  isNumberUniqueViolation,
+  readMasterNumber,
+  RESERVED_REGION_NUMBERS,
+} from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
 export type SpecialProductTypeFormState = { error: string } | undefined
@@ -19,6 +24,7 @@ type ParsedSpecialProductTypeForm =
   | {
       ok: true
       values: {
+        number: number
         name: string
         weight_basis: WeightBasis
         min_weight: number | null
@@ -29,6 +35,20 @@ type ParsedSpecialProductTypeForm =
 function readSpecialProductTypeForm(
   formData: FormData
 ): ParsedSpecialProductTypeForm {
+  // 番号は受注登録画面の「区分」の番号として使う（lib/master-number.ts で共通の検証）
+  const number = readMasterNumber(formData)
+  if (!number.ok) {
+    return number
+  }
+  // 区分の定数（1 寸法切 / 2 アイトレ / 3 定尺 / 9 加工）と重なる番号は使えない
+  // （DB 側の special_product_types_number_check でも拒否される）
+  if (RESERVED_REGION_NUMBERS.includes(number.value)) {
+    return {
+      ok: false,
+      error: `番号 ${RESERVED_REGION_NUMBERS.join('・')} は区分の番号と重なるため使えません`,
+    }
+  }
+
   const name = formData.get('name')
   const weightBasis = formData.get('weight_basis')
   const minWeightRaw = formData.get('min_weight')
@@ -56,11 +76,40 @@ function readSpecialProductTypeForm(
   return {
     ok: true,
     values: {
+      number: number.value,
       name: name.trim(),
       weight_basis: weightBasis as WeightBasis,
       min_weight: minWeight,
     },
   }
+}
+
+// チェックボックスの項目をまとめて読み取る。
+// チェックボックスはチェックされているときだけ 'on' が送信される
+function readFlags(formData: FormData) {
+  return {
+    applies_thickness_extra: formData.get('applies_thickness_extra') === 'on',
+    applies_large_plate_extra: formData.get('applies_large_plate_extra') === 'on',
+    always_piece_price: formData.get('always_piece_price') === 'on',
+    has_light_tier: formData.get('has_light_tier') === 'on',
+    irregular_cut_quote_required: formData.get('irregular_cut_quote_required') === 'on',
+    is_splice_order_type: formData.get('is_splice_order_type') === 'on',
+  }
+}
+
+// 一意制約違反（23505）のメッセージを、どの項目が重複したかに応じて出し分ける
+function uniqueViolationMessage(error: { code?: string; message?: string }): string | null {
+  if (isNumberUniqueViolation(error)) {
+    return 'この番号は既に使われています'
+  }
+  // スプライス受注用の種別は 1 つだけ（部分一意インデックス）
+  if (error.code === '23505' && (error.message ?? '').includes('splice_order_type')) {
+    return 'スプライス受注用の種別は既に登録されています（1 つだけ指定できます）'
+  }
+  if (error.code === '23505') {
+    return 'この種別名は既に登録されています'
+  }
+  return null
 }
 
 export async function createSpecialProductType(
@@ -72,30 +121,14 @@ export async function createSpecialProductType(
     return { error: parsed.error }
   }
 
-  const appliesThicknessExtra = formData.get('applies_thickness_extra') === 'on'
-  const appliesLargePlateExtra =
-    formData.get('applies_large_plate_extra') === 'on'
-  const alwaysPiecePrice = formData.get('always_piece_price') === 'on'
-  const hasLightTier = formData.get('has_light_tier') === 'on'
-  const irregularCutQuoteRequired =
-    formData.get('irregular_cut_quote_required') === 'on'
-
   const supabase = await createClient()
   const { error } = await supabase.from('special_product_types').insert({
     ...parsed.values,
-    applies_thickness_extra: appliesThicknessExtra,
-    applies_large_plate_extra: appliesLargePlateExtra,
-    always_piece_price: alwaysPiecePrice,
-    has_light_tier: hasLightTier,
-    irregular_cut_quote_required: irregularCutQuoteRequired,
+    ...readFlags(formData),
   })
 
   if (error) {
-    // 23505 = unique_violation。special_product_types.name の一意制約
-    if (error.code === '23505') {
-      return { error: 'この種別名は既に登録されています' }
-    }
-    return { error: `登録に失敗しました: ${error.message}` }
+    return { error: uniqueViolationMessage(error) ?? `登録に失敗しました: ${error.message}` }
   }
 
   revalidatePath('/masters/special-product-types')
@@ -113,34 +146,18 @@ export async function updateSpecialProductType(
     return { error: parsed.error }
   }
 
-  const appliesThicknessExtra = formData.get('applies_thickness_extra') === 'on'
-  const appliesLargePlateExtra =
-    formData.get('applies_large_plate_extra') === 'on'
-  const alwaysPiecePrice = formData.get('always_piece_price') === 'on'
-  const hasLightTier = formData.get('has_light_tier') === 'on'
-  const irregularCutQuoteRequired =
-    formData.get('irregular_cut_quote_required') === 'on'
-  const isActive = formData.get('is_active') === 'on'
-
   const supabase = await createClient()
   const { error } = await supabase
     .from('special_product_types')
     .update({
       ...parsed.values,
-      applies_thickness_extra: appliesThicknessExtra,
-      applies_large_plate_extra: appliesLargePlateExtra,
-      always_piece_price: alwaysPiecePrice,
-      has_light_tier: hasLightTier,
-      irregular_cut_quote_required: irregularCutQuoteRequired,
-      is_active: isActive,
+      ...readFlags(formData),
+      is_active: formData.get('is_active') === 'on',
     })
     .eq('id', specialProductTypeId)
 
   if (error) {
-    if (error.code === '23505') {
-      return { error: 'この種別名は既に登録されています' }
-    }
-    return { error: `更新に失敗しました: ${error.message}` }
+    return { error: uniqueViolationMessage(error) ?? `更新に失敗しました: ${error.message}` }
   }
 
   revalidatePath('/masters/special-product-types')

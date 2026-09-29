@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase-server'
-import { ProcessTypeForm } from '../process-type-form'
+import { DeliveryMethodForm } from '../delivery-method-form'
 
-// 加工種別の編集画面。admin 以外は DB 側の RLS でも拒否されるが、
+// 配達方法の編集画面。admin 以外は DB 側の RLS でも拒否されるが、
 // フォーム自体を出さないことで無駄な失敗操作をさせない。
-export default async function EditProcessTypePage(
-  props: PageProps<'/masters/process-types/[id]'>
+export default async function EditDeliveryMethodPage(
+  props: PageProps<'/masters/delivery-methods/[id]'>
 ) {
   const { id } = await props.params
   const user = await getCurrentUser()
@@ -22,20 +22,20 @@ export default async function EditProcessTypePage(
   }
 
   const supabase = await createClient()
-  const { data: processType } = await supabase
-    .from('process_types')
-    .select('id, number, name, category, is_active')
+  const { data: deliveryMethod } = await supabase
+    .from('delivery_methods')
+    .select('id, number, name, requires_note, is_active')
     .eq('id', id)
     .single()
 
-  if (!processType) {
+  if (!deliveryMethod) {
     notFound()
   }
 
   return (
     <main className="mx-auto max-w-md px-6 py-8">
-      <h1 className="mb-6 text-lg font-semibold">加工種別の編集</h1>
-      <ProcessTypeForm mode="edit" processType={processType} />
+      <h1 className="mb-6 text-lg font-semibold">配達方法の編集</h1>
+      <DeliveryMethodForm mode="edit" deliveryMethod={deliveryMethod} />
     </main>
   )
 }

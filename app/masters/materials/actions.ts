@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
 export type MaterialFormState = { error: string } | undefined
@@ -14,6 +15,7 @@ type ParsedMaterialForm =
   | {
       ok: true
       values: {
+        number: number
         name: string
         line_mark: string | null
         display_color: string | null
@@ -21,9 +23,26 @@ type ParsedMaterialForm =
     }
   | { ok: false; error: string }
 
+// 一意制約違反（23505）のメッセージを、どの項目が重複したかに応じて出し分ける
+function uniqueViolationMessage(error: { code?: string; message?: string }): string | null {
+  if (isNumberUniqueViolation(error)) {
+    return 'この番号は既に使われています'
+  }
+  if (error.code === '23505') {
+    return 'この材質名は既に登録されています'
+  }
+  return null
+}
+
 // line_mark・display_color は基本材質（SS400など）では空欄になる
 // （docs/table-design.md materials の説明を参照）
 function readMaterialForm(formData: FormData): ParsedMaterialForm {
+  // 番号は受注登録画面で材質を選ぶときに入力する値（lib/master-number.ts で共通の検証）
+  const number = readMasterNumber(formData)
+  if (!number.ok) {
+    return number
+  }
+
   const name = formData.get('name')
   const lineMark = formData.get('line_mark')
   const displayColor = formData.get('display_color')
@@ -35,6 +54,7 @@ function readMaterialForm(formData: FormData): ParsedMaterialForm {
   return {
     ok: true,
     values: {
+      number: number.value,
       name: name.trim(),
       line_mark:
         typeof lineMark === 'string' && lineMark.trim()
@@ -66,11 +86,7 @@ export async function createMaterial(
   })
 
   if (error) {
-    // 23505 = unique_violation。materials.name の一意制約
-    if (error.code === '23505') {
-      return { error: 'この材質名は既に登録されています' }
-    }
-    return { error: `登録に失敗しました: ${error.message}` }
+    return { error: uniqueViolationMessage(error) ?? `登録に失敗しました: ${error.message}` }
   }
 
   revalidatePath('/masters/materials')
@@ -102,10 +118,7 @@ export async function updateMaterial(
     .eq('id', materialId)
 
   if (error) {
-    if (error.code === '23505') {
-      return { error: 'この材質名は既に登録されています' }
-    }
-    return { error: `更新に失敗しました: ${error.message}` }
+    return { error: uniqueViolationMessage(error) ?? `更新に失敗しました: ${error.message}` }
   }
 
   revalidatePath('/masters/materials')

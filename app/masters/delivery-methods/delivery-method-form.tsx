@@ -1,66 +1,67 @@
 'use client'
 
-// 新規登録・編集の両方で使う入力フォーム。
+// 新規登録・編集の両方で使う入力フォーム。plate-type-form.tsx と同じ構造。
 
 import { useActionState } from 'react'
 import { NumberField } from '@/components/masters/number-field'
 import {
-  createPlateType,
-  updatePlateType,
-  type PlateTypeFormState,
+  createDeliveryMethod,
+  updateDeliveryMethod,
+  type DeliveryMethodFormState,
 } from './actions'
 
-type PlateType = {
+type DeliveryMethod = {
   id: string
   number: number
   name: string
-  applies_material_extra: boolean
+  requires_note: boolean
   is_active: boolean
 }
 
-type PlateTypeFormProps =
+type DeliveryMethodFormProps =
   | { mode: 'create' }
-  | { mode: 'edit'; plateType: PlateType }
+  | { mode: 'edit'; deliveryMethod: DeliveryMethod }
 
-export function PlateTypeForm(props: PlateTypeFormProps) {
+export function DeliveryMethodForm(props: DeliveryMethodFormProps) {
   const action =
     props.mode === 'create'
-      ? createPlateType
-      : updatePlateType.bind(null, props.plateType.id)
+      ? createDeliveryMethod
+      : updateDeliveryMethod.bind(null, props.deliveryMethod.id)
 
   const [state, formAction, pending] = useActionState<
-    PlateTypeFormState,
+    DeliveryMethodFormState,
     FormData
   >(action, undefined)
 
-  const plateType = props.mode === 'edit' ? props.plateType : null
+  const deliveryMethod = props.mode === 'edit' ? props.deliveryMethod : null
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <NumberField defaultValue={plateType?.number} />
+      <NumberField defaultValue={deliveryMethod?.number} />
 
       <div className="flex flex-col gap-1">
         <label htmlFor="name" className="text-sm">
-          種類名
+          配達方法名
         </label>
         <input
           id="name"
           name="name"
           type="text"
           required
-          defaultValue={plateType?.name}
-          placeholder="普通板、縞板、ボンデ、ミガキ など"
+          defaultValue={deliveryMethod?.name}
+          placeholder="宵積み、2便、置場引取 など"
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
 
+      {/* フリーのように、選んだときに受注登録画面で文字を入力させる配達方法か */}
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
-          name="applies_material_extra"
-          defaultChecked={plateType?.applies_material_extra}
+          name="requires_note"
+          defaultChecked={deliveryMethod?.requires_note}
         />
-        材質エキストラを適用する
+        選んだときに文字を入力する（フリー）
       </label>
 
       {props.mode === 'edit' && (
@@ -68,7 +69,7 @@ export function PlateTypeForm(props: PlateTypeFormProps) {
           <input
             type="checkbox"
             name="is_active"
-            defaultChecked={plateType?.is_active}
+            defaultChecked={deliveryMethod?.is_active}
           />
           有効
         </label>
