@@ -24,7 +24,7 @@ export default async function EditPlateTypePage(
   const supabase = await createClient()
   const { data: plateType } = await supabase
     .from('plate_types')
-    .select('id, name, applies_material_extra, is_active')
+    .select('id, number, name, applies_material_extra, is_active')
     .eq('id', id)
     .single()
 

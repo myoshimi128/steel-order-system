@@ -27,7 +27,7 @@
 | `stamps` | 現場用伝票に印字するスタンプ文言 |
 | `customer_stamps` | 得意先ごとに既定でチェックするスタンプ |
 | `users` | ユーザー。ロールを含む |
-| `delivery_methods` | 配達方法（宵積み / 2便 / 置場引取 など）。**未作成** |
+| `delivery_methods` | 配達方法（宵積み / 2便 / 置場引取 など） |
 
 ### トランザクション系
 
@@ -94,7 +94,7 @@
 
 `name` に一意制約を設ける。
 
-受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を追加する方針とする（**未作成**。後述「受注登録画面のための追加方針」を参照）。
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意、NOT NULL）を持つ（1 SS400 … 9 TMCP385C。後述「受注登録画面のための追加方針」を参照）。
 
 ### products（商品）
 
@@ -124,7 +124,7 @@
 
 `name` に一意制約を設ける。
 
-受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を追加する方針とする（0 普通板 / 1 縞板 / 2 ボンデ / 3 ミガキ。**未作成**）。
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意、NOT NULL）を持つ（0 普通板 / 1 縞板 / 2 ボンデ / 3 ミガキ）。
 
 ### cutting\_prices（切断単価）
 
@@ -221,11 +221,11 @@
 
 `name` に一意制約を設ける。
 
-受注登録画面のため、次の列を追加する方針とする（**未作成**。後述「受注登録画面のための追加方針」を参照）。
+受注登録画面のため、次の列を持つ（後述「受注登録画面のための追加方針」を参照）。
 
 | カラム | 型 | 説明 |
 | --- | --- | --- |
-| `number` | integer | 番号（一意）。受注登録画面の区分の番号として使う。区分の定数（1 寸法切 / 2 アイトレ / 3 定尺 / 9 加工）と重ならない値にする |
+| `number` | integer | 番号（一意、NOT NULL）。受注登録画面の区分の番号として使う。区分の定数（1 寸法切 / 2 アイトレ / 3 定尺 / 9 加工）と重ならない値にする（チェック制約で 1・2・3・9 を禁止）。初期値は 4 スプライス / 5 ササラ / 7 ベタ丸 / 8 ドーナツ |
 | `is_splice_order_type` | boolean | スプライス専用の受注で使う種別か（スプライスのみ true）。true の種別は通常の受注の区分の一覧に出さない。true の行は 1 行だけとする（部分一意インデックス） |
 
 スプライス専用の受注の明細に使う種別を、種別名ではなく `is_splice_order_type` で特定する。種別名で分岐しない方針に合わせるためである。
@@ -272,7 +272,9 @@
 
 `category` はショット加工量明細のような集計に使用する。
 
-受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を追加する方針とする（例: 11 キリ孔、14 ショット。**未作成**）。
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を持つ（初期データは seed 004。11 キリ孔 / 12 タップ孔 / 13 曲げ / 14 ショット / 15 開先 / 21 レーザー孔 / 22 プラズマ孔 / 23 ピアス孔 / 24 長孔 / 25 中抜き / 26 切り込み / 27 マーキング）。
+
+画面から登録された行に番号のないものがある可能性があるため、NULL 可で始めている。マスタ画面では番号を必須にしており、全行に番号が入った後で NOT NULL にする。
 
 ### manufacturers（メーカー）
 
@@ -343,7 +345,7 @@
 
 `customer_id` + `stamp_id` に一意制約を設ける。
 
-### delivery\_methods（配達方法）※未作成
+### delivery\_methods（配達方法）
 
 | カラム | 型 | 説明 |
 | --- | --- | --- |
@@ -377,12 +379,12 @@
 | `remarks` | text | 摘要 |
 | `field_note` | text | 現場用伝票に印字するフリーコメント |
 | `created_at` / `updated_at` | timestamptz |  |
-| `is_splice` | boolean | スプライス専用の受注か。既定 false。画面では番号の欄（0 通常 / 1 スプライス）で入力する（**未作成**） |
-| `deleted_at` | timestamptz | 論理削除した日時。NULL は有効な受注（**未作成**） |
-| `joint_no` | text | 継手番号（4〜6 文字）。スプライス専用の受注のみ（**未作成**） |
-| `splice_shot` | boolean | ショット加工の有無。スプライス専用の受注のみ。明細の仕入単価（`special_product_prices.has_shot`）の引き当てと、「ショット加工」の印字に使う（**未作成**） |
-| `delivery_method_id` | uuid | FK → `delivery_methods`。配達（**未作成**） |
-| `delivery_method_note` | text | 配達がフリーのときに入力する文字（**未作成**） |
+| `is_splice` | boolean | スプライス専用の受注か。既定 false。画面では番号の欄（0 通常 / 1 スプライス）で入力する |
+| `deleted_at` | timestamptz | 論理削除した日時。NULL は有効な受注 |
+| `joint_no` | text | 継手番号（4〜6 文字）。スプライス専用の受注のみ |
+| `splice_shot` | boolean | ショット加工の有無。スプライス専用の受注のみ。明細の仕入単価（`special_product_prices.has_shot`）の引き当てと、「ショット加工」の印字に使う |
+| `delivery_method_id` | uuid | FK → `delivery_methods`。配達。NOT NULL |
+| `delivery_method_note` | text | 配達がフリーのときに入力する文字。「フリーのときは必須」は別テーブルの値を見る条件のため、アプリ側で検証する |
 
 **スプライス専用の受注**
 
@@ -396,7 +398,7 @@
 
 受注の削除（受注登録画面の処理区分 2 削除）は論理削除とし、行は消さずに `deleted_at` に削除日時を入れる。`deleted_at` が入った受注は、受注一覧・現場用伝票・送り状発行などの対象から外す。誤って削除した場合の確認や、過去の受注番号の追跡ができるようにするためである。
 
-出荷実績（`shipments`）がある受注は削除できない。画面で削除を止めるだけでなく、`deleted_at` を設定する更新を DB 側でも拒否する（`before update` トリガー。未作成）。
+出荷実績（`shipments`）がある受注は削除できない。画面で削除を止めるだけでなく、`deleted_at` を設定する更新を DB 側でも拒否する（`before update` トリガー `orders_prevent_deleting_shipped`）。
 
 ステータスは受注ヘッダーに 1 つ持つ。実務では同一受注内の明細がまとめて加工・出荷されるため、明細単位の管理は行わない。
 
@@ -413,7 +415,7 @@
 | `cutting_method` | text | 切断方法。`シャーリング` / `ガス` / `レーザー` / `プラズマ`。`cutting_prices.cutting_method` と同じ値域。定尺売りの場合は NULL |
 | `cutting_type` | text | 寸法切 / アイトレ。定尺売り・特殊製品は NULL（ただしスプライス専用の受注の明細は、画面の切断区分を保存する） |
 | `special_product_type_id` | uuid | 特殊製品の場合に指定。通常の切断・定尺売りは NULL |
-| `plate_size` | text | 定尺サイズ。`3x6` / `4x8` / `5x10`。定尺売りの場合のみ指定（**未作成**。受注登録の実装時にマイグレーションで追加する） |
+| `plate_size` | text | 定尺サイズ。`3x6` / `4x8` / `5x10`。定尺売りの場合のみ指定 |
 | `steel_making` | text | 電炉材 / 高炉材。受注時に確定し、後から変更可。画面の初期値は電炉材。定尺売り、または種類が材質エキストラを適用しない（`plate_types.applies_material_extra` が false）場合は NULL |
 | `width` | numeric | 巾（mm）。ササラは使用材の寸法 |
 | `length` | numeric | 長さ（mm）。ササラは使用材の寸法 |
@@ -455,7 +457,7 @@
 | `process_type_id` | uuid | FK → `process_types` |
 | `spec` | text | 加工内容（例: キリ孔 1S/12 孔 38φ） |
 | `quantity` | integer | 加工数量 |
-| `price_unit` | text | 単価の単位。`個` / `kg`。既定は `個`（**未作成**） |
+| `price_unit` | text | 単価の単位。`個` / `kg`。既定は `個` |
 | `unit_price` | numeric | 加工の仕入単価。MVP では手入力 |
 | `remarks` | text | 摘要 |
 
@@ -528,7 +530,7 @@ destinations       │            │                    └── process_types
                    ├─< shipments ──< shipment_items ──> order_items
                    ├─< attachments
                    ├─< order_stamps ──> stamps
-                   ├── delivery_methods （配達。未作成）
+                   ├── delivery_methods （配達）
                    └── users （created_by）
 
 customers ──< customer_stamps >── stamps
@@ -564,7 +566,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 
 ### 受注登録画面のための追加方針
 
-受注登録画面（screen-design.md）をテンキーだけで入力できるコード入力にするため、次の変更を行う。マイグレーションは受注登録の実装時に作成する（現時点では **未作成**）。
+受注登録画面（screen-design.md）をテンキーだけで入力できるコード入力にするため、次の変更を行う。マイグレーションは `supabase/migrations/20260929100000`〜`20260929100300` の 4 ファイル、初期データは seed 001〜004 を参照。
 
 | 対象 | 変更 |
 | --- | --- |
@@ -607,9 +609,9 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - 価格系テーブル（`cutting_prices` `standard_plate_prices` `special_product_prices` など）は、それぞれの条件の組み合わせに一意制約（`valid_from` を含む）。詳細は各テーブルの説明を参照
 - `material_extras.material_id` に一意制約（材質ごとに1行）
 - `plate_types` `materials` `special_product_types` は `name` に一意制約
-- `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約（未作成）
-- `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス。未作成）
-- `orders` のスプライス関連の列（`is_splice` / `joint_no` / `splice_shot`）の整合性チェック（未作成。`orders` の説明を参照）
+- `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約
+- `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス）
+- `orders` のスプライス関連の列（`is_splice` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
 - `shipment_items.quantity` に正数チェック
 - 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
 - `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須
@@ -661,6 +663,24 @@ DB の関数は `security definer`（関数所有者の権限で実行）とし�
 
 これにより、事務ロールは明細の計算に必要な行だけを取得でき、価格マスタの一覧（単価表そのもの）は見られない状態を DB レベルで保証する。計算ルールは `lib/pricing` の 1 か所だけに置くため、SQL へ二重に実装しない。
 
+**関数の仕様**（`supabase/migrations/20260929100300_create_get_pricing_rows_function.sql`）
+
+| 引数 | 型 | 説明 |
+| --- | --- | --- |
+| `p_plate_type_id` | uuid | 種類（必須） |
+| `p_thickness` | numeric | 板厚（必須） |
+| `p_as_of` | date | 受注日＝単価の基準日（必須） |
+| `p_material_id` | uuid | 材質。無規格（ボンデ・ミガキ）は省略 |
+| `p_cutting_method` / `p_cutting_type` | text | 通常の切断・特殊製品で指定 |
+| `p_special_product_type_id` | uuid | 特殊製品で指定 |
+| `p_has_shot` | boolean | スプライスのショット有無（`orders.splice_shot`）。既定 false |
+| `p_plate_size` | text | 定尺売りで指定 |
+
+- 返り値は jsonb（`PricingMasters` と同じ形）
+- 関数の中で `current_user_role()` を確認し、office・admin 以外（factory・未ログイン）は例外にする
+- 実行権限は `public` と `anon` から外し、`authenticated` にだけ付与する
+- アプリからは `lib/pricing/fetch-pricing-masters.ts` の `fetchPricingMasters()` で呼び、戻り値を `calculateCuttingPrice()` などにそのまま渡す
+
 ### 列単位のアクセス制御の実装方法
 
 単価情報（`order_items` の `cutting_unit_price` / `sales_unit_price`、`order_item_processes` の `unit_price`）については、現場ロールが参照できないことを DB レベルで保証する。RLS の `USING` / `WITH CHECK` は行単位の制御しかできず列単位のマスキングはできないため、以下の方式を採る。
@@ -668,7 +688,19 @@ DB の関数は `security definer`（関数所有者の権限で実行）とし�
 - 実テーブルへの直接 `select` は office/admin にのみ許可し、factory 向けのポリシーは作らない（ポリシーがない操作は RLS のデフォルトで拒否される）。
 - 単価列を除いたビュー（`order_items_factory_view` / `order_item_processes_factory_view`）を作成し、`security_invoker = false`（ビュー所有者の権限で実行）にすることで実テーブルの RLS を越えて中身を読み、単価列だけを除いて返す。factory を含む `authenticated` ロールにはこのビューへの `select` 権限のみを付与する。
 
+**既知の課題: 現場ロール用ビューの列が古い**
+
+2 つのビューは最初の RLS マイグレーション（`20260919130000_create_rls_policies.sql`）で作成したままで、その後に追加・変更された列が反映されていない。
+
+- `order_items_factory_view` に次の列がない: `cutting_type`・`special_product_type_id`・`steel_making`・`plate_size`・`outer_diameter`・`inner_diameter`・`actual_weight`・`material_weight`・`price_unit`
+- `order_items_factory_view` の重量の列名が、`square_weight` へのリネーム前の `unit_weight` のまま（ビューはリネーム後の列を指しているが、ビュー上の列名は古い）
+- `order_item_processes_factory_view` に `price_unit`（加工の単位）がない
+
+現場ロール（factory）は MVP では運用しないため急ぎではないが、現場用伝票など現場ロールがビューを使う機能を実装する前に、新しいマイグレーションでビューを作り直す。作り直す際も、単価列（`cutting_unit_price`・`sales_unit_price`・加工の `unit_price`）は引き続き除外する。
+
 `orders` の「factory は参照・ステータス更新のみ」も同様に列単位の制御が必要になる。RLS の UPDATE ポリシーは更新前後の行をそれぞれ独立にしか検証できず列同士を比較できないため、`status` 列以外が変更された場合に例外を発生させる `before update` トリガー（`restrict_orders_update_for_factory`）で強制する。
+
+当初は比較する列を 1 つずつ列挙していたが、その後に追加した列（`customer_contact`、スプライス・配達・論理削除の列）が比較から漏れ、現場ロールでも更新できる状態になっていた。今後も列の追加で漏れが起きないよう、`status`（と `updated_at`）以外の行全体を比較する方式に作り直した（`supabase/migrations/20260929100200_restrict_order_deletion_and_factory_updates.sql`）。
 
 ロール判定には `public.users.role` を参照するヘルパー関数 `current_user_role()` を用いる。`users` テーブル自体も RLS 対象であるため、ポリシー評価中に `users` を参照すると RLS ポリシーが再帰的に評価されてしまう。これを避けるため、この関数は `security definer`（関数所有者の権限で実行）として定義し、RLS を経由せずに `role` を読み取る。
 

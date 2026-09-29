@@ -12,8 +12,8 @@ export default async function PlateTypesPage() {
   const supabase = await createClient()
   const { data: plateTypes, error } = await supabase
     .from('plate_types')
-    .select('id, name, applies_material_extra, is_active')
-    .order('name')
+    .select('id, number, name, applies_material_extra, is_active')
+    .order('number')
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
@@ -38,6 +38,7 @@ export default async function PlateTypesPage() {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-300 text-left dark:border-neutral-700">
+            <th className="py-2 pr-4">番号</th>
             <th className="py-2 pr-4">種類名</th>
             <th className="py-2 pr-4">材質エキストラ</th>
             <th className="py-2 pr-4">状態</th>
@@ -50,6 +51,7 @@ export default async function PlateTypesPage() {
               key={plateType.id}
               className="border-b border-neutral-100 dark:border-neutral-800"
             >
+              <td className="py-2 pr-4">{plateType.number}</td>
               <td className="py-2 pr-4">{plateType.name}</td>
               <td className="py-2 pr-4">
                 {plateType.applies_material_extra ? '適用する' : '適用しない'}

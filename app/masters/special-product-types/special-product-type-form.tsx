@@ -3,6 +3,8 @@
 // 新規登録・編集の両方で使う入力フォーム。
 
 import { useActionState } from 'react'
+import { NumberField } from '@/components/masters/number-field'
+import { RESERVED_REGION_NUMBERS } from '@/lib/master-number'
 import {
   createSpecialProductType,
   updateSpecialProductType,
@@ -11,6 +13,7 @@ import {
 
 type SpecialProductType = {
   id: string
+  number: number
   name: string
   weight_basis: '実重量' | '角重量' | '使用材重量'
   min_weight: number | null
@@ -19,6 +22,7 @@ type SpecialProductType = {
   always_piece_price: boolean
   has_light_tier: boolean
   irregular_cut_quote_required: boolean
+  is_splice_order_type: boolean
   is_active: boolean
 }
 
@@ -42,6 +46,12 @@ export function SpecialProductTypeForm(props: SpecialProductTypeFormProps) {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      {/* 受注登録画面の「区分」の番号として使う。区分の定数と重なる番号は使えない */}
+      <NumberField
+        defaultValue={specialProductType?.number}
+        note={`${RESERVED_REGION_NUMBERS.join('・')} は区分（寸法切・アイトレ・定尺・加工）の番号のため使えません`}
+      />
+
       <div className="flex flex-col gap-1">
         <label htmlFor="name" className="text-sm">
           種別名
@@ -139,6 +149,17 @@ export function SpecialProductTypeForm(props: SpecialProductTypeFormProps) {
           defaultChecked={specialProductType?.irregular_cut_quote_required}
         />
         アイトレは別途見積もり
+      </label>
+
+      {/* スプライス専用の受注（受注単位で切り替える）の明細に使う種別。1 つだけ指定できる。
+          この種別は通常の受注の区分の一覧には出さない */}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="is_splice_order_type"
+          defaultChecked={specialProductType?.is_splice_order_type}
+        />
+        スプライス受注用の種別（通常の受注の区分には出さない）
       </label>
 
       {props.mode === 'edit' && (

@@ -6,15 +6,23 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
 export type ProcessTypeFormState = { error: string } | undefined
 
 type ParsedProcessTypeForm =
-  | { ok: true; values: { name: string; category: string | null } }
+  | { ok: true; values: { number: number; name: string; category: string | null } }
   | { ok: false; error: string }
 
 function readProcessTypeForm(formData: FormData): ParsedProcessTypeForm {
+  // 番号は受注登録画面で加工方法を選ぶときに入力する値。
+  // DB 上は NULL 可（番号のない既存行があるため）だが、画面からの登録・更新では必須にする
+  const number = readMasterNumber(formData)
+  if (!number.ok) {
+    return number
+  }
+
   const name = formData.get('name')
   const category = formData.get('category')
 
@@ -25,6 +33,7 @@ function readProcessTypeForm(formData: FormData): ParsedProcessTypeForm {
   return {
     ok: true,
     values: {
+      number: number.value,
       name: name.trim(),
       category:
         typeof category === 'string' && category.trim()
@@ -32,6 +41,14 @@ function readProcessTypeForm(formData: FormData): ParsedProcessTypeForm {
           : null,
     },
   }
+}
+
+// 番号の一意制約違反のときだけ分かりやすいメッセージにする
+function errorMessage(error: { code?: string; message?: string }, action: string): string {
+  if (isNumberUniqueViolation(error)) {
+    return 'この番号は既に使われています'
+  }
+  return `${action}に失敗しました: ${error.message}`
 }
 
 export async function createProcessType(
@@ -47,7 +64,7 @@ export async function createProcessType(
   const { error } = await supabase.from('process_types').insert(parsed.values)
 
   if (error) {
-    return { error: `登録に失敗しました: ${error.message}` }
+    return { error: errorMessage(error, '登録') }
   }
 
   revalidatePath('/masters/process-types')
@@ -74,7 +91,7 @@ export async function updateProcessType(
     .eq('id', processTypeId)
 
   if (error) {
-    return { error: `更新に失敗しました: ${error.message}` }
+    return { error: errorMessage(error, '更新') }
   }
 
   revalidatePath('/masters/process-types')

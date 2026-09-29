@@ -13,9 +13,9 @@ export default async function SpecialProductTypesPage() {
   const { data: specialProductTypes, error } = await supabase
     .from('special_product_types')
     .select(
-      'id, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_active'
+      'id, number, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_splice_order_type, is_active'
     )
-    .order('name')
+    .order('number')
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -40,6 +40,7 @@ export default async function SpecialProductTypesPage() {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-300 text-left dark:border-neutral-700">
+            <th className="py-2 pr-4">番号</th>
             <th className="py-2 pr-4">種別名</th>
             <th className="py-2 pr-4">重量の基準</th>
             <th className="py-2 pr-4">最低保証重量</th>
@@ -48,6 +49,7 @@ export default async function SpecialProductTypesPage() {
             <th className="py-2 pr-4">常に枚単価</th>
             <th className="py-2 pr-4">1.5kgの段</th>
             <th className="py-2 pr-4">アイトレ</th>
+            <th className="py-2 pr-4">スプライス受注用</th>
             <th className="py-2 pr-4">状態</th>
             {isAdmin && <th className="py-2 pr-4" />}
           </tr>
@@ -58,6 +60,7 @@ export default async function SpecialProductTypesPage() {
               key={type.id}
               className="border-b border-neutral-100 dark:border-neutral-800"
             >
+              <td className="py-2 pr-4">{type.number}</td>
               <td className="py-2 pr-4">{type.name}</td>
               <td className="py-2 pr-4">{type.weight_basis}</td>
               <td className="py-2 pr-4">{type.min_weight ?? ''}</td>
@@ -74,6 +77,7 @@ export default async function SpecialProductTypesPage() {
               <td className="py-2 pr-4">
                 {type.irregular_cut_quote_required ? '別途見積もり' : '単価どおり'}
               </td>
+              <td className="py-2 pr-4">{type.is_splice_order_type ? 'はい' : ''}</td>
               <td className="py-2 pr-4">{type.is_active ? '有効' : '無効'}</td>
               {isAdmin && (
                 <td className="py-2 pr-4">

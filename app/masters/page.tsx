@@ -12,6 +12,7 @@ const MASTER_LINKS = [
   { href: '/masters/unit-weights', label: '単位質量' },
   { href: '/masters/process-types', label: '加工種別' },
   { href: '/masters/manufacturers', label: 'メーカー' },
+  { href: '/masters/delivery-methods', label: '配達方法' },
 ] as const
 
 // admin のみ参照できる価格系マスタ（docs/table-design.md RLS方針「価格系マスタ」）

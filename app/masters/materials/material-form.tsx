@@ -3,10 +3,12 @@
 // 新規登録・編集の両方で使う入力フォーム。customer-form.tsx と同じ構造。
 
 import { useActionState } from 'react'
+import { NumberField } from '@/components/masters/number-field'
 import { createMaterial, updateMaterial, type MaterialFormState } from './actions'
 
 type Material = {
   id: string
+  number: number
   name: string
   line_mark: string | null
   display_color: string | null
@@ -33,6 +35,8 @@ export function MaterialForm(props: MaterialFormProps) {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      <NumberField defaultValue={material?.number} />
+
       <div className="flex flex-col gap-1">
         <label htmlFor="name" className="text-sm">
           材質名
