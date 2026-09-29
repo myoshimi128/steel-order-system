@@ -11,7 +11,8 @@
 --
 -- 前提: 001_products_initial_data.sql で plate_types / materials / products が投入済みであること。
 --       マイグレーション 20260926100000_add_price_tier_flags.sql（最低保証重量のフラグ列）と
---       20260926110000_splice_weight_basis_and_irregular_cut_flag.sql（アイトレ別途のフラグ列）が
+--       20260926110000_splice_weight_basis_and_irregular_cut_flag.sql（アイトレ別途のフラグ列）と
+--       20260929100000_add_master_numbers_and_delivery_methods.sql（番号・スプライス受注用フラグの列）が
 --       適用済みであること。
 -- このスクリプトは空の価格系テーブルに対して一度だけ実行する想定（ON CONFLICT 処理は入れていない）。
 --
@@ -374,17 +375,19 @@ from (values ('3x6'), ('4x8'), ('5x10')) as s(plate_size);
 --   スプライス: 角重量・3kg保証。板厚エキストラ・大板加算は適用しない（該当板厚は別途見積もり）。
 --               寸法切を前提としたセット価格のため、アイトレは別途見積もり
 --               （請求は角重量が基本。寸法切では角重量と実重量は同じ値になる）
---   ササラ    : 使用材の重量（手入力）。板厚エキストラ・大板加算は適用しない
+--   ササラ    : 使用材の重量（使用材の寸法から自動計算）。板厚エキストラ・大板加算は適用しない
 --   ベタ丸    : 角重量。板厚エキストラ・大板加算を適用。常に枚単価で表示。1.5kg の段あり
 --   ドーナツ  : ベタ丸と同じ
+-- number は受注登録画面の区分の番号（区分の定数 1・2・3・9 と重ならない値）。
+-- is_splice_order_type はスプライス専用の受注で使う種別（スプライスのみ true）。
 insert into public.special_product_types
   (name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price,
-   has_light_tier, irregular_cut_quote_required)
+   has_light_tier, irregular_cut_quote_required, number, is_splice_order_type)
 values
-  ('スプライス', '角重量',     3,    false, false, false, false, true),
-  ('ササラ',     '使用材重量', null, false, false, false, false, false),
-  ('ベタ丸',     '角重量',     null, true,  true,  true,  true,  false),
-  ('ドーナツ',   '角重量',     null, true,  true,  true,  true,  false);
+  ('スプライス', '角重量',     3,    false, false, false, false, true,  4, true),
+  ('ササラ',     '使用材重量', null, false, false, false, false, false, 5, false),
+  ('ベタ丸',     '角重量',     null, true,  true,  true,  true,  false, 7, false),
+  ('ドーナツ',   '角重量',     null, true,  true,  true,  true,  false, 8, false);
 
 
 -- ============================================================

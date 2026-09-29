@@ -1,5 +1,8 @@
 -- 商品マスタ（plate_types / materials / products）の初期データ。
 --
+-- 前提: マイグレーションをすべて適用済みであること
+-- （plate_types.number・materials.number は 20260929100000_add_master_numbers_and_delivery_methods.sql で追加）。
+--
 -- 出典: 社内の在庫表をもとに作成（2026年3月時点）。
 --
 -- 在庫表は拠点別にも集計されているが、products は
@@ -32,11 +35,12 @@
 -- ============================================================
 -- 材質エキストラ（material_extras）を適用するのは普通板のみ
 -- （docs/table-design.md plate_types の説明を参照）。
-insert into public.plate_types (name, applies_material_extra) values
-  ('普通板', true),
-  ('縞板', false),
-  ('ボンデ', false),
-  ('ミガキ', false);
+-- number は受注登録画面で種類を選ぶ番号（0 普通板が初期値。docs/screen-design.md「番号の一覧」）。
+insert into public.plate_types (name, applies_material_extra, number) values
+  ('普通板', true,  0),
+  ('縞板',   false, 1),
+  ('ボンデ', false, 2),
+  ('ミガキ', false, 3);
 
 
 -- ============================================================
@@ -48,16 +52,17 @@ insert into public.plate_types (name, applies_material_extra) values
 -- （運用しながらマスタ管理画面で埋めていく想定）。
 -- has_dedicated_price（専用単価を持つか）は SN400C・SM400A・TMCP325C・TMCP385C のみ true。
 -- それ以外は SS400 ベースの単価に材質エキストラを加算して求める（docs/basic-design.md 参照）。
-insert into public.materials (name, has_dedicated_price) values
-  ('SS400', false),
-  ('SM490A', false),
-  ('SM400A', true),
-  ('SN400B', false),
-  ('SN400C', true),
-  ('SN490B', false),
-  ('SN490C', false),
-  ('TMCP325C', true),
-  ('TMCP385C', true);
+-- number は受注登録画面で材質を選ぶ番号（画面デザインの材質の一覧どおり）。
+insert into public.materials (name, has_dedicated_price, number) values
+  ('SS400',    false, 1),
+  ('SM490A',   false, 2),
+  ('SM400A',   true,  3),
+  ('SN400B',   false, 4),
+  ('SN400C',   true,  6),
+  ('SN490B',   false, 7),
+  ('SN490C',   false, 5),
+  ('TMCP325C', true,  8),
+  ('TMCP385C', true,  9);
 
 
 -- ============================================================
