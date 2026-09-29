@@ -206,6 +206,30 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_methods: {
+        Row: {
+          id: string
+          is_active: boolean
+          name: string
+          number: number
+          requires_note: boolean
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          name: string
+          number: number
+          requires_note?: boolean
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          name?: string
+          number?: number
+          requires_note?: boolean
+        }
+        Relationships: []
+      }
       large_plate_extras: {
         Row: {
           extra_price: number
@@ -282,6 +306,7 @@ export type Database = {
           is_active: boolean
           line_mark: string | null
           name: string
+          number: number
         }
         Insert: {
           display_color?: string | null
@@ -290,6 +315,7 @@ export type Database = {
           is_active?: boolean
           line_mark?: string | null
           name: string
+          number: number
         }
         Update: {
           display_color?: string | null
@@ -298,6 +324,7 @@ export type Database = {
           is_active?: boolean
           line_mark?: string | null
           name?: string
+          number?: number
         }
         Relationships: []
       }
@@ -348,6 +375,7 @@ export type Database = {
           id: string
           line_no: number
           order_item_id: string
+          price_unit: string
           process_type_id: string
           quantity: number | null
           remarks: string | null
@@ -358,6 +386,7 @@ export type Database = {
           id?: string
           line_no: number
           order_item_id: string
+          price_unit?: string
           process_type_id: string
           quantity?: number | null
           remarks?: string | null
@@ -368,6 +397,7 @@ export type Database = {
           id?: string
           line_no?: number
           order_item_id?: string
+          price_unit?: string
           process_type_id?: string
           quantity?: number | null
           remarks?: string | null
@@ -416,6 +446,7 @@ export type Database = {
           order_id: string
           outer_diameter: number | null
           package_count: number | null
+          plate_size: string | null
           price_unit: string | null
           product_id: string
           quantity: number
@@ -443,6 +474,7 @@ export type Database = {
           order_id: string
           outer_diameter?: number | null
           package_count?: number | null
+          plate_size?: string | null
           price_unit?: string | null
           product_id: string
           quantity: number
@@ -470,6 +502,7 @@ export type Database = {
           order_id?: string
           outer_diameter?: number | null
           package_count?: number | null
+          plate_size?: string | null
           price_unit?: string | null
           product_id?: string
           quantity?: number
@@ -557,15 +590,21 @@ export type Database = {
           created_by: string
           customer_contact: string | null
           customer_id: string
+          deleted_at: string | null
           delivery_destination_id: string
+          delivery_method_id: string
+          delivery_method_note: string | null
           due_date: string | null
           due_date_type: string
           field_note: string | null
           id: string
+          is_splice: boolean
+          joint_no: string | null
           order_date: string
           order_no: string
           project_name: string | null
           remarks: string | null
+          splice_shot: boolean | null
           status: string
           updated_at: string
         }
@@ -574,15 +613,21 @@ export type Database = {
           created_by: string
           customer_contact?: string | null
           customer_id: string
+          deleted_at?: string | null
           delivery_destination_id: string
+          delivery_method_id: string
+          delivery_method_note?: string | null
           due_date?: string | null
           due_date_type: string
           field_note?: string | null
           id?: string
+          is_splice?: boolean
+          joint_no?: string | null
           order_date: string
           order_no: string
           project_name?: string | null
           remarks?: string | null
+          splice_shot?: boolean | null
           status?: string
           updated_at?: string
         }
@@ -591,15 +636,21 @@ export type Database = {
           created_by?: string
           customer_contact?: string | null
           customer_id?: string
+          deleted_at?: string | null
           delivery_destination_id?: string
+          delivery_method_id?: string
+          delivery_method_note?: string | null
           due_date?: string | null
           due_date_type?: string
           field_note?: string | null
           id?: string
+          is_splice?: boolean
+          joint_no?: string | null
           order_date?: string
           order_no?: string
           project_name?: string | null
           remarks?: string | null
+          splice_shot?: boolean | null
           status?: string
           updated_at?: string
         }
@@ -625,6 +676,13 @@ export type Database = {
             referencedRelation: "delivery_destinations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "orders_delivery_method_id_fkey"
+            columns: ["delivery_method_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_methods"
+            referencedColumns: ["id"]
+          },
         ]
       }
       plate_types: {
@@ -633,18 +691,21 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          number: number
         }
         Insert: {
           applies_material_extra?: boolean
           id?: string
           is_active?: boolean
           name: string
+          number: number
         }
         Update: {
           applies_material_extra?: boolean
           id?: string
           is_active?: boolean
           name?: string
+          number?: number
         }
         Relationships: []
       }
@@ -654,18 +715,21 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          number: number | null
         }
         Insert: {
           category?: string | null
           id?: string
           is_active?: boolean
           name: string
+          number?: number | null
         }
         Update: {
           category?: string | null
           id?: string
           is_active?: boolean
           name?: string
+          number?: number | null
         }
         Relationships: []
       }
@@ -856,8 +920,10 @@ export type Database = {
           id: string
           irregular_cut_quote_required: boolean
           is_active: boolean
+          is_splice_order_type: boolean
           min_weight: number | null
           name: string
+          number: number
           weight_basis: string
         }
         Insert: {
@@ -868,8 +934,10 @@ export type Database = {
           id?: string
           irregular_cut_quote_required?: boolean
           is_active?: boolean
+          is_splice_order_type?: boolean
           min_weight?: number | null
           name: string
+          number: number
           weight_basis: string
         }
         Update: {
@@ -880,8 +948,10 @@ export type Database = {
           id?: string
           irregular_cut_quote_required?: boolean
           is_active?: boolean
+          is_splice_order_type?: boolean
           min_weight?: number | null
           name?: string
+          number?: number
           weight_basis?: string
         }
         Relationships: []
@@ -1176,6 +1246,20 @@ export type Database = {
     }
     Functions: {
       current_user_role: { Args: never; Returns: string }
+      get_pricing_rows: {
+        Args: {
+          p_as_of: string
+          p_cutting_method?: string
+          p_cutting_type?: string
+          p_has_shot?: boolean
+          p_material_id?: string
+          p_plate_size?: string
+          p_plate_type_id: string
+          p_special_product_type_id?: string
+          p_thickness: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
