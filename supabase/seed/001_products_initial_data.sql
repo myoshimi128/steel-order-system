@@ -1,7 +1,8 @@
 -- 商品マスタ（plate_types / materials / products）の初期データ。
 --
 -- 前提: マイグレーションをすべて適用済みであること
--- （plate_types.number・materials.number は 20260929100000_add_master_numbers_and_delivery_methods.sql で追加）。
+-- （plate_types.number・materials.number は 20260929100000_add_master_numbers_and_delivery_methods.sql、
+--   materials.default_steel_making は 20260930100500_material_default_values.sql で追加）。
 --
 -- 出典: 社内の在庫表をもとに作成（2026年3月時点）。
 --
@@ -52,17 +53,20 @@ insert into public.plate_types (name, applies_material_extra, number) values
 -- （運用しながらマスタ管理画面で埋めていく想定）。
 -- has_dedicated_price（専用単価を持つか）は SN400C・SM400A・TMCP325C・TMCP385C のみ true。
 -- それ以外は SS400 ベースの単価に材質エキストラを加算して求める（docs/basic-design.md 参照）。
--- number は受注登録画面で材質を選ぶ番号（画面デザインの材質の一覧どおり）。
-insert into public.materials (name, has_dedicated_price, number) values
-  ('SS400',    false, 1),
-  ('SM490A',   false, 2),
-  ('SM400A',   true,  3),
-  ('SN400B',   false, 4),
-  ('SN400C',   true,  6),
-  ('SN490B',   false, 7),
-  ('SN490C',   false, 5),
-  ('TMCP325C', true,  8),
-  ('TMCP385C', true,  9);
+-- number は受注登録画面で材質を選ぶ番号。最も多く使う SS400 を「0（いつもの値＝初期値）」にし、
+-- ほかは画面デザインの材質の一覧どおり（1 は空き番号）。
+-- default_steel_making は、受注明細で材質を選んだときに入れる製鋼法の初期値
+-- （SS400 は電炉材、それ以外の規格材は高炉材。画面で変更できる）。
+insert into public.materials (name, has_dedicated_price, number, default_steel_making) values
+  ('SS400',    false, 0, '電炉材'),
+  ('SM490A',   false, 2, '高炉材'),
+  ('SM400A',   true,  3, '高炉材'),
+  ('SN400B',   false, 4, '高炉材'),
+  ('SN400C',   true,  6, '高炉材'),
+  ('SN490B',   false, 7, '高炉材'),
+  ('SN490C',   false, 5, '高炉材'),
+  ('TMCP325C', true,  8, '高炉材'),
+  ('TMCP385C', true,  9, '高炉材');
 
 
 -- ============================================================

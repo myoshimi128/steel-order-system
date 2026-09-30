@@ -22,6 +22,8 @@ type TextFieldProps = {
   maxLength?: number
   // 入力欄の幅（Tailwind のクラス）
   widthClass?: string
+  // エラーの文章を欄の下に出すか（明細の行では false にし、行の下にまとめて出す）
+  showErrorText?: boolean
 }
 
 export function TextField({
@@ -35,6 +37,7 @@ export function TextField({
   onPrevious,
   maxLength,
   widthClass = 'w-40',
+  showErrorText = true,
 }: TextFieldProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (isComposing(event) || event.key !== 'Enter') {
@@ -61,6 +64,8 @@ export function TextField({
           ref={inputRef}
           type="text"
           autoComplete="off"
+          // 文字を入れる欄の印。明細の行のキー操作（「*」「-」など）を、この欄では普通の文字として扱う
+          data-free-text="true"
           value={value}
           maxLength={maxLength}
           onChange={(event) => onValueChange(event.target.value)}
@@ -70,7 +75,7 @@ export function TextField({
             error ? 'border-red-500' : 'border-neutral-300 dark:border-neutral-700'
           }`}
         />
-        <FieldError message={error} />
+        {showErrorText && <FieldError message={error} />}
       </div>
     </div>
   )

@@ -306,6 +306,7 @@ export type Database = {
       }
       materials: {
         Row: {
+          default_steel_making: string
           display_color: string | null
           has_dedicated_price: boolean
           id: string
@@ -315,6 +316,7 @@ export type Database = {
           number: number
         }
         Insert: {
+          default_steel_making?: string
           display_color?: string | null
           has_dedicated_price?: boolean
           id?: string
@@ -324,6 +326,7 @@ export type Database = {
           number: number
         }
         Update: {
+          default_steel_making?: string
           display_color?: string | null
           has_dedicated_price?: boolean
           id?: string
@@ -922,6 +925,7 @@ export type Database = {
           always_piece_price: boolean
           applies_large_plate_extra: boolean
           applies_thickness_extra: boolean
+          dimension_shape: string
           has_light_tier: boolean
           id: string
           irregular_cut_quote_required: boolean
@@ -936,6 +940,7 @@ export type Database = {
           always_piece_price?: boolean
           applies_large_plate_extra?: boolean
           applies_thickness_extra?: boolean
+          dimension_shape?: string
           has_light_tier?: boolean
           id?: string
           irregular_cut_quote_required?: boolean
@@ -950,6 +955,7 @@ export type Database = {
           always_piece_price?: boolean
           applies_large_plate_extra?: boolean
           applies_thickness_extra?: boolean
+          dimension_shape?: string
           has_light_tier?: boolean
           id?: string
           irregular_cut_quote_required?: boolean
@@ -1251,6 +1257,7 @@ export type Database = {
       }
     }
     Functions: {
+      create_order: { Args: { p_items: Json; p_order: Json }; Returns: string }
       current_user_role: { Args: never; Returns: string }
       get_pricing_rows: {
         Args: {

@@ -1,6 +1,6 @@
 'use client'
 
-// 入力欄の移動（Enter で次の欄、Shift+Enter で前の欄）を管理するカスタムフック。
+// 入力欄の移動（Enter・↓ で次の欄、Shift+Enter・↑ で前の欄）を管理するカスタムフック。
 //
 // 受注登録画面はテンキーだけで入力を進めるため、Tab ではなく Enter で次の欄へ移る
 // （docs/screen-design.md「入力方式」）。入力順は欄の ID の配列で受け取り、
@@ -11,7 +11,8 @@
 //   <input ref={navigation.register('customerId')} ... />
 //   Enter のときに navigation.focusNext('customerId') を呼ぶ
 
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef, type KeyboardEvent } from 'react'
+import { isComposing } from './is-composing'
 
 // フォーカスを当てられる要素（input・button など）
 type FocusableElement = HTMLElement
@@ -62,7 +63,12 @@ export function useFieldNavigation(order: readonly string[]) {
   const move = useCallback(
     (fromId: string, step: 1 | -1) => {
       const currentOrder = orderRef.current
-      let index = currentOrder.indexOf(fromId) + step
+      const fromIndex = currentOrder.indexOf(fromId)
+      // 入力順に含まれない欄（明細の摘要など）からは移動しない（先頭の欄へ飛んでしまうため）
+      if (fromIndex < 0) {
+        return
+      }
+      let index = fromIndex + step
       while (index >= 0 && index < currentOrder.length) {
         if (focusField(currentOrder[index])) {
           return
@@ -91,6 +97,14 @@ export function useFieldNavigation(order: readonly string[]) {
     [move],
   )
 
+  // 指定した欄へ、画面の更新が終わってから移る（行を挿入した直後など、欄がまだ画面にない場合）
+  const focusFieldLater = useCallback(
+    (id: string) => {
+      setTimeout(() => focusField(id), 0)
+    },
+    [focusField],
+  )
+
   // 入力順の最初の欄へ移る（保存後に次の入力を始めるときなど）
   const focusFirst = useCallback(() => {
     setTimeout(() => {
@@ -114,7 +128,57 @@ export function useFieldNavigation(order: readonly string[]) {
     [register, focusNext, focusPrevious],
   )
 
-  return { register, fieldProps, focusField, focusNext, focusPrevious, focusFirst }
+  // 矢印キー（↑ で前の欄、↓ で次の欄）での移動。画面全体の外枠の onKeyDown に渡して使う。
+  //   <div onKeyDown={navigation.handleArrowKeys}> ... </div>
+  // 欄ごとに処理を書かず、ここ 1 か所でヘッダー・明細の両方の欄を同じように動かす。
+  // ← → は欄の中の文字の移動に使うため、ここでは扱わない。
+  // 次の場合は移動しない（欄の側の操作を優先する）。
+  //   ・欄の側でキーを処理済み（event.defaultPrevented）: 「/」で一覧を開いているときの候補の選択など
+  //   ・日本語入力の変換中: ↑↓ は変換候補の選択に使う
+  //   ・入力順に登録されていない欄（一覧の検索の欄・明細の摘要など）
+  const handleArrowKeys = useCallback(
+    (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+        return
+      }
+      if (
+        event.defaultPrevented ||
+        event.shiftKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey ||
+        isComposing(event)
+      ) {
+        return
+      }
+      // フォーカスのある要素から、欄の ID を探す
+      let fieldId: string | undefined
+      for (const [id, element] of elementsRef.current) {
+        if (element === event.target) {
+          fieldId = id
+          break
+        }
+      }
+      if (!fieldId || !orderRef.current.includes(fieldId)) {
+        return
+      }
+      // 入力欄の中でカーソルが先頭・末尾へ動く既定の動作を止めて、欄を移動する
+      event.preventDefault()
+      move(fieldId, event.key === 'ArrowDown' ? 1 : -1)
+    },
+    [move],
+  )
+
+  return {
+    register,
+    fieldProps,
+    handleArrowKeys,
+    focusField,
+    focusFieldLater,
+    focusNext,
+    focusPrevious,
+    focusFirst,
+  }
 }
 
 export type FieldNavigation = ReturnType<typeof useFieldNavigation>

@@ -20,6 +20,10 @@ export type SpecialProductTypeFormState = { error: string } | undefined
 const WEIGHT_BASIS_VALUES = ['実重量', '角重量', '使用材重量'] as const
 type WeightBasis = (typeof WEIGHT_BASIS_VALUES)[number]
 
+// 20260930100200_add_dimension_shape_to_special_product_types.sql の check と同じ値
+const DIMENSION_SHAPE_VALUES = ['角', '円', 'ドーナツ'] as const
+type DimensionShape = (typeof DIMENSION_SHAPE_VALUES)[number]
+
 type ParsedSpecialProductTypeForm =
   | {
       ok: true
@@ -28,6 +32,7 @@ type ParsedSpecialProductTypeForm =
         name: string
         weight_basis: WeightBasis
         min_weight: number | null
+        dimension_shape: DimensionShape
       }
     }
   | { ok: false; error: string }
@@ -52,6 +57,7 @@ function readSpecialProductTypeForm(
   const name = formData.get('name')
   const weightBasis = formData.get('weight_basis')
   const minWeightRaw = formData.get('min_weight')
+  const dimensionShape = formData.get('dimension_shape')
 
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '種別名を入力してください' }
@@ -62,6 +68,14 @@ function readSpecialProductTypeForm(
     !WEIGHT_BASIS_VALUES.includes(weightBasis as WeightBasis)
   ) {
     return { ok: false, error: '重量の基準を選択してください' }
+  }
+
+  // 寸法の形は、受注登録画面の明細で寸法の入力欄を切り替えるために使う
+  if (
+    typeof dimensionShape !== 'string' ||
+    !DIMENSION_SHAPE_VALUES.includes(dimensionShape as DimensionShape)
+  ) {
+    return { ok: false, error: '寸法の形を選択してください' }
   }
 
   // 最低保証重量は任意項目（スプライス以外は空欄のまま）
@@ -80,6 +94,7 @@ function readSpecialProductTypeForm(
       name: name.trim(),
       weight_basis: weightBasis as WeightBasis,
       min_weight: minWeight,
+      dimension_shape: dimensionShape as DimensionShape,
     },
   }
 }

@@ -13,7 +13,7 @@ export default async function SpecialProductTypesPage() {
   const { data: specialProductTypes, error } = await supabase
     .from('special_product_types')
     .select(
-      'id, number, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_splice_order_type, is_active'
+      'id, number, name, weight_basis, dimension_shape, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_splice_order_type, is_active'
     )
     .order('number')
 
@@ -43,6 +43,7 @@ export default async function SpecialProductTypesPage() {
             <th className="py-2 pr-4">番号</th>
             <th className="py-2 pr-4">種別名</th>
             <th className="py-2 pr-4">重量の基準</th>
+            <th className="py-2 pr-4">寸法の形</th>
             <th className="py-2 pr-4">最低保証重量</th>
             <th className="py-2 pr-4">板厚エキストラ</th>
             <th className="py-2 pr-4">大板加算</th>
@@ -63,6 +64,7 @@ export default async function SpecialProductTypesPage() {
               <td className="py-2 pr-4">{type.number}</td>
               <td className="py-2 pr-4">{type.name}</td>
               <td className="py-2 pr-4">{type.weight_basis}</td>
+              <td className="py-2 pr-4">{type.dimension_shape}</td>
               <td className="py-2 pr-4">{type.min_weight ?? ''}</td>
               <td className="py-2 pr-4">
                 {type.applies_thickness_extra ? '適用する' : '適用しない'}

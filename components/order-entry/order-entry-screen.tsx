@@ -1,66 +1,111 @@
 'use client'
 
-// 受注登録画面の全体。ヘッダー・明細・補助エリア・登録ボタンを並べる。
-// 現時点ではヘッダーのみ実装しており、明細と補助エリアは次の作業で追加する。
+// 受注登録画面の全体。ヘッダー・明細・キー操作の案内・登録ボタンを並べる。
+// 補助エリア（注意事項・スタンプ・フリーコメント）は次の作業で追加する。
 //
-// 入力値は useOrderHeader、欄の移動は useFieldNavigation が管理する。
+//   入力値: useOrderHeader（ヘッダー）・useOrderItems（明細）
+//   計算  : useItemCalculations（重量・仕入単価・合計）
+//   欄の移動: useFieldNavigation（ヘッダー → 明細の各行 → 登録ボタン の順）
 // ここでは保存の流れ（確認 → Server Action の呼び出し → 結果の表示）だけを扱う。
 
-import { useState, useTransition, type KeyboardEvent } from 'react'
-import { createOrderHeader } from '@/app/orders/new/actions'
+import { useEffect, useState, useTransition, type KeyboardEvent } from 'react'
+import { createOrder } from '@/app/orders/new/actions'
 import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
+import { itemFieldId, itemFieldOrder } from '@/lib/order-entry/item-row'
+import type { ItemFieldName } from '@/lib/order-entry/item-types'
+import type { OrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
+import { useItemCalculations } from '@/lib/order-entry/use-item-calculations'
+import { useOrderHeader } from '@/lib/order-entry/use-order-header'
+import { useOrderItems } from '@/lib/order-entry/use-order-items'
 import { hasErrors } from '@/lib/order-entry/validate-order-header'
-import {
-  useOrderHeader,
-  type HeaderMasterOptions,
-} from '@/lib/order-entry/use-order-header'
+import { hasItemErrors } from '@/lib/order-entry/validate-order-items'
 import { OrderHeader } from './header/order-header'
+import { KeyGuide } from './items/key-guide'
+import { OrderItemsTable } from './items/order-items-table'
 
 type OrderEntryScreenProps = {
-  masters: HeaderMasterOptions
+  masters: OrderEntryMasters
   // 日本時間の今日の日付 'YYYY-MM-DD'（サーバーで求めて渡す）
   today: string
 }
 
+type StatusMessage = { kind: 'success' | 'error' | 'info'; text: string }
+
 export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
-  const header = useOrderHeader(masters, today)
-  const navigation = useFieldNavigation(header.fieldOrder)
+  const header = useOrderHeader(masters.header, today)
+  const items = useOrderItems(masters.items)
+  // 単価の基準日は受注日（料金改定があっても受注日時点の単価を使う）
+  const { rows: calculations, totals } = useItemCalculations(items.checks, header.values.orderDate)
+
+  // 画面全体の入力順: ヘッダーの欄 → 明細の各行の欄 → 登録ボタン
+  const fieldOrder = [
+    ...header.fieldOrder.filter((id) => id !== 'submit'),
+    ...items.rows.flatMap((row, index) =>
+      itemFieldOrder(row, items.checks[index].resolved, masters.items),
+    ),
+    'submit',
+  ]
+  const navigation = useFieldNavigation(fieldOrder)
+
+  // 画面を開いたら、入力順の最初の欄（処理区分）にカーソルを置く。
+  // 登録後に画面が空に戻ったときも、handleSubmit の中で同じく最初の欄へ移る
+  const { focusFirst } = navigation
+  useEffect(() => {
+    focusFirst()
+  }, [focusFirst])
+
   const [isPending, startTransition] = useTransition()
-  // 保存の結果のメッセージ（成功・失敗）
-  const [result, setResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(
-    null,
-  )
+  // 画面下部に出すメッセージ（保存の結果・キー操作の案内など）
+  const [status, setStatus] = useState<StatusMessage | null>(null)
+
+  // エラーのある最初の欄へ移る（ヘッダー → 明細の順に探す）
+  function focusFirstError(
+    headerErrorIds: string[],
+    itemErrors: Record<string, Partial<Record<ItemFieldName, string>>>,
+  ) {
+    const errorIds = new Set(headerErrorIds)
+    for (const [rowKey, errors] of Object.entries(itemErrors)) {
+      for (const field of Object.keys(errors) as ItemFieldName[]) {
+        errorIds.add(itemFieldId(rowKey, field))
+      }
+    }
+    const first = fieldOrder.find((id) => errorIds.has(id))
+    if (first) {
+      navigation.focusField(first)
+    }
+  }
 
   function handleSubmit() {
-    setResult(null)
+    setStatus(null)
 
-    // 画面側で先に確認し、エラーがあれば最初の欄へ移る
-    const errors = header.validate()
-    if (hasErrors(errors)) {
-      const firstErrorField = header.fieldOrder.find((id) => id in errors)
-      if (firstErrorField) {
-        navigation.focusField(firstErrorField)
-      }
-      setResult({ kind: 'error', text: '入力内容を確認してください' })
+    // 画面側で先に確認する（サーバーでも同じ確認をする）
+    const headerErrors = header.validate()
+    const itemsValidation = items.validate()
+    if (hasErrors(headerErrors) || hasItemErrors(itemsValidation)) {
+      focusFirstError(Object.keys(headerErrors), itemsValidation.rowErrors)
+      setStatus({ kind: 'error', text: itemsValidation.itemsError ?? '入力内容を確認してください' })
       return
     }
 
-    // Server Action を呼んで保存する。startTransition の中で呼ぶと、
-    // 保存中（isPending）の状態を使ってボタンを押せなくできる
-    const input = header.toInput()
+    // Server Action を呼んで、ヘッダーと明細をまとめて保存する。
+    // startTransition の中で呼ぶと、保存中（isPending）の状態を使ってボタンを押せなくできる
+    const headerInput = header.toInput()
+    const itemRows = items.rows
     startTransition(async () => {
-      const response = await createOrderHeader(input)
+      const response = await createOrder(headerInput, itemRows)
       if (response.ok) {
-        setResult({ kind: 'success', text: `受注No. ${response.orderNo} を登録しました` })
+        setStatus({ kind: 'success', text: `受注No. ${response.orderNo} を登録しました` })
         // 次の受注を続けて入力できるよう、初期値に戻して最初の欄へ移る
         header.reset()
+        items.reset()
         navigation.focusFirst()
         return
       }
-      if (response.errors) {
-        header.setErrors(response.errors)
+      if (response.headerErrors) {
+        header.setErrors(response.headerErrors)
       }
-      setResult({ kind: 'error', text: response.message ?? '入力内容を確認してください' })
+      items.setServerErrors(response.itemErrors, response.itemsError)
+      setStatus({ kind: 'error', text: response.message ?? '入力内容を確認してください' })
     })
   }
 
@@ -73,26 +118,46 @@ export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // 画面の高さ（上部のユーザー表示の分を除く）に収め、明細の部分だけをスクロールさせる。
+    // ↑↓ による欄の移動は、ここ（画面全体の外枠）でまとめて受け取る
+    <div
+      onKeyDown={navigation.handleArrowKeys}
+      className="flex h-[calc(100dvh-41px)] min-h-0 flex-col"
+    >
       {/* ヘッダーは固定表示（明細が増えても見失わないようにする） */}
-      <div className="sticky top-0 z-10">
-        <OrderHeader header={header} navigation={navigation} masters={masters} today={today} />
+      <div className="shrink-0">
+        <OrderHeader
+          header={header}
+          navigation={navigation}
+          masters={masters.header}
+          today={today}
+        />
       </div>
 
-      {/* 明細（次の作業で実装） */}
-      <div className="flex-1 px-6 py-8 text-sm text-neutral-400">明細は次の作業で実装します</div>
+      <OrderItemsTable
+        items={items}
+        calculations={calculations}
+        totals={totals}
+        masters={masters.items}
+        navigation={navigation}
+        onNotice={(text) => setStatus({ kind: 'info', text })}
+      />
 
-      <footer className="flex items-center justify-end gap-4 border-t border-neutral-200 px-6 py-4 dark:border-neutral-800">
-        {result && (
+      <KeyGuide />
+
+      <footer className="flex shrink-0 items-center justify-end gap-4 border-t border-neutral-200 px-6 py-3 dark:border-neutral-800">
+        {status && (
           <p
             role="status"
             className={`text-sm ${
-              result.kind === 'success'
+              status.kind === 'success'
                 ? 'text-green-700 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
+                : status.kind === 'error'
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-neutral-600 dark:text-neutral-400'
             }`}
           >
-            {result.text}
+            {status.text}
           </p>
         )}
         <button

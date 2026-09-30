@@ -49,6 +49,8 @@ export function CodeList<T>({ title, options, highlightIndex, onSelect, search }
             // 一覧を開いたらすぐに検索の文字を打てるよう、検索の欄にフォーカスを当てる
             autoFocus
             autoComplete="off"
+            // 文字を入れる欄の印（明細の行のキー操作を普通の文字として扱う）
+            data-free-text="true"
             value={search.query}
             placeholder="ふりがな・名前"
             aria-label={`${title}の検索`}

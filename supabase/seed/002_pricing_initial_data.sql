@@ -12,7 +12,8 @@
 -- 前提: 001_products_initial_data.sql で plate_types / materials / products が投入済みであること。
 --       マイグレーション 20260926100000_add_price_tier_flags.sql（最低保証重量のフラグ列）と
 --       20260926110000_splice_weight_basis_and_irregular_cut_flag.sql（アイトレ別途のフラグ列）と
---       20260929100000_add_master_numbers_and_delivery_methods.sql（番号・スプライス受注用フラグの列）が
+--       20260929100000_add_master_numbers_and_delivery_methods.sql（番号・スプライス受注用フラグの列）と
+--       20260930100200_add_dimension_shape_to_special_product_types.sql（寸法の形の列）が
 --       適用済みであること。
 -- このスクリプトは空の価格系テーブルに対して一度だけ実行する想定（ON CONFLICT 処理は入れていない）。
 --
@@ -380,14 +381,15 @@ from (values ('3x6'), ('4x8'), ('5x10')) as s(plate_size);
 --   ドーナツ  : ベタ丸と同じ
 -- number は受注登録画面の区分の番号（区分の定数 1・2・3・9 と重ならない値）。
 -- is_splice_order_type はスプライス専用の受注で使う種別（スプライスのみ true）。
+-- dimension_shape は受注明細の寸法の形（角: 縦×横 / 円: 直径 / ドーナツ: 外径×内径）。
 insert into public.special_product_types
   (name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price,
-   has_light_tier, irregular_cut_quote_required, number, is_splice_order_type)
+   has_light_tier, irregular_cut_quote_required, number, is_splice_order_type, dimension_shape)
 values
-  ('スプライス', '角重量',     3,    false, false, false, false, true,  4, true),
-  ('ササラ',     '使用材重量', null, false, false, false, false, false, 5, false),
-  ('ベタ丸',     '角重量',     null, true,  true,  true,  true,  false, 7, false),
-  ('ドーナツ',   '角重量',     null, true,  true,  true,  true,  false, 8, false);
+  ('スプライス', '角重量',     3,    false, false, false, false, true,  4, true,  '角'),
+  ('ササラ',     '使用材重量', null, false, false, false, false, false, 5, false, '角'),
+  ('ベタ丸',     '角重量',     null, true,  true,  true,  true,  false, 7, false, '円'),
+  ('ドーナツ',   '角重量',     null, true,  true,  true,  true,  false, 8, false, 'ドーナツ');
 
 
 -- ============================================================
@@ -452,9 +454,11 @@ from (values
 -- ============================================================
 -- 実在の企業名はリポジトリに含めない方針のため、仮の名称・コードで登録する。
 -- 実運用ではマスタ管理画面から実際の名称・コードに更新すること。
+-- コードは受注登録画面でテンキー入力するため数字のみとする（manufacturers_code_digits_check）。
+-- 「0」は受注登録画面の「0 指定なし」に使うため、メーカーのコードには使わない。
 insert into public.manufacturers (code, name) values
-  ('A', 'メーカーA'),
-  ('B', 'メーカーB');
+  ('1', 'メーカーA'),
+  ('2', 'メーカーB');
 
 
 -- ============================================================

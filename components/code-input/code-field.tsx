@@ -31,6 +31,11 @@ type CodeFieldProps<T> = {
   onPrevious: () => void
   // 一覧に検索の欄を付けるか（売り先・入れ先など件数の多い欄）
   searchable?: boolean
+  // 入力できない状態にする（切断方法が定尺のときの区分など、値が固定される欄）
+  disabled?: boolean
+  // エラーの文章を欄の下に出すか。明細の行のように欄が狭い場合は false にし、
+  // 枠の色だけで示して文章は行の下にまとめて出す
+  showErrorText?: boolean
   // 番号の欄の幅（Tailwind のクラス）。コードの桁数に合わせる
   codeWidthClass?: string
   // 名称の表示部分の幅（Tailwind のクラス）
@@ -59,6 +64,8 @@ export function CodeField<T>({
   onNext,
   onPrevious,
   searchable = false,
+  disabled = false,
+  showErrorText = true,
   codeWidthClass = 'w-12',
   nameWidthClass = 'w-28',
 }: CodeFieldProps<T>) {
@@ -105,10 +112,13 @@ export function CodeField<T>({
             onKeyDown={field.handleKeyDown}
             onBlur={field.handleBlur}
             aria-invalid={hasError}
-            className={`${codeWidthClass} rounded-l border-r border-neutral-200 bg-neutral-50 px-2 py-1.5 text-center font-semibold tabular-nums outline-none focus:bg-blue-50 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:bg-blue-950`}
+            disabled={disabled}
+            className={`${codeWidthClass} rounded-l border-r border-neutral-200 bg-neutral-50 px-2 py-1.5 text-center font-semibold tabular-nums outline-none focus:bg-blue-50 disabled:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:bg-blue-950`}
           />
           {/* 番号から引いた名称（表示のみ） */}
-          <span className={`${nameWidthClass} truncate px-2 py-1.5`}>
+          <span
+            className={`${nameWidthClass} truncate px-2 py-1.5 ${disabled ? 'text-neutral-400' : ''}`}
+          >
             {field.selected?.label ?? ''}
           </span>
         </div>
@@ -130,7 +140,7 @@ export function CodeField<T>({
             }
           />
         )}
-        <FieldError message={message} />
+        {showErrorText && <FieldError message={message} />}
       </div>
     </div>
   )

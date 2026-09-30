@@ -88,6 +88,7 @@
 | `line_mark` | text | 材質ラインの指示（青2本 など）。基本材質は NULL |
 | `display_color` | text | 現場用伝票での表示色。基本材質は NULL |
 | `has_dedicated_price` | boolean | 専用単価（`cutting_prices` に材質を指定した行）を持つか |
+| `default_steel_making` | text | 製鋼法の初期値。`電炉材` / `高炉材`。既定 `電炉材` |
 | `is_active` | boolean | 有効フラグ |
 
 材質ラインは材質ごとに色と本数が決まっているため、マスタに登録して現場用伝票に印字する。「材質ライン要」とだけ印字するのではなく「材質ライン：青2本」のように具体的な指示を出すことで、現場が別途確認する手間をなくす。
@@ -98,7 +99,9 @@
 
 `name` に一意制約を設ける。
 
-受注登録画面の番号入力のため、番号の列 `number`（integer、一意、NOT NULL）を持つ（1 SS400 … 9 TMCP385C。後述「受注登録画面のための追加方針」を参照）。
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意、NOT NULL）を持つ（後述「受注登録画面のための追加方針」を参照）。最も多く使う SS400 を「0（いつもの値＝初期値）」とし、明細の材質の初期値にする。ほかは 2 SM490A / 3 SM400A / 4 SN400B / 5 SN490C / 6 SN400C / 7 SN490B / 8 TMCP325C / 9 TMCP385C で、1 は空き番号（SS400 を 1 から 0 に変えたため）。
+
+`default_steel_making`（製鋼法の初期値）は、受注明細で材質を選んだときに製鋼法の欄へ入れる値である。製鋼法は材質によって決まることが多いため（SS400 は電炉材、それ以外の規格材は高炉材）、材質ごとの値として持つ。明細ではそのあと手で変更できる（`supabase/migrations/20260930100500_material_default_values.sql`）。
 
 ### products（商品）
 
@@ -221,6 +224,7 @@
 | `always_piece_price` | boolean | 常に枚単価で表示するか（ベタ丸・ドーナツ） |
 | `has_light_tier` | boolean | 1.5kg の段があるか（ベタ丸・ドーナツのみ true）。既定 false |
 | `irregular_cut_quote_required` | boolean | 切断区分がアイトレの場合に別途見積もりとするか（スプライスのみ true）。既定 false |
+| `dimension_shape` | text | 受注明細の寸法の形。`角`（縦×横。スプライス・ササラ）/ `円`（直径。ベタ丸）/ `ドーナツ`（外径×内径）。既定 `角` |
 | `is_active` | boolean | 有効フラグ |
 
 `name` に一意制約を設ける。
@@ -233,6 +237,8 @@
 | `is_splice_order_type` | boolean | スプライス専用の受注で使う種別か（スプライスのみ true）。true の種別は通常の受注の区分の一覧に出さない。true の行は 1 行だけとする（部分一意インデックス） |
 
 スプライス専用の受注の明細に使う種別を、種別名ではなく `is_splice_order_type` で特定する。種別名で分岐しない方針に合わせるためである。
+
+`dimension_shape`（寸法の形）は、受注明細の寸法の入力欄を切り替えるために使う。既存の列（`weight_basis`・`always_piece_price` など）ではベタ丸とドーナツを区別できないため、種別名で分岐せずに済むよう寸法の形をデータとして持つ（`supabase/migrations/20260930100200_add_dimension_shape_to_special_product_types.sql`）。
 
 ### special\_product\_prices（特殊製品単価）
 
@@ -285,9 +291,11 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `code` | text | メーカーコード（例: 220、230） |
+| `code` | text | メーカーコード（例: 220、230）。数字のみ。`0` は使えない。一意 |
 | `name` | text | メーカー名（メーカーA、メーカーB、メーカーC など） |
 | `is_active` | boolean | 有効フラグ |
+
+受注登録画面の明細では、メーカーをコードで選ぶ（テンキーで入力する）。そのため得意先・納入先のコードと同じく数字のみとする。`0` は受注登録画面の「0 指定なし」（`order_items.manufacturer_specified_id` を NULL にする）に使うため、メーカーのコードには使えない。コードで 1 つのメーカーを特定するため、一意制約を設ける（`supabase/migrations/20260930100400_restrict_manufacturer_code.sql`）。
 
 ### users（ユーザー）
 
@@ -419,6 +427,18 @@
 - 採番テーブルと採番関数は、Data API で公開していない `private` スキーマに置く。ブラウザから直接呼ばれて番号が飛ぶことを防ぐためである
 
 実装は `supabase/migrations/20260930100000_add_order_no_numbering.sql` を参照。
+
+**受注の登録（create_order）**
+
+ヘッダーと明細は、DB の関数 `create_order(p_order jsonb, p_items jsonb)` で 1 回にまとめて登録し、採番された受注番号を返す。Supabase のクライアント（PostgREST）は複数の insert を 1 つの transaction にまとめられないため、関数にしている。関数の中の処理は 1 つの transaction で実行されるため、明細の登録で失敗すると、ヘッダーの登録と受注番号の採番も取り消される。
+
+- 引数はそれぞれ `orders`・`order_items` の列名をキーにした JSON（明細は配列で 1 件以上）
+- `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
+- 起案者（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
+- 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
+- 実行権限は `authenticated` にだけ付与する
+
+実装は `supabase/migrations/20260930100300_create_create_order_function.sql` を参照。
 
 ### order\_items（受注明細）
 
@@ -626,6 +646,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `material_extras.material_id` に一意制約（材質ごとに1行）
 - `plate_types` `materials` `special_product_types` は `name` に一意制約
 - `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約
+- `customers` `delivery_destinations` `manufacturers` の `code` は数字のみ（`manufacturers` はさらに `0` を禁止し、一意制約）
 - `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス）
 - `orders` のスプライス関連の列（`is_splice` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
 - `shipment_items.quantity` に正数チェック
