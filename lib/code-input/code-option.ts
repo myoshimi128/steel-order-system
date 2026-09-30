@@ -37,7 +37,20 @@ export function findOptionByValue<T>(
 }
 
 // 選択肢を番号の数値順に並べる。
-// 文字列のまま並べると '10' が '9' より前になるため、数値として比較する
+// 文字列のまま並べると '10' が '9' より前になるため、数値として比較する。
+// 数字でない番号（数値にできないもの）は、数字の番号の後ろに文字列の順で並べる
 export function sortByCode<T>(options: readonly CodeOption<T>[]): CodeOption<T>[] {
-  return [...options].sort((a, b) => Number(a.code) - Number(b.code))
+  return [...options].sort((a, b) => {
+    const aNumber = Number(a.code)
+    const bNumber = Number(b.code)
+    const aIsNumber = a.code.trim() !== '' && Number.isFinite(aNumber)
+    const bIsNumber = b.code.trim() !== '' && Number.isFinite(bNumber)
+    if (aIsNumber && bIsNumber) {
+      return aNumber - bNumber
+    }
+    if (aIsNumber !== bIsNumber) {
+      return aIsNumber ? -1 : 1
+    }
+    return a.code.localeCompare(b.code)
+  })
 }
