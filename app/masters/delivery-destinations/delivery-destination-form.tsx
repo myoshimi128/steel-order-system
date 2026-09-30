@@ -3,6 +3,7 @@
 // 新規登録・編集の両方で使う入力フォーム。customer-form.tsx と同じ構造。
 
 import { useActionState } from 'react'
+import { NameKanaField } from '@/components/masters/name-kana-field'
 import {
   createDeliveryDestination,
   updateDeliveryDestination,
@@ -13,6 +14,7 @@ type DeliveryDestination = {
   id: string
   code: string
   name: string
+  name_kana: string | null
   address: string | null
   area: string | null
   is_active: boolean
@@ -66,6 +68,8 @@ export function DeliveryDestinationForm(props: DeliveryDestinationFormProps) {
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
+
+      <NameKanaField defaultValue={destination?.name_kana} />
 
       <div className="flex flex-col gap-1">
         <label htmlFor="address" className="text-sm">

@@ -5,12 +5,14 @@
 // customerId を bind した updateCustomer を Server Action として使う。
 
 import { useActionState } from 'react'
+import { NameKanaField } from '@/components/masters/name-kana-field'
 import { createCustomer, updateCustomer, type CustomerFormState } from './actions'
 
 type Customer = {
   id: string
   code: string
   name: string
+  name_kana: string | null
   sales_rep: string | null
   is_active: boolean
 }
@@ -64,6 +66,8 @@ export function CustomerForm(props: CustomerFormProps) {
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
+
+      <NameKanaField defaultValue={customer?.name_kana} />
 
       <div className="flex flex-col gap-1">
         <label htmlFor="sales_rep" className="text-sm">

@@ -12,7 +12,7 @@ export default async function DeliveryDestinationsPage() {
   const supabase = await createClient()
   const { data: destinations, error } = await supabase
     .from('delivery_destinations')
-    .select('id, code, name, address, area, is_active')
+    .select('id, code, name, name_kana, address, area, is_active')
     .order('code')
 
   return (
@@ -53,7 +53,12 @@ export default async function DeliveryDestinationsPage() {
               className="border-b border-neutral-100 dark:border-neutral-800"
             >
               <td className="py-2 pr-4">{destination.code}</td>
-              <td className="py-2 pr-4">{destination.name}</td>
+              <td className="py-2 pr-4">
+                {destination.name}
+                {destination.name_kana && (
+                  <span className="block text-xs text-neutral-400">{destination.name_kana}</span>
+                )}
+              </td>
               <td className="py-2 pr-4">{destination.address ?? ''}</td>
               <td className="py-2 pr-4">{destination.area ?? ''}</td>
               <td className="py-2 pr-4">
