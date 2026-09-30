@@ -24,7 +24,7 @@ export default async function EditDeliveryDestinationPage(
   const supabase = await createClient()
   const { data: destination } = await supabase
     .from('delivery_destinations')
-    .select('id, code, name, address, area, is_active')
+    .select('id, code, name, name_kana, address, area, is_active')
     .eq('id', id)
     .single()
 

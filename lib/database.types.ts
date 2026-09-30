@@ -99,6 +99,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          name_kana: string | null
           sales_rep: string | null
           updated_at: string
         }
@@ -108,6 +109,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          name_kana?: string | null
           sales_rep?: string | null
           updated_at?: string
         }
@@ -117,6 +119,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          name_kana?: string | null
           sales_rep?: string | null
           updated_at?: string
         }
@@ -187,6 +190,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          name_kana: string | null
         }
         Insert: {
           address?: string | null
@@ -195,6 +199,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          name_kana?: string | null
         }
         Update: {
           address?: string | null
@@ -203,6 +208,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          name_kana?: string | null
         }
         Relationships: []
       }
@@ -624,7 +630,7 @@ export type Database = {
           is_splice?: boolean
           joint_no?: string | null
           order_date: string
-          order_no: string
+          order_no?: string
           project_name?: string | null
           remarks?: string | null
           splice_shot?: boolean | null

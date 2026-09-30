@@ -14,7 +14,10 @@ import { createClient } from '@/lib/supabase-server'
 export type CustomerFormState = { error: string } | undefined
 
 type ParsedCustomerForm =
-  | { ok: true; values: { code: string; name: string; sales_rep: string | null } }
+  | {
+      ok: true
+      values: { code: string; name: string; name_kana: string | null; sales_rep: string | null }
+    }
   | { ok: false; error: string }
 
 // フォームの共通項目を読み取り、簡単なバリデーションを行う
@@ -23,6 +26,7 @@ type ParsedCustomerForm =
 function readCustomerForm(formData: FormData): ParsedCustomerForm {
   const code = formData.get('code')
   const name = formData.get('name')
+  const nameKana = formData.get('name_kana')
   const salesRep = formData.get('sales_rep')
 
   if (typeof code !== 'string' || !code.trim()) {
@@ -42,6 +46,9 @@ function readCustomerForm(formData: FormData): ParsedCustomerForm {
     values: {
       code: code.trim(),
       name: name.trim(),
+      // ふりがなは任意（受注登録画面の検索に使う）
+      name_kana:
+        typeof nameKana === 'string' && nameKana.trim() ? nameKana.trim() : null,
       sales_rep:
         typeof salesRep === 'string' && salesRep.trim()
           ? salesRep.trim()

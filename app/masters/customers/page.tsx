@@ -12,7 +12,7 @@ export default async function CustomersPage() {
   const supabase = await createClient()
   const { data: customers, error } = await supabase
     .from('customers')
-    .select('id, code, name, sales_rep, is_active')
+    .select('id, code, name, name_kana, sales_rep, is_active')
     .order('code')
 
   return (
@@ -52,7 +52,12 @@ export default async function CustomersPage() {
               className="border-b border-neutral-100 dark:border-neutral-800"
             >
               <td className="py-2 pr-4">{customer.code}</td>
-              <td className="py-2 pr-4">{customer.name}</td>
+              <td className="py-2 pr-4">
+                {customer.name}
+                {customer.name_kana && (
+                  <span className="block text-xs text-neutral-400">{customer.name_kana}</span>
+                )}
+              </td>
               <td className="py-2 pr-4">{customer.sales_rep ?? ''}</td>
               <td className="py-2 pr-4">
                 {customer.is_active ? '有効' : '無効'}

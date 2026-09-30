@@ -24,7 +24,7 @@ export default async function EditCustomerPage(
   const supabase = await createClient()
   const { data: customer } = await supabase
     .from('customers')
-    .select('id, code, name, sales_rep, is_active')
+    .select('id, code, name, name_kana, sales_rep, is_active')
     .eq('id', id)
     .single()
 

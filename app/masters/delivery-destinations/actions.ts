@@ -17,6 +17,7 @@ type ParsedDeliveryDestinationForm =
       values: {
         code: string
         name: string
+        name_kana: string | null
         address: string | null
         area: string | null
       }
@@ -28,6 +29,7 @@ function readDeliveryDestinationForm(
 ): ParsedDeliveryDestinationForm {
   const code = formData.get('code')
   const name = formData.get('name')
+  const nameKana = formData.get('name_kana')
   const address = formData.get('address')
   const area = formData.get('area')
 
@@ -48,6 +50,9 @@ function readDeliveryDestinationForm(
     values: {
       code: code.trim(),
       name: name.trim(),
+      // ふりがなは任意（受注登録画面の検索に使う）
+      name_kana:
+        typeof nameKana === 'string' && nameKana.trim() ? nameKana.trim() : null,
       address:
         typeof address === 'string' && address.trim() ? address.trim() : null,
       area: typeof area === 'string' && area.trim() ? area.trim() : null,
