@@ -1,91 +1,145 @@
 'use server'
 
-// 受注登録（新規）の保存を行う Server Action。
+// 受注登録（新規）の Server Action。
 //
-// 現時点ではヘッダー（orders）だけを登録する。明細を実装するときに、
-// ヘッダーと明細をまとめて 1 回で保存する形に作り替える。
+//   fetchPricingRows: 明細 1 行分の条件に該当する価格マスタの行を取得する（画面の単価の自動計算に使う）
+//   createOrder     : ヘッダーと明細をまとめて 1 回で登録する
 //
-// 画面側でも同じ確認（validateOrderHeader）をしているが、画面を経由しない呼び出しもありうるため、
-// サーバー側でもう一度確認する。登録の権限は RLS（orders_insert_office_admin）でも強制されている。
-// 受注番号は DB の初期値（private.next_order_no()）で自動採番されるため、ここでは指定しない。
+// 画面側でも同じ確認・計算をしているが、画面を経由しない呼び出しもありうるため、
+// サーバー側でもう一度確認し、重量・仕入単価も計算し直す（画面から送られた単価は使わない）。
+// 登録は DB の関数 create_order で 1 つの transaction として行い、途中で失敗したら全体を取り消す。
 
 import { getCurrentUser } from '@/lib/auth'
+import { buildOrderItemPayload, buildOrderPayload, type OrderItemPayload } from '@/lib/order-entry/build-order-payload'
+import { calculateItem, pricingConditionsKey, pricingConditionsOf } from '@/lib/order-entry/calculate-item'
+import { INITIAL_ITEM_ROW } from '@/lib/order-entry/item-row'
+import type { ItemErrors, ItemRowValues } from '@/lib/order-entry/item-types'
+import { loadOrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
+import { resolveItemRow } from '@/lib/order-entry/resolve-item'
 import {
   hasErrors,
   validateOrderHeader,
   type OrderHeaderErrors,
   type OrderHeaderInput,
 } from '@/lib/order-entry/validate-order-header'
+import { hasItemErrors, validateOrderItems } from '@/lib/order-entry/validate-order-items'
+import {
+  fetchPricingMasters,
+  type PricingRowConditions,
+} from '@/lib/pricing/fetch-pricing-masters'
+import type { PricingMasters } from '@/lib/pricing/types'
 import { createClient } from '@/lib/supabase-server'
 
-export type CreateOrderHeaderResult =
-  | { ok: true; orderNo: string }
-  | { ok: false; errors?: OrderHeaderErrors; message?: string }
-
-// 空文字は NULL として保存する（任意項目の未入力）
-function nullIfEmpty(value: string): string | null {
-  return value.trim() === '' ? null : value.trim()
+// 受注を起票できるのは事務・管理者のみ（現場は受注を起票しない）
+async function canEnterOrders(): Promise<boolean> {
+  const user = await getCurrentUser()
+  return user !== null && (user.role === 'office' || user.role === 'admin')
 }
 
-export async function createOrderHeader(
-  input: OrderHeaderInput
-): Promise<CreateOrderHeaderResult> {
-  // 受注を起票できるのは事務・管理者のみ（現場は受注を起票しない）
-  const user = await getCurrentUser()
-  if (!user || (user.role !== 'office' && user.role !== 'admin')) {
+// ------------------------------------------------------------
+// 価格マスタの行の取得
+// ------------------------------------------------------------
+
+export type FetchPricingRowsResult =
+  | { ok: true; masters: PricingMasters }
+  | { ok: false; message: string }
+
+export async function fetchPricingRows(
+  conditions: PricingRowConditions,
+): Promise<FetchPricingRowsResult> {
+  if (!(await canEnterOrders())) {
+    return { ok: false, message: '価格を取得する権限がありません' }
+  }
+  try {
+    const supabase = await createClient()
+    return { ok: true, masters: await fetchPricingMasters(supabase, conditions) }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : '価格の取得に失敗しました' }
+  }
+}
+
+// ------------------------------------------------------------
+// 受注の登録
+// ------------------------------------------------------------
+
+export type CreateOrderResult =
+  | { ok: true; orderNo: string }
+  | {
+      ok: false
+      headerErrors?: OrderHeaderErrors
+      // 明細の行の key ごとのエラー
+      itemErrors?: Record<string, ItemErrors>
+      // 明細全体のエラー（明細が 1 行もない など）
+      itemsError?: string
+      message?: string
+    }
+
+export async function createOrder(
+  header: OrderHeaderInput,
+  items: ItemRowValues[],
+): Promise<CreateOrderResult> {
+  if (!(await canEnterOrders())) {
     return { ok: false, message: '受注を登録する権限がありません' }
   }
-
   const supabase = await createClient()
+  const masters = await loadOrderEntryMasters(supabase)
 
-  // 配達がフリー（文字の入力が必要）かどうかを DB の値で確認する
-  let deliveryMethodRequiresNote = false
-  if (input.deliveryMethodId) {
-    const { data: deliveryMethod } = await supabase
-      .from('delivery_methods')
-      .select('requires_note')
-      .eq('id', input.deliveryMethodId)
-      .maybeSingle()
-    if (!deliveryMethod) {
-      return { ok: false, errors: { deliveryMethodId: '存在しない配達方法です' } }
+  // --- ヘッダーの確認 ---
+  // 配達がフリー（文字の入力が必要）かどうかは、DB から取得したマスタの値で判定する
+  const deliveryMethodRequiresNote =
+    header.deliveryMethodId !== null &&
+    masters.header.deliveryMethodIdsRequiringNote.includes(header.deliveryMethodId)
+  const headerErrors = validateOrderHeader(header, { deliveryMethodRequiresNote })
+
+  // --- 明細の確認 ---
+  const itemsValidation = validateOrderItems(items, masters.items, INITIAL_ITEM_ROW)
+
+  if (hasErrors(headerErrors) || hasItemErrors(itemsValidation)) {
+    return {
+      ok: false,
+      headerErrors,
+      itemErrors: itemsValidation.rowErrors,
+      itemsError: itemsValidation.itemsError,
+      message: '入力内容を確認してください',
     }
-    deliveryMethodRequiresNote = deliveryMethod.requires_note
   }
 
-  const errors = validateOrderHeader(input, { deliveryMethodRequiresNote })
-  if (hasErrors(errors)) {
-    return { ok: false, errors }
+  // --- 重量・仕入単価をサーバー側で計算し直す ---
+  // 同じ条件の行は価格マスタの行を使い回す（1 回の登録の中だけのキャッシュ）
+  const pricingCache = new Map<string, PricingMasters>()
+  const itemPayloads: OrderItemPayload[] = []
+  for (const [index, row] of itemsValidation.targetRows.entries()) {
+    const resolved = resolveItemRow(row, masters.items)
+    const conditions = pricingConditionsOf(resolved, header.orderDate)
+    if (!conditions) {
+      return { ok: false, message: `${index + 1} 行目の単価を計算できません` }
+    }
+    const key = pricingConditionsKey(conditions)
+    let pricingMasters = pricingCache.get(key)
+    if (!pricingMasters) {
+      pricingMasters = await fetchPricingMasters(supabase, conditions)
+      pricingCache.set(key, pricingMasters)
+    }
+    const payload = buildOrderItemPayload(
+      resolved,
+      calculateItem(resolved, pricingMasters, header.orderDate),
+      // 行番号は、保存する行（空の行を除いたもの）の並び順で 1 から振る
+      index + 1,
+      row.fieldNote,
+    )
+    if (!payload) {
+      return { ok: false, message: `${index + 1} 行目の単価を計算できません` }
+    }
+    itemPayloads.push(payload)
   }
 
-  // validateOrderHeader で必須項目は確認済みのため、ここでは値が入っている
-  const { data, error } = await supabase
-    .from('orders')
-    .insert({
-      order_date: input.orderDate,
-      is_splice: input.isSplice,
-      // 通常の受注では継手番号・ショットを保存しない（orders_splice_columns_check）
-      joint_no: input.isSplice ? input.jointNo.trim() : null,
-      splice_shot: input.isSplice ? input.spliceShot : null,
-      customer_id: input.customerId!,
-      customer_contact: nullIfEmpty(input.customerContact),
-      delivery_destination_id: input.deliveryDestinationId!,
-      project_name: nullIfEmpty(input.projectName),
-      due_date_type: input.dueDateType!,
-      // 後報・最短出荷は日付を持たない
-      due_date: nullIfEmpty(input.dueDate),
-      delivery_method_id: input.deliveryMethodId!,
-      delivery_method_note: deliveryMethodRequiresNote
-        ? nullIfEmpty(input.deliveryMethodNote)
-        : null,
-      // 起案者はログイン中のユーザー
-      created_by: user.id,
-    })
-    .select('order_no')
-    .single()
-
-  if (error || !data) {
+  // --- 登録（ヘッダーと明細を 1 つの transaction で） ---
+  const { data: orderNo, error } = await supabase.rpc('create_order', {
+    p_order: buildOrderPayload(header, deliveryMethodRequiresNote),
+    p_items: itemPayloads,
+  })
+  if (error || !orderNo) {
     return { ok: false, message: `登録に失敗しました: ${error?.message ?? '不明なエラー'}` }
   }
-
-  return { ok: true, orderNo: data.order_no }
+  return { ok: true, orderNo }
 }

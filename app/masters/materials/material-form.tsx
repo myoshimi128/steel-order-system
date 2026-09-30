@@ -12,6 +12,7 @@ type Material = {
   name: string
   line_mark: string | null
   display_color: string | null
+  default_steel_making: '電炉材' | '高炉材'
   has_dedicated_price: boolean
   is_active: boolean
 }
@@ -78,6 +79,23 @@ export function MaterialForm(props: MaterialFormProps) {
           placeholder="基本材質は空欄"
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
+      </div>
+
+      {/* 受注明細でこの材質を選んだときに、製鋼法の欄へ入れる初期値（明細で変更できる） */}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="default_steel_making" className="text-sm">
+          製鋼法の初期値
+        </label>
+        <select
+          id="default_steel_making"
+          name="default_steel_making"
+          required
+          defaultValue={material?.default_steel_making ?? '電炉材'}
+          className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          <option value="電炉材">電炉</option>
+          <option value="高炉材">高炉</option>
+        </select>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

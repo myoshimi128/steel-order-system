@@ -6,6 +6,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { isDigitsOnly } from '@/lib/master-number'
+import { NO_MANUFACTURER_CODE } from '@/lib/order-entry/constants'
 import { createClient } from '@/lib/supabase-server'
 
 export type ManufacturerFormState = { error: string } | undefined
@@ -21,6 +23,16 @@ function readManufacturerForm(formData: FormData): ParsedManufacturerForm {
   if (typeof code !== 'string' || !code.trim()) {
     return { ok: false, error: 'メーカーコードを入力してください' }
   }
+  // 受注登録画面でテンキーだけで入力できるよう、コードは数字のみとする
+  // （DB 側でも manufacturers_code_digits_check で同じ制限をかけている）
+  if (!isDigitsOnly(code.trim())) {
+    return { ok: false, error: 'メーカーコードは数字のみで入力してください' }
+  }
+  // 「0」は受注登録画面の「0 指定なし」に使うため、メーカーのコードにはできない
+  // （DB 側でも manufacturers_code_not_zero_check で同じ制限をかけている）
+  if (code.trim() === NO_MANUFACTURER_CODE) {
+    return { ok: false, error: '「0」は「指定なし」に使うため、メーカーコードにはできません' }
+  }
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: 'メーカー名を入力してください' }
   }
@@ -29,6 +41,15 @@ function readManufacturerForm(formData: FormData): ParsedManufacturerForm {
     ok: true,
     values: { code: code.trim(), name: name.trim() },
   }
+}
+
+// コードの一意制約（manufacturers_code_key）に違反したときだけ、分かりやすいメッセージにする。
+// 23505 = unique_violation
+function errorMessage(error: { code?: string; message?: string }, action: string): string {
+  if (error.code === '23505') {
+    return 'このメーカーコードは既に使われています'
+  }
+  return `${action}に失敗しました: ${error.message}`
 }
 
 export async function createManufacturer(
@@ -44,7 +65,7 @@ export async function createManufacturer(
   const { error } = await supabase.from('manufacturers').insert(parsed.values)
 
   if (error) {
-    return { error: `登録に失敗しました: ${error.message}` }
+    return { error: errorMessage(error, '登録') }
   }
 
   revalidatePath('/masters/manufacturers')
@@ -71,7 +92,7 @@ export async function updateManufacturer(
     .eq('id', manufacturerId)
 
   if (error) {
-    return { error: `更新に失敗しました: ${error.message}` }
+    return { error: errorMessage(error, '更新') }
   }
 
   revalidatePath('/masters/manufacturers')

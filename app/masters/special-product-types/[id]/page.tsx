@@ -25,7 +25,7 @@ export default async function EditSpecialProductTypePage(
   const { data: specialProductType } = await supabase
     .from('special_product_types')
     .select(
-      'id, number, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_splice_order_type, is_active'
+      'id, number, name, weight_basis, dimension_shape, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_splice_order_type, is_active'
     )
     .eq('id', id)
     .single()
@@ -39,7 +39,7 @@ export default async function EditSpecialProductTypePage(
       <h1 className="mb-6 text-lg font-semibold">特殊製品種別の編集</h1>
       <SpecialProductTypeForm
         mode="edit"
-        // weight_basis は DB 上 text 列（CHECK 制約で3値に限定）のため、
+        // weight_basis・dimension_shape は DB 上 text 列（CHECK 制約で値を限定）のため、
         // 生成された型では string にしかならない。値自体は制約が保証している
         specialProductType={{
           ...specialProductType,
@@ -47,6 +47,7 @@ export default async function EditSpecialProductTypePage(
             | '実重量'
             | '角重量'
             | '使用材重量',
+          dimension_shape: specialProductType.dimension_shape as '角' | '円' | 'ドーナツ',
         }}
       />
     </main>

@@ -12,7 +12,9 @@ export default async function MaterialsPage() {
   const supabase = await createClient()
   const { data: materials, error } = await supabase
     .from('materials')
-    .select('id, number, name, line_mark, display_color, has_dedicated_price, is_active')
+    .select(
+      'id, number, name, line_mark, display_color, default_steel_making, has_dedicated_price, is_active'
+    )
     .order('number')
 
   return (
@@ -42,6 +44,7 @@ export default async function MaterialsPage() {
             <th className="py-2 pr-4">材質名</th>
             <th className="py-2 pr-4">材質ライン</th>
             <th className="py-2 pr-4">表示色</th>
+            <th className="py-2 pr-4">製鋼法の初期値</th>
             <th className="py-2 pr-4">専用単価</th>
             <th className="py-2 pr-4">状態</th>
             {isAdmin && <th className="py-2 pr-4" />}
@@ -57,6 +60,9 @@ export default async function MaterialsPage() {
               <td className="py-2 pr-4">{material.name}</td>
               <td className="py-2 pr-4">{material.line_mark ?? ''}</td>
               <td className="py-2 pr-4">{material.display_color ?? ''}</td>
+              <td className="py-2 pr-4">
+                {material.default_steel_making === '高炉材' ? '高炉' : '電炉'}
+              </td>
               <td className="py-2 pr-4">
                 {material.has_dedicated_price ? 'あり' : 'なし'}
               </td>

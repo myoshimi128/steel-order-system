@@ -7,6 +7,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
+import { STEEL_MAKING_OPTIONS, type SteelMakingValue } from '@/lib/order-entry/constants'
 import { createClient } from '@/lib/supabase-server'
 
 export type MaterialFormState = { error: string } | undefined
@@ -19,9 +20,13 @@ type ParsedMaterialForm =
         name: string
         line_mark: string | null
         display_color: string | null
+        default_steel_making: SteelMakingValue
       }
     }
   | { ok: false; error: string }
+
+// 製鋼法の初期値の選択肢（order_items.steel_making と同じ値域）
+const STEEL_MAKING_VALUES = STEEL_MAKING_OPTIONS.map((option) => option.value)
 
 // 一意制約違反（23505）のメッセージを、どの項目が重複したかに応じて出し分ける
 function uniqueViolationMessage(error: { code?: string; message?: string }): string | null {
@@ -46,9 +51,17 @@ function readMaterialForm(formData: FormData): ParsedMaterialForm {
   const name = formData.get('name')
   const lineMark = formData.get('line_mark')
   const displayColor = formData.get('display_color')
+  const defaultSteelMaking = formData.get('default_steel_making')
 
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '材質名を入力してください' }
+  }
+  // 製鋼法の初期値は、受注明細で材質を選んだときに製鋼法の欄へ入れる値
+  if (
+    typeof defaultSteelMaking !== 'string' ||
+    !STEEL_MAKING_VALUES.includes(defaultSteelMaking as SteelMakingValue)
+  ) {
+    return { ok: false, error: '製鋼法の初期値を選択してください' }
   }
 
   return {
@@ -64,6 +77,7 @@ function readMaterialForm(formData: FormData): ParsedMaterialForm {
         typeof displayColor === 'string' && displayColor.trim()
           ? displayColor.trim()
           : null,
+      default_steel_making: defaultSteelMaking as SteelMakingValue,
     },
   }
 }

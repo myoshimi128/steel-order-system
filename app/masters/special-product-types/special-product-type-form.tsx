@@ -16,6 +16,7 @@ type SpecialProductType = {
   number: number
   name: string
   weight_basis: '実重量' | '角重量' | '使用材重量'
+  dimension_shape: '角' | '円' | 'ドーナツ'
   min_weight: number | null
   applies_thickness_extra: boolean
   applies_large_plate_extra: boolean
@@ -84,6 +85,24 @@ export function SpecialProductTypeForm(props: SpecialProductTypeFormProps) {
           <option value="実重量">実重量</option>
           <option value="角重量">角重量</option>
           <option value="使用材重量">使用材重量</option>
+        </select>
+      </div>
+
+      {/* 受注登録画面の明細で、寸法の入力欄を切り替えるために使う */}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="dimension_shape" className="text-sm">
+          寸法の形
+        </label>
+        <select
+          id="dimension_shape"
+          name="dimension_shape"
+          required
+          defaultValue={specialProductType?.dimension_shape ?? '角'}
+          className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          <option value="角">角（縦 × 横）</option>
+          <option value="円">円（直径）</option>
+          <option value="ドーナツ">ドーナツ（外径 × 内径）</option>
         </select>
       </div>
 
