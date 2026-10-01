@@ -7,6 +7,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sortByCode, type CodeOption } from '@/lib/code-input/code-option'
 import type { Database } from '@/lib/database.types'
+import { SAME_AS_CUSTOMER_OPTION } from './constants'
 import type { ItemMasters, SpecialProductTypeMaster } from './item-types'
 import type { HeaderMasterOptions } from './use-order-header'
 
@@ -47,6 +48,7 @@ export async function loadOrderEntryMasters(
     manufacturers,
     unitWeights,
     specialProductTypes,
+    processTypes,
   ] = await Promise.all([
     supabase.from('customers').select('id, code, name, name_kana').eq('is_active', true),
     supabase.from('delivery_destinations').select('id, code, name, name_kana').eq('is_active', true),
@@ -71,6 +73,8 @@ export async function loadOrderEntryMasters(
         'id, number, name, weight_basis, min_weight, applies_thickness_extra, applies_large_plate_extra, always_piece_price, has_light_tier, irregular_cut_quote_required, is_splice_order_type, dimension_shape',
       )
       .eq('is_active', true),
+    // 加工方法（加工の行）。番号が未設定の行は画面の選択肢から外す（item-options.ts）
+    supabase.from('process_types').select('id, number, name').eq('is_active', true),
   ])
 
   const deliveryMethodRows = rowsOf(deliveryMethods, '配達方法')
@@ -78,7 +82,11 @@ export async function loadOrderEntryMasters(
   return {
     header: {
       customers: sortByCode(rowsOf(customers, '得意先').map(toCodedMasterOption)),
-      destinations: sortByCode(rowsOf(destinations, '納入先').map(toCodedMasterOption)),
+      // 入れ先は先頭に「0 売り先と同じ」（初期値）を置き、その後に納入先マスタの行を並べる
+      destinations: [
+        SAME_AS_CUSTOMER_OPTION,
+        ...sortByCode(rowsOf(destinations, '納入先').map(toCodedMasterOption)),
+      ],
       deliveryMethods: sortByCode(
         deliveryMethodRows.map(
           (row): CodeOption<string> => ({ code: String(row.number), label: row.name, value: row.id }),
@@ -109,6 +117,7 @@ export async function loadOrderEntryMasters(
           dimension_shape: row.dimension_shape as SpecialProductTypeMaster['dimension_shape'],
         }),
       ),
+      processTypes: rowsOf(processTypes, '加工種別'),
     },
   }
 }

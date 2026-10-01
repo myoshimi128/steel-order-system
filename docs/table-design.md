@@ -70,7 +70,7 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `code` | text | 納入先コード。数字のみ。受注登録画面でテンキー入力するため |
+| `code` | text | 納入先コード。数字のみ。受注登録画面でテンキー入力するため。`0` は受注登録画面の「0 売り先と同じ」に使うため使えない |
 | `name` | text | 納入先名 |
 | `name_kana` | text | 納入先名のふりがな。受注登録画面の入れ先の検索に使う。ひらがな・カタカナのどちらでもよい。任意（NULL 可） |
 | `address` | text | 住所 |
@@ -382,7 +382,7 @@
 | `order_date` | date | 受注日。登録日を初期値とし、必要な場合のみ変更する |
 | `customer_id` | uuid | FK → `customers`。売り先（得意先） |
 | `customer_contact` | text | 担当者（客先担当）。得意先側の窓口担当者 |
-| `delivery_destination_id` | uuid | FK → `delivery_destinations`。入れ先（納入先） |
+| `delivery_destination_id` | uuid | FK → `delivery_destinations`。入れ先（納入先）。NULL は売り先と同じ（受注登録画面の「0 売り先と同じ」）。表示・印刷では、NULL のとき売り先の名前を入れ先として出す |
 | `project_name` | text | 工事名 |
 | `due_date_type` | text | 納期種別。`確定` / `仮納期` / `後報` / `最短出荷` |
 | `due_date` | date | 納期。`後報` `最短出荷` では NULL |
@@ -393,7 +393,7 @@
 | `created_at` / `updated_at` | timestamptz |  |
 | `is_splice` | boolean | スプライス専用の受注か。既定 false。画面では番号の欄（0 通常 / 1 スプライス）で入力する |
 | `deleted_at` | timestamptz | 論理削除した日時。NULL は有効な受注 |
-| `joint_no` | text | 継手番号（4〜6 文字）。スプライス専用の受注のみ |
+| `joint_no` | text | 継手番号（任意。10 文字以内）。スプライス専用の受注のみ |
 | `splice_shot` | boolean | ショット加工の有無。スプライス専用の受注のみ。明細の仕入単価（`special_product_prices.has_shot`）の引き当てと、「ショット加工」の印字に使う |
 | `delivery_method_id` | uuid | FK → `delivery_methods`。配達。NOT NULL |
 | `delivery_method_note` | text | 配達がフリーのときに入力する文字。「フリーのときは必須」は別テーブルの値を見る条件のため、アプリ側で検証する |
@@ -404,7 +404,7 @@
 
 `splice_shot` が true の受注は、現場用伝票に「ショット加工」を目立つ位置に印字する。これは `order_stamps` には保存せず `splice_shot` から印字する。ショットの有無とスタンプを別々に持つと、両者が食い違うおそれがあるためである。
 
-チェック制約として、`is_splice` が false のときは `joint_no` と `splice_shot` を NULL とし、true のときは `joint_no`（4〜6 文字）と `splice_shot` を必須とする。
+チェック制約として、`is_splice` が false のときは `joint_no` と `splice_shot` を NULL とし、true のときは `splice_shot` を必須とする。`joint_no` は任意で、入力する場合は 1〜10 文字とする（空欄は NULL で保存する）。当初は 4〜6 文字の必須としていたが、長い継手番号があり、継手番号のない受注もあるため変更した（`supabase/migrations/20261001100100_optional_joint_no_and_same_as_customer_destination.sql`）。
 
 **論理削除**
 
@@ -433,12 +433,13 @@
 ヘッダーと明細は、DB の関数 `create_order(p_order jsonb, p_items jsonb)` で 1 回にまとめて登録し、採番された受注番号を返す。Supabase のクライアント（PostgREST）は複数の insert を 1 つの transaction にまとめられないため、関数にしている。関数の中の処理は 1 つの transaction で実行されるため、明細の登録で失敗すると、ヘッダーの登録と受注番号の採番も取り消される。
 
 - 引数はそれぞれ `orders`・`order_items` の列名をキーにした JSON（明細は配列で 1 件以上）
+- 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）
 - `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
 - 起案者（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
 - 実行権限は `authenticated` にだけ付与する
 
-実装は `supabase/migrations/20260930100300_create_create_order_function.sql` を参照。
+実装は `supabase/migrations/20260930100300_create_create_order_function.sql`（加工の登録を加えたものは `20261001100000_create_order_with_processes.sql`）を参照。
 
 ### order\_items（受注明細）
 
@@ -611,7 +612,8 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `delivery_methods` | 配達方法マスタを新規作成 |
 | `orders` | `is_splice` / `joint_no` / `splice_shot` / `delivery_method_id` / `delivery_method_note` / `deleted_at` を追加 |
 | `order_item_processes` | `price_unit`（個 / kg）を追加 |
-| `customers` / `delivery_destinations` | `code` を数字のみに制限するチェック制約を追加（既存データが数字のみであることを確認してから） |
+| `customers` / `delivery_destinations` | `code` を数字のみに制限するチェック制約を追加（既存データが数字のみであることを確認してから）。`delivery_destinations` はさらに `0` を禁止（「0 売り先と同じ」に使うため） |
+| `orders` | `delivery_destination_id` を NULL 可に変更（NULL は売り先と同じ） |
 | 価格マスタの行を取り出す関数 | 明細の条件に該当する価格マスタの行だけを返す `security definer` の関数を作成（後述「価格マスタの権限と単価計算」） |
 | 受注の削除の制限 | 出荷実績がある受注の論理削除を拒否するトリガーを作成（`orders` の「論理削除」を参照） |
 | `order_items` | `plate_size`（定尺サイズ）を追加 |
@@ -622,6 +624,8 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - 固定の選択肢（処理区分・切断方法・区分・製鋼法・納期種別・定尺サイズ）の番号は、アプリ側の定数で持つ。DB に保存するのは番号ではなく値（例: `cutting_method` は `ガス`）とし、番号は画面の入力にだけ使う
 
 メーカーは既存の `manufacturers.code`（メーカーコード）を番号として使う。「0 指定なし」はマスタの行ではなく、`manufacturer_specified_id` を NULL にすることを表す。
+
+入れ先も同じ考え方で、既存の `delivery_destinations.code`（納入先コード）を番号として使い、「0 売り先と同じ」はマスタの行ではなく、`orders.delivery_destination_id` を NULL にすることを表す。
 
 ### 計算で求める項目
 
@@ -646,7 +650,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `material_extras.material_id` に一意制約（材質ごとに1行）
 - `plate_types` `materials` `special_product_types` は `name` に一意制約
 - `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約
-- `customers` `delivery_destinations` `manufacturers` の `code` は数字のみ（`manufacturers` はさらに `0` を禁止し、一意制約）
+- `customers` `delivery_destinations` `manufacturers` の `code` は数字のみ（`delivery_destinations` はさらに `0` を禁止。`manufacturers` はさらに `0` を禁止し、一意制約）
 - `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス）
 - `orders` のスプライス関連の列（`is_splice` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
 - `shipment_items.quantity` に正数チェック

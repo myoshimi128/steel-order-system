@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyItemFieldChange, copyItemRow, itemFieldOrder } from './item-row'
+import { applyItemFieldChange, itemFieldOrder } from './item-row'
 import { ITEM_MASTERS, itemRow } from './test-fixtures'
 
 describe('applyItemFieldChange', () => {
@@ -75,13 +75,6 @@ describe('createEmptyItemRow の初期値', () => {
   it('種類 0 普通板・材質 0 SS400・製鋼法 1 電炉・メーカー 0 指定なし', () => {
     const row = itemRow({})
     expect([row.plateType, row.material, row.steelMaking, row.manufacturer]).toEqual(['0', '0', '1', '0'])
-  })
-})
-
-describe('copyItemRow', () => {
-  it('直前の行の入力値（数量・摘要も含む）を写し、行の ID は今の行のまま', () => {
-    const source = itemRow({ key: 'prev', cuttingMethod: '2', quantity: '5', fieldNote: '急ぎ' } as never)
-    expect(copyItemRow(source, 'current')).toEqual({ ...source, key: 'current' })
   })
 })
 

@@ -57,11 +57,21 @@ export type ItemMasters = {
   manufacturers: readonly ManufacturerMaster[]
   unitWeights: readonly UnitWeightMaster[]
   specialProductTypes: readonly SpecialProductTypeMaster[]
+  processTypes: readonly ProcessTypeMaster[]
+}
+
+export type ProcessTypeMaster = {
+  id: string
+  // 番号が未設定の加工種別は、受注登録画面では選べない
+  number: number | null
+  name: string
 }
 
 // --- 明細の行の入力値 ---
 
-// 各欄の入力値（番号の欄は打った番号、数値の欄は打った文字をそのまま持つ）
+// 各欄の入力値（番号の欄は打った番号、数値の欄は打った文字をそのまま持つ）。
+// 材料の行と加工の行を同じ形で持ち、区分が「9 加工」の行を加工の行として扱う。
+// 加工の行は、それより上にあるいちばん近い材料の行にぶら下がる（item-structure.ts）。
 export type ItemRowValues = {
   // 行を見分けるための ID（画面の中だけで使う。保存はしない）
   key: string
@@ -80,9 +90,19 @@ export type ItemRowValues = {
   innerDiameter: string
   // 定尺サイズの番号
   plateSize: string
+  // 数量（材料の行は枚数、加工の行は加工数量）
   quantity: string
-  // 摘要（order_items.field_note）
+  // 摘要（材料の行は order_items.field_note、加工の行は order_item_processes.remarks）
   fieldNote: string
+  // --- 加工の行だけで使う欄 ---
+  // 加工方法（加工種別マスタの番号）
+  processType: string
+  // 加工内容（例: 1S / 12孔 38φ）
+  spec: string
+  // 単位の番号（1 個 / 2 kg）
+  priceUnit: string
+  // 加工の仕入単価（手入力。空欄は単価未定）
+  unitPrice: string
 }
 
 export type ItemFieldName = Exclude<keyof ItemRowValues, 'key'>
@@ -97,10 +117,19 @@ export type Region =
   | { kind: 'cut'; cuttingType: CuttingType }
   // 定尺売り
   | { kind: 'standard' }
-  // 加工の行（次の作業で実装）
+  // 加工の行
   | { kind: 'process' }
-  // 特殊製品（ササラ・ベタ丸・ドーナツ）
-  | { kind: 'special'; type: SpecialProductTypeMaster }
+  // 特殊製品（ササラ・ベタ丸・ドーナツ、スプライス専用の受注ではスプライス）。
+  // cuttingType はスプライス専用の受注の切断区分（寸法切 / アイトレ）。それ以外の特殊製品は null
+  | { kind: 'special'; type: SpecialProductTypeMaster; cuttingType: CuttingType | null }
+
+// 受注全体の設定のうち、明細の解釈・計算に使うもの（ヘッダーの値）
+export type ItemContext = {
+  // スプライス専用の受注か
+  isSplice: boolean
+  // スプライス専用の受注のショット加工の有無（未選択は null）
+  spliceShot: boolean | null
+}
 
 // 寸法の入力欄の種類
 export type DimensionKind = 'rectangle' | 'circle' | 'donut' | 'plateSize'

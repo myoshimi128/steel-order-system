@@ -23,7 +23,7 @@ type DimensionFieldsProps = DimensionInputProps & {
 export function DimensionFields({ kind, regionLabel, ...props }: DimensionFieldsProps) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="w-16 shrink-0 truncate text-sm text-neutral-600 dark:text-neutral-400">
+      <span className="w-20 shrink-0 truncate text-sm text-neutral-600 dark:text-neutral-400">
         {regionLabel}
       </span>
       {kind === 'rectangle' && <RectangleDimensions {...props} />}

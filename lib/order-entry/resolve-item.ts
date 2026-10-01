@@ -28,6 +28,7 @@ import {
 } from './item-options'
 import type {
   DimensionKind,
+  ItemContext,
   ItemMasters,
   ItemRowValues,
   PlateTypeMaster,
@@ -183,11 +184,25 @@ export type ResolvedItem = {
   productSelection: ProductSelection | null
   // 縞板の単位質量（kg/m²）。メーカー・板厚がそろっていて登録があれば値が入る
   unitWeight: number | null
+  // スプライスのショット加工の有無（スプライス専用の受注のヘッダーの値。それ以外の行は false）。
+  // スプライス専用の受注でショットが未選択なら null（単価を計算できない）
+  hasShot: boolean | null
 }
 
-export function resolveItemRow(row: ItemRowValues, masters: ItemMasters): ResolvedItem {
+// 通常の受注（スプライス専用の受注でない）の設定。引数を省略したときに使う
+export const NORMAL_ORDER_CONTEXT: ItemContext = { isSplice: false, spliceShot: null }
+
+export function resolveItemRow(
+  row: ItemRowValues,
+  masters: ItemMasters,
+  context: ItemContext = NORMAL_ORDER_CONTEXT,
+): ResolvedItem {
   const cuttingMethod = findCodeOption(CUTTING_METHOD_OPTIONS, row.cuttingMethod)?.value ?? null
-  const region = resolveRegion(row.region, masters)
+  // スプライス専用の受注では、区分の欄は切断区分（1 寸法切 / 2 アイトレ）と 9 加工
+  const region = resolveRegion(row.region, masters, context.isSplice)
+  // ショットの有無はスプライス受注用の種別の行だけで使う（ほかの特殊製品の単価はショットなしの行）
+  const isSpliceRow = region?.kind === 'special' && region.type.is_splice_order_type
+  const hasShot = isSpliceRow ? context.spliceShot : false
   const dimensionKind = dimensionKindOf(region)
 
   const plateType =
@@ -270,6 +285,7 @@ export function resolveItemRow(row: ItemRowValues, masters: ItemMasters): Resolv
     exceedsStandard,
     productSelection,
     unitWeight,
+    hasShot,
   }
 }
 

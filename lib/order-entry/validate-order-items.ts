@@ -1,13 +1,23 @@
-// 受注明細（材料の行）の入力内容の確認。
+// 受注明細（材料の行・加工の行）の入力内容の確認。
 //
 // 画面とサーバー（Server Action）の両方で同じ確認をするため、画面や DB に依存しない純粋な関数にしている。
 // 確認には 2 種類ある。
 //   ・入力中から出す警告（liveErrors）: 取り扱いのない板厚、単位質量のないメーカー など。
 //     入力した値そのものが誤っているため、その場で気づけるようにする
 //   ・保存時の確認（errors）: 上記に加えて、未入力の必須項目など
+// 加工の行の確認は process-row.ts にある。
 
-import { isBlankRow, hasAnyProduct, resolveItemRow, type ResolvedItem } from './resolve-item'
-import type { ItemErrors, ItemMasters, ItemRowValues } from './item-types'
+import { regionOptions } from './item-options'
+import { isProcessRow, parentIndexOf } from './item-structure'
+import type { ItemContext, ItemErrors, ItemMasters, ItemRowValues } from './item-types'
+import { checkProcessRow, type ProcessRowCheck } from './process-row'
+import {
+  hasAnyProduct,
+  isBlankRow,
+  NORMAL_ORDER_CONTEXT,
+  resolveItemRow,
+  type ResolvedItem,
+} from './resolve-item'
 
 export type ItemRowCheck = {
   resolved: ResolvedItem
@@ -17,8 +27,13 @@ export type ItemRowCheck = {
   liveErrors: ItemErrors
 }
 
-export function checkItemRow(row: ItemRowValues, masters: ItemMasters): ItemRowCheck {
-  const resolved = resolveItemRow(row, masters)
+// 材料の行の確認
+export function checkItemRow(
+  row: ItemRowValues,
+  masters: ItemMasters,
+  context: ItemContext = NORMAL_ORDER_CONTEXT,
+): ItemRowCheck {
+  const resolved = resolveItemRow(row, masters, context)
   const errors: ItemErrors = {}
   const liveErrors: ItemErrors = {}
 
@@ -42,9 +57,16 @@ export function checkItemRow(row: ItemRowValues, masters: ItemMasters): ItemRowC
   // --- 切断方法・区分 ---
   checkCode('cuttingMethod', resolved.cuttingMethod !== null, '切断方法')
   if (checkCode('region', resolved.region !== null, '区分')) {
-    // 区分のエラーはここまで
-  } else if (resolved.region?.kind === 'process') {
-    liveErrors.region = '加工の行は次の作業で対応します'
+    // スプライスの 0 / 1 を切り替えた後に、切り替え後の受注で使えない区分の行が残っている場合
+    // （例: 通常の受注で入れた 7 ベタ丸の行のまま、スプライス専用の受注に切り替えた）
+    const usableInOtherOrder = regionOptions(masters, !context.isSplice).some(
+      (option) => option.code === row.region.trim(),
+    )
+    if (row.region.trim() && usableInOtherOrder) {
+      liveErrors.region = context.isSplice
+        ? 'スプライス専用の受注では使えない区分です（1 寸法切 / 2 アイトレ / 9 加工）'
+        : '通常の受注では使えない区分です'
+    }
   } else if (resolved.cuttingMethod === '定尺' && resolved.region?.kind !== 'standard') {
     // 画面では切断方法を定尺にすると区分も定尺に固定されるが、念のため確認する
     errors.region = '切断方法が定尺のときは、区分も定尺にしてください'
@@ -137,12 +159,34 @@ export function checkItemRow(row: ItemRowValues, masters: ItemMasters): ItemRowC
   return { resolved, errors: { ...errors, ...liveErrors }, liveErrors }
 }
 
+// 行ごとの確認の結果（材料の行か加工の行かで中身が変わる）
+export type RowCheck =
+  | ({ kind: 'material' } & ItemRowCheck)
+  | ({ kind: 'process' } & ProcessRowCheck)
+
+// 明細のすべての行を確認する。
+// 加工の行は、上にある材料の行（母材）の有無も確認する。何も入力していない材料の行は母材にしない
+export function checkRows(
+  rows: readonly ItemRowValues[],
+  masters: ItemMasters,
+  initialRow: ItemRowValues,
+  context: ItemContext = NORMAL_ORDER_CONTEXT,
+): RowCheck[] {
+  return rows.map((row, index): RowCheck => {
+    if (isProcessRow(row)) {
+      const parentIndex = parentIndexOf(rows, index, (candidate) => isBlankRow(candidate, initialRow))
+      return { kind: 'process', ...checkProcessRow(row, masters, parentIndex >= 0) }
+    }
+    return { kind: 'material', ...checkItemRow(row, masters, context) }
+  })
+}
+
 export type OrderItemsValidation = {
   // 行の key ごとのエラー（エラーのない行は含めない）
   rowErrors: Record<string, ItemErrors>
   // 明細全体のエラー（明細が 1 行もない など）
   itemsError?: string
-  // 保存の対象になる行（何も入力していない行を除いたもの）
+  // 保存の対象になる行（何も入力していない行を除いたもの。加工の行も含む）
   targetRows: ItemRowValues[]
 }
 
@@ -151,18 +195,26 @@ export function validateOrderItems(
   rows: readonly ItemRowValues[],
   masters: ItemMasters,
   initialRow: ItemRowValues,
+  context: ItemContext = NORMAL_ORDER_CONTEXT,
 ): OrderItemsValidation {
-  const targetRows = rows.filter((row) => !isBlankRow(row, initialRow))
+  const checks = checkRows(rows, masters, initialRow, context)
   const rowErrors: Record<string, ItemErrors> = {}
-  for (const row of targetRows) {
-    const { errors } = checkItemRow(row, masters)
+  const targetRows: ItemRowValues[] = []
+  rows.forEach((row, index) => {
+    if (isBlankRow(row, initialRow)) {
+      return
+    }
+    targetRows.push(row)
+    const { errors } = checks[index]
     if (Object.keys(errors).length > 0) {
       rowErrors[row.key] = errors
     }
-  }
+  })
+  // 材料の行が 1 行もない受注は登録できない（加工の行だけでも登録できない）
+  const hasMaterial = targetRows.some((row) => !isProcessRow(row))
   return {
     rowErrors,
-    itemsError: targetRows.length === 0 ? '明細を 1 行以上入力してください' : undefined,
+    itemsError: hasMaterial ? undefined : '明細を 1 行以上入力してください',
     targetRows,
   }
 }

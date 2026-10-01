@@ -18,7 +18,7 @@ export function RectangleDimensions(props: DimensionInputProps) {
         onValueChange={(value) => onChange('width', value)}
         error={errors.width}
         allowDecimal
-        widthClass="w-24"
+        widthClass="w-[5.5rem]"
         showErrorText={false}
       />
       <span className="text-neutral-400">×</span>
@@ -28,7 +28,7 @@ export function RectangleDimensions(props: DimensionInputProps) {
         onValueChange={(value) => onChange('length', value)}
         error={errors.length}
         allowDecimal
-        widthClass="w-24"
+        widthClass="w-[5.5rem]"
         showErrorText={false}
       />
     </>

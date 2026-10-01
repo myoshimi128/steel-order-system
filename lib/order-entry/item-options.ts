@@ -4,14 +4,19 @@
 // 種類によって材質・メーカーの選択肢を絞り込む（docs/screen-design.md「種類・材質・製鋼法」「メーカー」）。
 
 import { findCodeOption, sortByCode, type CodeOption } from '@/lib/code-input/code-option'
-import { FIXED_REGION_OPTIONS, NO_MANUFACTURER_CODE } from './constants'
+import { FIXED_REGION_OPTIONS, NO_MANUFACTURER_CODE, SPLICE_REGION_OPTIONS } from './constants'
 import type { DimensionKind, ItemMasters, Region } from './item-types'
 
-// 区分の選択肢。固定の区分（1 寸法切 / 2 アイトレ / 3 定尺 / 9 加工）に、
-// 特殊製品種別（ササラ・ベタ丸・ドーナツ）を番号で加える。
-// スプライス受注用の種別（is_splice_order_type）は、通常の受注の区分には出さない。
+// 区分の選択肢。
+//   通常の受注        : 固定の区分（1 寸法切 / 2 アイトレ / 3 定尺 / 9 加工）に、
+//                       特殊製品種別（ササラ・ベタ丸・ドーナツ）を番号で加える。
+//                       スプライス受注用の種別（is_splice_order_type）は出さない
+//   スプライス専用の受注: 切断区分（1 寸法切 / 2 アイトレ）と 9 加工
 // 選択肢の値は表示用の名称にしている（解釈は resolveRegion で行う）
-export function regionOptions(masters: ItemMasters): CodeOption<string>[] {
+export function regionOptions(masters: ItemMasters, isSplice = false): CodeOption<string>[] {
+  if (isSplice) {
+    return SPLICE_REGION_OPTIONS.map((option) => ({ ...option, value: option.value as string }))
+  }
   const specialOptions = masters.specialProductTypes
     .filter((type) => !type.is_splice_order_type)
     .map((type) => ({ code: String(type.number), label: type.name, value: type.id }))
@@ -21,8 +26,37 @@ export function regionOptions(masters: ItemMasters): CodeOption<string>[] {
   ])
 }
 
-// 区分の番号を解釈する。見つからなければ null
-export function resolveRegion(code: string, masters: ItemMasters): Region | null {
+// スプライス専用の受注の明細に使う特殊製品種別（is_splice_order_type が true の種別）
+export function spliceOrderType(masters: ItemMasters) {
+  return masters.specialProductTypes.find((type) => type.is_splice_order_type) ?? null
+}
+
+// 加工方法の選択肢（番号＝process_types.number、値＝id）。番号が未設定の加工種別は出さない
+export function processTypeOptions(masters: ItemMasters): CodeOption<string>[] {
+  return sortByCode(
+    masters.processTypes
+      .filter((type) => type.number !== null)
+      .map((type) => ({ code: String(type.number), label: type.name, value: type.id })),
+  )
+}
+
+// 区分の番号を解釈する。見つからなければ null。
+// スプライス専用の受注では、1 寸法切 / 2 アイトレ をスプライス（切断区分つき）として、9 を加工として解釈する
+export function resolveRegion(code: string, masters: ItemMasters, isSplice = false): Region | null {
+  if (isSplice) {
+    const splice = findCodeOption(SPLICE_REGION_OPTIONS, code)
+    if (!splice) {
+      return null
+    }
+    if (splice.value === '加工') {
+      return { kind: 'process' }
+    }
+    const type = spliceOrderType(masters)
+    return type && (splice.value === '寸法切' || splice.value === 'アイトレ')
+      ? { kind: 'special', type, cuttingType: splice.value }
+      : null
+  }
+
   const fixed = findCodeOption(FIXED_REGION_OPTIONS, code)
   if (fixed) {
     switch (fixed.value) {
@@ -39,7 +73,7 @@ export function resolveRegion(code: string, masters: ItemMasters): Region | null
   const special = masters.specialProductTypes.find(
     (type) => !type.is_splice_order_type && String(type.number) === trimmed,
   )
-  return special ? { kind: 'special', type: special } : null
+  return special ? { kind: 'special', type: special, cuttingType: null } : null
 }
 
 // 区分に応じた寸法の入力欄の種類。特殊製品は種別の dimension_shape で決まる

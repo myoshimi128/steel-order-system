@@ -44,9 +44,23 @@ export function dueDateTypeNeedsDate(dueDateType: DueDateType | null): boolean {
   return dueDateType === '確定' || dueDateType === '仮納期'
 }
 
-// 継手番号の文字数（orders_splice_columns_check と同じ条件）
-export const JOINT_NO_MIN_LENGTH = 4
-export const JOINT_NO_MAX_LENGTH = 6
+// 継手番号の文字数の上限（orders_splice_columns_check と同じ条件）。
+// 継手番号は任意で、下限はない（長い番号もあるため上限だけを決める）
+export const JOINT_NO_MAX_LENGTH = 10
+
+// --- 入れ先の「0 売り先と同じ」 ---
+// 入れ先が売り先と同じ場合は、入れ先の番号の欄に 0 を入れる（初期値）。
+// 保存時は orders.delivery_destination_id を NULL にする（docs/screen-design.md「ヘッダー」）。
+// 納入先マスタのコードに 0 は使えない（delivery_destinations_code_not_zero_check）ため、区別できる
+export const SAME_AS_CUSTOMER_CODE = '0'
+// 選択肢の値。納入先の id（uuid）と重ならない文字列にして、「売り先と同じ」を選んだことを表す
+export const SAME_AS_CUSTOMER_DESTINATION = 'same-as-customer'
+
+export const SAME_AS_CUSTOMER_OPTION: CodeOption<string> = {
+  code: SAME_AS_CUSTOMER_CODE,
+  label: '売り先と同じ',
+  value: SAME_AS_CUSTOMER_DESTINATION,
+}
 
 
 // ============================================================
@@ -78,6 +92,28 @@ export const FIXED_REGION_OPTIONS: readonly CodeOption<FixedRegion>[] = [
 
 // 切断方法 9 定尺を選んだときに固定する区分の番号
 export const STANDARD_REGION_CODE = '3'
+
+// 区分 9 加工（この番号の行は加工の行になる）
+export const PROCESS_REGION_CODE = '9'
+
+// --- スプライス専用の受注の区分（切断区分） ---
+// スプライス専用の受注では、区分の欄は切断区分になる（明細はすべてスプライス）。
+// 番号は通常の受注の区分と同じ（1 寸法切 / 2 アイトレ / 9 加工）
+export const SPLICE_REGION_OPTIONS: readonly CodeOption<FixedRegion>[] = [
+  { code: '1', label: '寸法切', value: '寸法切' },
+  { code: '2', label: 'アイトレ', value: 'アイトレ' },
+  { code: PROCESS_REGION_CODE, label: '加工', value: '加工' },
+]
+
+// --- 加工の行の単位（order_item_processes.price_unit の値域と一致させる） ---
+//   個: 仕入金額 = 仕入単価 × 数量
+//   kg: 仕入金額 = 仕入単価 × 母材の合計重量
+export type ProcessPriceUnit = '個' | 'kg'
+
+export const PROCESS_PRICE_UNIT_OPTIONS: readonly CodeOption<ProcessPriceUnit>[] = [
+  { code: '1', label: '個', value: '個' },
+  { code: '2', label: 'kg', value: 'kg' },
+]
 
 // --- 製鋼法（order_items.steel_making の値域と一致させる） ---
 export type SteelMakingValue = '電炉材' | '高炉材'

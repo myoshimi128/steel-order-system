@@ -600,7 +600,7 @@ export type Database = {
           customer_contact: string | null
           customer_id: string
           deleted_at: string | null
-          delivery_destination_id: string
+          delivery_destination_id: string | null
           delivery_method_id: string
           delivery_method_note: string | null
           due_date: string | null
@@ -623,7 +623,7 @@ export type Database = {
           customer_contact?: string | null
           customer_id: string
           deleted_at?: string | null
-          delivery_destination_id: string
+          delivery_destination_id?: string | null
           delivery_method_id: string
           delivery_method_note?: string | null
           due_date?: string | null
@@ -646,7 +646,7 @@ export type Database = {
           customer_contact?: string | null
           customer_id?: string
           deleted_at?: string | null
-          delivery_destination_id?: string
+          delivery_destination_id?: string | null
           delivery_method_id?: string
           delivery_method_note?: string | null
           due_date?: string | null

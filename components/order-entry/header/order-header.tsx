@@ -59,7 +59,8 @@ export function OrderHeader({ header, navigation, masters, today }: OrderHeaderP
           onCodeChange={(code) => setValue('isSplice', code)}
           error={errors.isSplice}
           codeWidthClass="w-10"
-          nameWidthClass="w-20"
+          // 名称「スプライス」（5 文字）が切れずに収まる幅
+          nameWidthClass="w-24"
         />
         {header.isSplice && <SpliceFields header={header} navigation={navigation} />}
 

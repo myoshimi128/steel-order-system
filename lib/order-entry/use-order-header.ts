@@ -15,6 +15,7 @@ import {
   DUE_DATE_TYPE_OPTIONS,
   dueDateTypeNeedsDate,
   PROCESSING_TYPE_OPTIONS,
+  SAME_AS_CUSTOMER_CODE,
   SHOT_OPTIONS,
   SPLICE_OPTIONS,
 } from './constants'
@@ -56,6 +57,9 @@ export type HeaderMasterOptions = {
   deliveryMethodIdsRequiringNote: readonly string[]
 }
 
+// スプライスを 1 にしたときのショットの初期値（1 有）
+const SPLICE_SHOT_DEFAULT_CODE = '1'
+
 // 新規入力の初期値。
 // 処理区分（0 新規）・スプライス（0 通常）・受注日（今日）は初期値があるため、Enter だけで進める
 function initialValues(today: string): HeaderValues {
@@ -67,7 +71,8 @@ function initialValues(today: string): HeaderValues {
     orderDate: today,
     customerId: '',
     customerContact: '',
-    deliveryDestinationId: '',
+    // 入れ先は「0 売り先と同じ」を初期値にする（Enter だけで進める）
+    deliveryDestinationId: SAME_AS_CUSTOMER_CODE,
     projectName: '',
     dueDateType: '',
     dueDate: '',
@@ -104,6 +109,10 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
 
   // 番号から選んだ値を引く（見つからなければ undefined）
   const isSplice = findCodeOption(SPLICE_OPTIONS, values.isSplice)?.value ?? false
+  // スプライス専用の受注のショット加工の有無（未選択は null）。明細の単価の計算に使う
+  const spliceShot = isSplice
+    ? (findCodeOption(SHOT_OPTIONS, values.spliceShot)?.value ?? null)
+    : null
   const dueDateType = findCodeOption(DUE_DATE_TYPE_OPTIONS, values.dueDateType)?.value ?? null
   const deliveryMethodId =
     findCodeOption(masters.deliveryMethods, values.deliveryMethodId)?.value ?? null
@@ -131,9 +140,18 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     'submit',
   ]
 
-  // 欄の値を変える。その欄に出ていたエラーは消す（入力し直したため）
+  // 欄の値を変える。その欄に出ていたエラーは消す（入力し直したため）。
+  // スプライスを 1 にしたとき、ショットが空欄なら初期値の 1 有を入れる（スプライスはショット有が多いため）。
+  // 一度入力したショットは、スプライスを 0 に戻してまた 1 にしても、そのまま残す
   function setValue(field: HeaderFieldId, value: string) {
-    setValues((current) => ({ ...current, [field]: value }))
+    setValues((current) => {
+      const next = { ...current, [field]: value }
+      const becomesSplice = field === 'isSplice' && findCodeOption(SPLICE_OPTIONS, value)?.value === true
+      if (becomesSplice && next.spliceShot.trim() === '') {
+        next.spliceShot = SPLICE_SHOT_DEFAULT_CODE
+      }
+      return next
+    })
     setErrors((current) => {
       if (!(field in current)) {
         return current
@@ -208,6 +226,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     setValue,
     setErrors,
     isSplice,
+    spliceShot,
     needsDueDate,
     requiresDeliveryNote,
     fieldOrder,

@@ -33,16 +33,29 @@ type StatusMessage = { kind: 'success' | 'error' | 'info'; text: string }
 
 export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
   const header = useOrderHeader(masters.header, today)
-  const items = useOrderItems(masters.items)
+  // スプライス専用の受注かどうかとショットの有無（ヘッダーの値）で、明細の区分の解釈と単価が変わる。
+  // スプライスの 0 / 1 を切り替えても明細は残し、切り替え後の受注で使えない区分の行にはエラーを出す
+  const context = { isSplice: header.isSplice, spliceShot: header.spliceShot }
+  const items = useOrderItems(masters.items, context)
   // 単価の基準日は受注日（料金改定があっても受注日時点の単価を使う）
-  const { rows: calculations, totals } = useItemCalculations(items.checks, header.values.orderDate)
+  const { rows: calculations, totals } = useItemCalculations(
+    items.rows,
+    items.checks,
+    header.values.orderDate,
+  )
 
   // 画面全体の入力順: ヘッダーの欄 → 明細の各行の欄 → 登録ボタン
   const fieldOrder = [
     ...header.fieldOrder.filter((id) => id !== 'submit'),
-    ...items.rows.flatMap((row, index) =>
-      itemFieldOrder(row, items.checks[index].resolved, masters.items),
-    ),
+    ...items.rows.flatMap((row, index) => {
+      const check = items.checks[index]
+      // 加工の行は入力順が決まっているため、材料の行の判定（材質・製鋼法の有無）は使わない
+      const flags =
+        check.kind === 'material'
+          ? check.resolved
+          : { needsMaterial: false, steelMakingApplicable: false }
+      return itemFieldOrder(row, flags, masters.items, context)
+    }),
     'submit',
   ]
   const navigation = useFieldNavigation(fieldOrder)
@@ -139,6 +152,7 @@ export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
         calculations={calculations}
         totals={totals}
         masters={masters.items}
+        isSplice={header.isSplice}
         navigation={navigation}
         onNotice={(text) => setStatus({ kind: 'info', text })}
       />

@@ -22,6 +22,7 @@ export const ITEM_MASTERS: ItemMasters = {
     { id: 'p-ss400-9-std', plate_type_id: 'plate-normal', material_id: 'mat-ss400', thickness: 9, shape: '定尺' },
     { id: 'p-ss400-9-large', plate_type_id: 'plate-normal', material_id: 'mat-ss400', thickness: 9, shape: '大板' },
     { id: 'p-ss400-6-std', plate_type_id: 'plate-normal', material_id: 'mat-ss400', thickness: 6, shape: '定尺' },
+    { id: 'p-ss400-16-std', plate_type_id: 'plate-normal', material_id: 'mat-ss400', thickness: 16, shape: '定尺' },
     { id: 'p-ss400-28-large', plate_type_id: 'plate-normal', material_id: 'mat-ss400', thickness: 28, shape: '大板' },
     // 普通板 SN400B 9mm 定尺のみ
     { id: 'p-sn400b-9-std', plate_type_id: 'plate-normal', material_id: 'mat-sn400b', thickness: 9, shape: '定尺' },
@@ -44,6 +45,12 @@ export const ITEM_MASTERS: ItemMasters = {
     { ...SPLICE, number: 4, name: 'スプライス', is_splice_order_type: true, dimension_shape: '角' },
     { ...SASARA, number: 5, name: 'ササラ', is_splice_order_type: false, dimension_shape: '角' },
     { ...BETAMARU, number: 7, name: 'ベタ丸', is_splice_order_type: false, dimension_shape: '円' },
+  ],
+  processTypes: [
+    { id: 'proc-kiri', number: 11, name: 'キリ孔' },
+    { id: 'proc-shot', number: 14, name: 'ショット' },
+    // 番号が未設定の加工種別は、受注登録画面では選べない
+    { id: 'proc-unnumbered', number: null, name: '番号なし' },
   ],
 }
 

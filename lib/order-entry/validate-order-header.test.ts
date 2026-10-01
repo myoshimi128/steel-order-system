@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { buildOrderPayload } from './build-order-payload'
+import { SAME_AS_CUSTOMER_DESTINATION } from './constants'
 import { hasErrors, validateOrderHeader, type OrderHeaderInput } from './validate-order-header'
 
 // すべて正しく入力された通常の受注
@@ -65,22 +67,58 @@ describe('validateOrderHeader', () => {
     ).toEqual({})
   })
 
-  it('スプライス専用の受注は継手番号（4〜6 文字）とショットが必須', () => {
+  it('スプライス専用の受注はショットが必須。継手番号は任意', () => {
     const splice = { ...VALID, isSplice: true }
     const errors = validateOrderHeader(splice, NO_NOTE)
-    expect(errors.jointNo).toBeDefined()
     expect(errors.spliceShot).toBeDefined()
+    expect(errors.jointNo).toBeUndefined()
 
-    expect(validateOrderHeader({ ...splice, jointNo: 'GJ1', spliceShot: true }, NO_NOTE).jointNo)
-      .toBeDefined()
+    // 継手番号は空欄のまま登録できる
+    expect(validateOrderHeader({ ...splice, jointNo: '', spliceShot: true }, NO_NOTE)).toEqual({})
+  })
+
+  it('継手番号は 10 文字以内（下限はない）', () => {
+    const splice = { ...VALID, isSplice: true, spliceShot: true }
+    expect(validateOrderHeader({ ...splice, jointNo: 'G' }, NO_NOTE)).toEqual({})
+    expect(validateOrderHeader({ ...splice, jointNo: 'AB12345678' }, NO_NOTE)).toEqual({})
+    expect(validateOrderHeader({ ...splice, jointNo: 'AB123456789' }, NO_NOTE).jointNo).toBe(
+      '継手番号は 10 文字以内で入力してください',
+    )
+  })
+
+  it('入れ先は「売り先と同じ」でもよい', () => {
     expect(
-      validateOrderHeader({ ...splice, jointNo: 'GJ10000', spliceShot: true }, NO_NOTE).jointNo,
-    ).toBeDefined()
-    expect(validateOrderHeader({ ...splice, jointNo: 'GJ10', spliceShot: false }, NO_NOTE))
-      .toEqual({})
+      validateOrderHeader({ ...VALID, deliveryDestinationId: SAME_AS_CUSTOMER_DESTINATION }, NO_NOTE),
+    ).toEqual({})
   })
 
   it('通常の受注では継手番号・ショットを確認しない', () => {
     expect(validateOrderHeader({ ...VALID, jointNo: '', spliceShot: null }, NO_NOTE)).toEqual({})
+  })
+})
+
+describe('buildOrderPayload', () => {
+  it('入れ先が「売り先と同じ」なら delivery_destination_id は NULL', () => {
+    expect(
+      buildOrderPayload({ ...VALID, deliveryDestinationId: SAME_AS_CUSTOMER_DESTINATION }, false)
+        .delivery_destination_id,
+    ).toBeNull()
+    expect(buildOrderPayload(VALID, false).delivery_destination_id).toBe('destination-1')
+  })
+
+  it('スプライス専用の受注で継手番号が空欄なら NULL、入力があれば前後の空白を除いて保存する', () => {
+    const splice = { ...VALID, isSplice: true, spliceShot: true }
+    expect(buildOrderPayload({ ...splice, jointNo: '  ' }, false)).toMatchObject({
+      joint_no: null,
+      splice_shot: true,
+    })
+    expect(buildOrderPayload({ ...splice, jointNo: ' AB1234 ' }, false).joint_no).toBe('AB1234')
+  })
+
+  it('通常の受注では継手番号・ショットを保存しない', () => {
+    expect(buildOrderPayload({ ...VALID, jointNo: 'AB1234' }, false)).toMatchObject({
+      joint_no: null,
+      splice_shot: null,
+    })
   })
 })
