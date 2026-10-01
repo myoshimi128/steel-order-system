@@ -5,25 +5,21 @@
 // 最終的な制約は DB（NOT NULL・チェック制約・外部キー）でも強制されるが、
 // ここで先に確認することで、どの欄が問題かを画面に示せるようにする。
 
-import {
-  dueDateTypeNeedsDate,
-  JOINT_NO_MAX_LENGTH,
-  JOINT_NO_MIN_LENGTH,
-  type DueDateType,
-} from './constants'
+import { dueDateTypeNeedsDate, JOINT_NO_MAX_LENGTH, type DueDateType } from './constants'
 
 // 保存に使うヘッダーの値。番号ではなく、保存する値（id など）に変換した後のもの
 export type OrderHeaderInput = {
   // 受注日 'YYYY-MM-DD'
   orderDate: string
   isSplice: boolean
-  // 継手番号（スプライス専用の受注のみ）
+  // 継手番号（スプライス専用の受注のみ。任意）
   jointNo: string
   // ショット加工の有無（スプライス専用の受注のみ。未選択は null）
   spliceShot: boolean | null
   customerId: string | null
   // 担当者（客先担当）。任意
   customerContact: string
+  // 入れ先。納入先の id か、売り先と同じなら SAME_AS_CUSTOMER_DESTINATION（保存時は NULL）。未選択は null
   deliveryDestinationId: string | null
   // 工事名。任意
   projectName: string
@@ -53,13 +49,10 @@ export function validateOrderHeader(
     errors.orderDate = '受注日を入力してください'
   }
 
-  // スプライス専用の受注は、継手番号とショットの有無が必須
+  // スプライス専用の受注は、ショットの有無が必須。継手番号は任意（入力する場合は上限の文字数まで）
   if (input.isSplice) {
-    const jointNo = input.jointNo.trim()
-    if (!jointNo) {
-      errors.jointNo = '継手番号を入力してください'
-    } else if (jointNo.length < JOINT_NO_MIN_LENGTH || jointNo.length > JOINT_NO_MAX_LENGTH) {
-      errors.jointNo = `継手番号は ${JOINT_NO_MIN_LENGTH}〜${JOINT_NO_MAX_LENGTH} 文字で入力してください`
+    if (input.jointNo.trim().length > JOINT_NO_MAX_LENGTH) {
+      errors.jointNo = `継手番号は ${JOINT_NO_MAX_LENGTH} 文字以内で入力してください`
     }
     if (input.spliceShot === null) {
       errors.spliceShot = 'ショットの有無を選択してください'

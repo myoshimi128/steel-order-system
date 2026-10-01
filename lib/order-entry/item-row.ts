@@ -4,6 +4,7 @@ import { findCodeOption } from '@/lib/code-input/code-option'
 import {
   CUTTING_METHOD_OPTIONS,
   NO_MANUFACTURER_CODE,
+  PROCESS_REGION_CODE,
   STANDARD_REGION_CODE,
   STEEL_MAKING_OPTIONS,
   USUAL_VALUE_CODE,
@@ -14,7 +15,15 @@ import {
   requiresManufacturer,
   resolveRegion,
 } from './item-options'
-import type { DimensionKind, ItemFieldName, ItemMasters, ItemRowValues } from './item-types'
+import { isProcessRow } from './item-structure'
+import type {
+  DimensionKind,
+  ItemContext,
+  ItemFieldName,
+  ItemMasters,
+  ItemRowValues,
+} from './item-types'
+import { NORMAL_ORDER_CONTEXT } from './resolve-item'
 
 // 行を見分けるための ID を作る（画面の中だけで使う）
 function newRowKey(): string {
@@ -47,14 +56,24 @@ export const EMPTY_ITEM_VALUES: Omit<ItemRowValues, 'key'> = {
   plateSize: '',
   quantity: '',
   fieldNote: '',
+  // 加工の行だけで使う欄。単位の初期値は 1 個
+  processType: '',
+  spec: '',
+  priceUnit: '1',
+  unitPrice: '',
 }
 
 // 空の行と比べるための基準の行（key は比較に使わない）
 export const INITIAL_ITEM_ROW: ItemRowValues = { key: '', ...EMPTY_ITEM_VALUES }
 
-// 「*」の複写: 直前の行の入力値（数量・摘要も含む）を、今の行に写す。行の ID は今の行のまま
-export function copyItemRow(source: ItemRowValues, targetKey: string): ItemRowValues {
-  return { ...source, key: targetKey }
+// 新しい加工の行（「+」で追加するとき）。区分を 9 加工にした空の行
+export function createProcessRow(): ItemRowValues {
+  return { ...createEmptyItemRow(), region: PROCESS_REGION_CODE }
+}
+
+// 新しい行の ID（行の複写で、写した加工の行に新しい ID を振るときに使う）
+export function newItemRowKey(): string {
+  return newRowKey()
 }
 
 // 切断方法が定尺（9）かどうか
@@ -134,6 +153,11 @@ export function itemFieldId(rowKey: string, field: ItemFieldName): string {
   return `${rowKey}:${field}`
 }
 
+// 行の先頭の欄の ID（材料の行は切断方法、加工の行は区分）。次の行へ移るときに使う
+export function firstItemFieldId(row: ItemRowValues): string {
+  return itemFieldId(row.key, isProcessRow(row) ? 'region' : 'cuttingMethod')
+}
+
 // 寸法の入力欄（板厚の後）の並び
 const DIMENSION_FIELDS: Record<DimensionKind, ItemFieldName[]> = {
   rectangle: ['width', 'length'],
@@ -142,15 +166,31 @@ const DIMENSION_FIELDS: Record<DimensionKind, ItemFieldName[]> = {
   plateSize: ['plateSize'],
 }
 
+// 加工の行の入力順: 区分 → 加工方法 → 加工内容 → 数量 → 単位 → 仕入単価
+const PROCESS_FIELDS: ItemFieldName[] = [
+  'region',
+  'processType',
+  'spec',
+  'quantity',
+  'priceUnit',
+  'unitPrice',
+]
+
 // 1 行分の入力順。
-//   切断方法 → 区分 → 種類 → 材質 → 製鋼法 → メーカー → 板厚 → 寸法 → 数量
+//   材料の行: 切断方法 → 区分 → 種類 → 材質 → 製鋼法 → メーカー → 板厚 → 寸法 → 数量
+//   加工の行: 区分 → 加工方法 → 加工内容 → 数量 → 単位 → 仕入単価
 // 入力しない欄（定尺で固定された区分、材質のない種類の材質、「—」の製鋼法）は含めない。
 // 摘要は Enter の順路に含めない（「-」で移動する）
 export function itemFieldOrder(
   row: ItemRowValues,
   flags: { needsMaterial: boolean; steelMakingApplicable: boolean },
   masters: ItemMasters,
+  context: ItemContext = NORMAL_ORDER_CONTEXT,
 ): string[] {
+  if (isProcessRow(row)) {
+    return PROCESS_FIELDS.map((field) => itemFieldId(row.key, field))
+  }
+
   const fields: ItemFieldName[] = ['cuttingMethod']
   if (!isStandardCuttingMethod(row.cuttingMethod)) {
     fields.push('region')
@@ -165,15 +205,10 @@ export function itemFieldOrder(
   fields.push('manufacturer', 'thickness')
 
   // 区分がまだ決まっていない場合は、寸法の欄を入力順に入れない（区分を決めると現れる）
-  const regionKind = dimensionKindOfRow(row, masters)
+  const regionKind = dimensionKindOf(resolveRegion(row.region, masters, context.isSplice))
   if (regionKind) {
     fields.push(...DIMENSION_FIELDS[regionKind])
   }
   fields.push('quantity')
   return fields.map((field) => itemFieldId(row.key, field))
-}
-
-// 行の区分から寸法の入力欄の種類を求める（item-options の関数を行の入力値から呼ぶための補助）
-function dimensionKindOfRow(row: ItemRowValues, masters: ItemMasters): DimensionKind | null {
-  return dimensionKindOf(resolveRegion(row.region, masters))
 }

@@ -1,14 +1,17 @@
 'use client'
 
-// 明細の行の中のキー操作を扱うカスタムフック（docs/screen-design.md「キー操作」）。
+// 明細の行の中のキー操作を扱うカスタムフック（docs/screen-design.md「行の操作」）。
 //
-//   *              直前の行を今の行に複写する
+//   *              複写する
+//                    材料の行: 直前の材料の行を、加工の行ごと今の行に写す。
+//                              空の行の切断方法の欄で行番号を打ってから押すと、その番号の材料の行を写す
+//                    加工の行: 何もしない（加工は 1 行にまとめて入力するため、写す必要がない）
 //   -              その行の摘要へ移る
-//   +              加工の行を追加する（次の作業で実装するため、今は案内を出すだけ）
-//   Ctrl + Delete  行を削除する
+//   +              加工の行を追加する（今の材料の行の、最後の加工の行のすぐ下）
+//   Ctrl + Delete  行を削除する（材料の行は加工の行ごと）
 //   Ctrl + Insert  今の行の前に行を挿入する
 //
-// これらは番号・寸法・数量の欄でだけ有効にする。文字を入れる欄（摘要・一覧の検索の欄。
+// これらは番号・寸法・数量の欄でだけ有効にする。文字を入れる欄（摘要・加工内容・一覧の検索の欄。
 // data-free-text の印がある欄）では普通の文字として入力する。
 // 行の外枠の onKeyDown で受け取るため、各欄の部品に処理を足さなくて済む
 // （キーの既定動作＝文字の入力は、欄の処理が終わった後に行われるため、ここで止められる）。
@@ -23,7 +26,7 @@ type UseItemRowKeyboardParams = {
   rowKey: string
   items: OrderItemsState
   navigation: FieldNavigation
-  // 画面に案内を出す（「+」の加工の行など）
+  // 画面に案内を出す（複写できなかった理由など）
   onNotice: (message: string) => void
 }
 
@@ -37,8 +40,8 @@ export function useItemRowKeyboard({ rowKey, items, navigation, onNotice }: UseI
 
     if (event.ctrlKey && event.key === 'Delete') {
       event.preventDefault()
-      const nextKey = items.deleteRow(rowKey)
-      navigation.focusFieldLater(itemFieldId(nextKey, 'cuttingMethod'))
+      // 削除した位置にある行の先頭の欄（材料の行は切断方法、加工の行は区分）へ移る
+      navigation.focusFieldLater(items.deleteRow(rowKey))
       return
     }
     if (event.ctrlKey && event.key === 'Insert') {
@@ -52,20 +55,29 @@ export function useItemRowKeyboard({ rowKey, items, navigation, onNotice }: UseI
     }
 
     switch (event.key) {
-      case '*':
+      case '*': {
         event.preventDefault()
-        if (!items.copyPreviousRow(rowKey)) {
-          onNotice('先頭の行には複写する行がありません')
+        // 切断方法の欄に打った数字は、写す材料の行の番号として扱う（空の行で使う想定）
+        const isCuttingMethodField = target.id === itemFieldId(rowKey, 'cuttingMethod')
+        const typed = isCuttingMethodField ? (target as HTMLInputElement).value.trim() : ''
+        const sourceNumber = /^\d+$/.test(typed) ? Number(typed) : null
+        const result = items.copyRow(rowKey, sourceNumber)
+        if (!result.ok) {
+          onNotice(result.message)
         }
         return
+      }
       case '-':
         event.preventDefault()
         navigation.focusField(itemFieldId(rowKey, 'fieldNote'))
         return
-      case '+':
+      case '+': {
         event.preventDefault()
-        onNotice('加工の行の追加は次の作業で対応します')
+        const newKey = items.addProcessRow(rowKey)
+        // 追加した加工の行の、加工方法の欄へ移る（区分は 9 加工が入っている）
+        navigation.focusFieldLater(itemFieldId(newKey, 'processType'))
         return
+      }
     }
   }
 }

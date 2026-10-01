@@ -5,6 +5,11 @@
 //   ・価格マスタの行を取得するための条件（get_pricing_rows の引数）を作る
 //   ・画面に表示する値（合計重量・仕入金額）と、保存する値（1 枚あたりの重量）をそろえる
 // を行う。画面（リアルタイムの計算）とサーバー（保存時の計算）の両方で同じ関数を使う。
+//
+// 重量と単価は切り離して求める。
+//   重量: 寸法・種類・材質（縞板は単位質量）・数量がそろえば計算する
+//   単価: 重量に加えて、価格マスタの行（取得が必要）・ショットの有無などがそろったら計算する
+// ショットが未入力・価格マスタの行が取得中・別途見積もりなど、単価が決まらない場合も重量は表示する。
 
 import type { PricingRowConditions } from '@/lib/pricing/fetch-pricing-masters'
 import { calcAmount } from '@/lib/pricing/amount'
@@ -27,31 +32,51 @@ export type PieceWeights = {
   displayWeight: number
 }
 
-export type ItemCalculation =
-  // 計算に必要な入力がそろっていない
+// 行の重量。1 枚あたりの重量と、重量の欄に表示する合計重量（1 枚あたり × 数量）
+export type ItemWeight = {
+  weights: PieceWeights
+  totalWeight: number
+}
+
+// 行の仕入単価・仕入金額の状態
+export type ItemPrice =
+  // 重量が出ていない（寸法・数量などの入力の途中）。単価の欄は空欄
   | { status: 'incomplete' }
-  // 価格マスタの行を取得中（重量は先に表示できる）
-  | { status: 'loading'; weights: PieceWeights; totalWeight: number }
+  // 重量は出ているが、単価を決められない（ショット未入力・受注日未入力・取り扱いのない板厚など）。
+  // 「未確定」と表示する。このままでは登録できない
+  | { status: 'undetermined'; reason: string }
+  // 価格マスタの行を取得中
+  | { status: 'loading' }
   // 別途見積もり（仕入単価は空欄のまま登録する）
-  | { status: 'quote'; reason: string; weights: PieceWeights; totalWeight: number }
+  | { status: 'quote'; reason: string }
   | {
       status: 'priced'
-      weights: PieceWeights
-      totalWeight: number
       unitPrice: number
       priceUnit: 'kg' | '枚'
       amount: number
     }
+
+// 行の計算結果。重量（weight）と単価（price）は別々に持つ。
+// weight が null のときは price も incomplete になる（単価の計算には重量が必要なため）
+export type ItemCalculation = {
+  weight: ItemWeight | null
+  price: ItemPrice
+}
 
 // ------------------------------------------------------------
 // 重量
 // ------------------------------------------------------------
 
 // 1 枚あたりの重量を求める。入力がそろっていなければ null。
-// 縞板は単位質量（unitWeight）を使い、それ以外は比重 7.85 の式で求める（lib/pricing/weight.ts）
+// 縞板は単位質量（unitWeight）を使い、それ以外は比重 7.85 の式で求める（lib/pricing/weight.ts）。
+// 単価の計算（価格マスタ・ショットの有無・別途見積もりの判定）には影響されない
 export function calculatePieceWeights(item: ResolvedItem): PieceWeights | null {
-  const { thickness, dimensions, dimensionKind, region } = item
-  if (thickness === null || !dimensionKind) {
+  const { thickness, dimensions, dimensionKind, region, plateType } = item
+  if (thickness === null || !dimensionKind || !plateType) {
+    return null
+  }
+  // 材質を選ぶ種類では、材質がそろってから計算する（入力の途中で重量を出さないため）
+  if (item.needsMaterial && !item.materialId) {
     return null
   }
   // 縞板でメーカーの単位質量がない場合は重量を計算できない
@@ -75,8 +100,11 @@ export function calculatePieceWeights(item: ResolvedItem): PieceWeights | null {
       if (region?.kind === 'special' && region.type.weight_basis === '使用材重量') {
         return { squareWeight: square, actualWeight: null, materialWeight: square, displayWeight: square }
       }
-      // 寸法切は角重量と実重量が同じ。アイトレの実重量は送り状発行の画面で入力する
-      const isDimensionCut = region?.kind === 'cut' && region.cuttingType === '寸法切'
+      // 寸法切は角重量と実重量が同じ。アイトレの実重量は送り状発行の画面で入力する。
+      // 切断区分は、通常の切断と、スプライス専用の受注の明細（特殊製品の切断区分）の両方を見る
+      const cuttingType =
+        region?.kind === 'cut' || region?.kind === 'special' ? region.cuttingType : null
+      const isDimensionCut = cuttingType === '寸法切'
       return {
         squareWeight: square,
         actualWeight: isDimensionCut ? square : null,
@@ -119,6 +147,15 @@ export function calculatePieceWeights(item: ResolvedItem): PieceWeights | null {
   }
 }
 
+// 行の重量（1 枚あたりの重量と合計重量）。寸法・数量などがそろっていなければ null
+export function calculateItemWeight(item: ResolvedItem): ItemWeight | null {
+  const weights = calculatePieceWeights(item)
+  if (!weights || item.quantity === null) {
+    return null
+  }
+  return { weights, totalWeight: calcTotalWeight(weights.displayWeight, item.quantity) }
+}
+
 // ------------------------------------------------------------
 // 価格マスタの行を取得する条件
 // ------------------------------------------------------------
@@ -142,12 +179,34 @@ export function pricingConditionsOf(item: ResolvedItem, asOf: string): PricingRo
       }
       return { ...base, cuttingMethod: item.cuttingMethod, cuttingType: region.cuttingType }
     case 'special':
-      return { ...base, specialProductTypeId: region.type.id }
+      // スプライス専用の受注でショットの有無が未選択なら、単価を引けない。
+      // 切断区分（寸法切 / アイトレ）は条件に含めない（特殊製品単価は切断区分で分かれておらず、
+      // アイトレの別途見積もりは取得した後に lib/pricing で判定する）。
+      // そのため、スプライスの寸法切とアイトレは同じ条件になり、取得結果も同じになる
+      if (item.hasShot === null) {
+        return null
+      }
+      return { ...base, specialProductTypeId: region.type.id, hasShot: item.hasShot }
     case 'standard':
       return item.plateSize ? { ...base, plateSize: item.plateSize } : null
     case 'process':
       return null
   }
+}
+
+// 価格マスタの行を取得する条件が作れない理由（「未確定」の欄に添える）。
+// pricingConditionsOf が null を返す場合の、画面に出す説明
+function missingPricingReason(item: ResolvedItem, asOf: string): string {
+  if (!asOf) {
+    return '受注日が未入力のため単価を計算できません'
+  }
+  if (item.region?.kind === 'special' && item.hasShot === null) {
+    return 'ショットが未入力のため単価を計算できません'
+  }
+  if (item.region?.kind === 'cut' && !item.cuttingMethod) {
+    return '切断方法が未入力のため単価を計算できません'
+  }
+  return '入力がそろっていないため単価を計算できません'
 }
 
 // 条件を、取得結果を使い回すためのキー（文字列）にする
@@ -170,29 +229,48 @@ export function pricingConditionsKey(conditions: PricingRowConditions): string {
 // ------------------------------------------------------------
 
 // 行の重量と仕入単価・仕入金額を求める。
-// pricingMasters は get_pricing_rows で取得した行（未取得なら undefined）
+// pricingMasters は get_pricing_rows で取得した行（未取得・取得失敗なら undefined）。
+// 重量は単価の状態に関係なく、寸法などがそろえば返す
 export function calculateItem(
   item: ResolvedItem,
   pricingMasters: PricingMasters | undefined,
   asOf: string,
 ): ItemCalculation {
-  const weights = calculatePieceWeights(item)
-  const conditions = pricingConditionsOf(item, asOf)
+  const weight = calculateItemWeight(item)
+  if (!weight) {
+    return { weight: null, price: { status: 'incomplete' } }
+  }
+  return { weight, price: calculateItemPrice(item, weight, pricingMasters, asOf) }
+}
+
+// 仕入単価・仕入金額を求める（重量が出ている行だけ）
+function calculateItemPrice(
+  item: ResolvedItem,
+  weight: ItemWeight,
+  pricingMasters: PricingMasters | undefined,
+  asOf: string,
+): ItemPrice {
+  const { weights } = weight
   const { region, plateType, thickness, quantity, productSelection } = item
-  if (
-    !weights ||
-    !conditions ||
-    !region ||
-    !plateType ||
-    thickness === null ||
-    quantity === null ||
-    !productSelection?.ok
-  ) {
+  // 重量が出ている行は、区分・種類・板厚・数量がそろっている（calculateItemWeight で確認済み）
+  if (!region || !plateType || thickness === null || quantity === null) {
     return { status: 'incomplete' }
   }
-  const totalWeight = calcTotalWeight(weights.displayWeight, quantity)
+  // 加工の行は材料の単価を持たない（加工の仕入金額は process-row.ts で求める）
+  if (region.kind === 'process') {
+    return { status: 'incomplete' }
+  }
+
+  const conditions = pricingConditionsOf(item, asOf)
+  if (!conditions) {
+    return { status: 'undetermined', reason: missingPricingReason(item, asOf) }
+  }
+  // 種類・材質・板厚の商品がない（取り扱いのない板厚）。確認（validate-order-items）でもエラーになる
+  if (!productSelection?.ok) {
+    return { status: 'undetermined', reason: '取り扱いのない板厚のため単価を計算できません' }
+  }
   if (!pricingMasters) {
-    return { status: 'loading', weights, totalWeight }
+    return { status: 'loading' }
   }
 
   // 製鋼法を入力しない行（定尺売り・縞板など）は、高炉材加算の対象外として電炉材で計算する
@@ -217,21 +295,14 @@ export function calculateItem(
       pricingMasters,
     )
     if (result.status === 'quote') {
-      return { status: 'quote', reason: result.reason, weights, totalWeight }
+      return { status: 'quote', reason: result.reason }
     }
     return {
       status: 'priced',
-      weights,
-      totalWeight: result.totalWeight,
       unitPrice: result.kgUnitPrice,
       priceUnit: 'kg',
       amount: result.amount,
     }
-  }
-
-  // 加工の行は材料の単価を持たない（次の作業で実装）
-  if (region.kind === 'process') {
-    return { status: 'incomplete' }
   }
 
   // --- 通常の切断・特殊製品 ---
@@ -259,8 +330,11 @@ export function calculateItem(
             materialId: item.materialId,
             thickness,
             shape,
-            // 通常の受注の特殊製品は切断区分を持たない（スプライス専用の受注は次の作業）
-            cuttingType: null,
+            // スプライス専用の受注は切断区分（寸法切 / アイトレ）を渡す。アイトレは別途見積もりになる
+            // （special_product_types.irregular_cut_quote_required）。ほかの特殊製品は null
+            cuttingType: region.cuttingType,
+            // スプライスのショット加工の有無（ヘッダーの値）。pricingConditionsOf で null でないことを確認済み
+            hasShot: item.hasShot ?? false,
             steelMaking,
             asOf,
             squareWeight: weights.squareWeight,
@@ -271,45 +345,12 @@ export function calculateItem(
         )
 
   if (price.status === 'quote') {
-    return { status: 'quote', reason: price.reason, weights, totalWeight }
+    return { status: 'quote', reason: price.reason }
   }
   return {
     status: 'priced',
-    weights,
-    totalWeight,
     unitPrice: price.unitPrice,
     priceUnit: price.priceUnit,
     amount: calcAmount(price, quantity),
   }
-}
-
-// ------------------------------------------------------------
-// 合計
-// ------------------------------------------------------------
-
-export type ItemTotals = {
-  totalWeight: number
-  totalAmount: number
-  // 別途見積もりで仕入単価が空欄になる行の数
-  quoteCount: number
-}
-
-// 明細の合計。重量は計算できた行、金額は仕入単価が決まった行だけを合計する
-export function sumItems(calculations: readonly ItemCalculation[]): ItemTotals {
-  let totalWeight = 0
-  let totalAmount = 0
-  let quoteCount = 0
-  for (const calculation of calculations) {
-    if (calculation.status === 'incomplete') {
-      continue
-    }
-    totalWeight += calculation.totalWeight
-    if (calculation.status === 'priced') {
-      totalAmount += calculation.amount
-    } else if (calculation.status === 'quote') {
-      quoteCount += 1
-    }
-  }
-  // 浮動小数点の誤差が合計で目立たないよう、重量は小数第 2 位までに丸める
-  return { totalWeight: Math.round(totalWeight * 100) / 100, totalAmount, quoteCount }
 }
