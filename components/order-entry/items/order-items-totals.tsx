@@ -2,7 +2,7 @@
 // 重量は計算できた行、仕入金額は仕入単価が決まった行だけを合計する。
 // 単価未定は、別途見積もりで仕入単価が空欄になる行の数（受注の修正で後から入力する）。
 
-import type { ItemTotals } from '@/lib/order-entry/calculate-item'
+import type { ItemTotals } from '@/lib/order-entry/item-totals'
 import { ITEM_GRID_CLASS } from './item-grid'
 
 type OrderItemsTotalsProps = {

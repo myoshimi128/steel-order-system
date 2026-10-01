@@ -24,7 +24,8 @@ export function SpliceFields({ header, navigation }: SpliceFieldsProps) {
         onValueChange={(value) => header.setValue('jointNo', value)}
         error={header.errors.jointNo}
         maxLength={JOINT_NO_MAX_LENGTH}
-        widthClass="w-24"
+        // 継手番号の上限（10 文字）が収まる幅
+        widthClass="w-32"
       />
       <CodeField
         {...navigation.fieldProps('spliceShot')}

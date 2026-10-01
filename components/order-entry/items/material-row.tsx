@@ -15,13 +15,14 @@ import { TextField } from '@/components/code-input/text-field'
 import type { CodeOption } from '@/lib/code-input/code-option'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { CUTTING_METHOD_OPTIONS, STEEL_MAKING_OPTIONS } from '@/lib/order-entry/constants'
+import type { ItemCalculation } from '@/lib/order-entry/calculate-item'
 import { manufacturerOptionsFor, materialOptionsFor } from '@/lib/order-entry/item-options'
-import { itemFieldId } from '@/lib/order-entry/item-row'
+import { firstItemFieldId, itemFieldId } from '@/lib/order-entry/item-row'
 import type { ItemErrors, ItemFieldName, ItemMasters } from '@/lib/order-entry/item-types'
 import { buildProductName } from '@/lib/order-entry/product-name'
-import type { ItemRowCalculation } from '@/lib/order-entry/use-item-calculations'
 import { useItemRowKeyboard } from '@/lib/order-entry/use-item-row-keyboard'
 import type { OrderItemsState } from '@/lib/order-entry/use-order-items'
+import type { ItemRowCheck } from '@/lib/order-entry/validate-order-items'
 import { DimensionFields } from './dimension-fields'
 import { ITEM_GRID_CLASS } from './item-grid'
 import { NotApplicable } from './not-applicable'
@@ -31,10 +32,16 @@ import { RowMessages } from './row-messages'
 
 type MaterialRowProps = {
   index: number
+  // No 欄に出す材料の行の番号（加工の行は数えない）
+  number: number
   items: OrderItemsState
-  calculation: ItemRowCalculation
+  check: ItemRowCheck
+  calculation: ItemCalculation
+  pricingError?: string
   errors: ItemErrors
   masters: ItemMasters
+  // スプライス専用の受注か（区分の欄が切断区分になる）
+  isSplice: boolean
   regionOptions: readonly CodeOption<string>[]
   plateTypeOptions: readonly CodeOption<string>[]
   navigation: FieldNavigation
@@ -43,17 +50,21 @@ type MaterialRowProps = {
 
 export function MaterialRow({
   index,
+  number,
   items,
-  calculation,
+  check,
+  calculation: result,
+  pricingError,
   errors,
   masters,
+  isSplice,
   regionOptions,
   plateTypeOptions,
   navigation,
   onNotice,
 }: MaterialRowProps) {
   const row = items.rows[index]
-  const { resolved } = items.checks[index]
+  const { resolved } = check
   const isLastRow = index === items.rows.length - 1
   const handleRowKeyDown = useItemRowKeyboard({ rowKey: row.key, items, navigation, onNotice })
 
@@ -61,10 +72,13 @@ export function MaterialRow({
   const fieldProps = (field: ItemFieldName) => navigation.fieldProps(itemFieldId(row.key, field))
   const setField = (field: ItemFieldName, value: string) => items.setField(row.key, field, value)
 
-  // 次の行の先頭（切断方法）へ移る。最後の行なら行を追加してから移る
+  // 次の行の先頭（材料の行は切断方法、加工の行は区分）へ移る。最後の行なら行を追加してから移る
   function moveToNextRow() {
-    const nextKey = isLastRow ? items.appendRow() : items.rows[index + 1].key
-    navigation.focusFieldLater(itemFieldId(nextKey, 'cuttingMethod'))
+    if (isLastRow) {
+      navigation.focusFieldLater(itemFieldId(items.appendRow(), 'cuttingMethod'))
+      return
+    }
+    navigation.focusFieldLater(firstItemFieldId(items.rows[index + 1]))
   }
 
   // 切断方法の欄の Enter: 何も入力していない最後の行なら、明細の入力を終えたとして登録ボタンへ移る
@@ -78,9 +92,12 @@ export function MaterialRow({
   }
 
   const plateTypeId = resolved.plateType?.id ?? null
-  const regionLabel = regionOptions.find((option) => option.code === row.region.trim())?.label ?? ''
+  // 品名の下段に出す区分名。スプライス専用の受注の明細は「スプライス」と表示する
+  const regionLabel =
+    resolved.region?.kind === 'special' && resolved.region.type.is_splice_order_type
+      ? resolved.region.type.name
+      : (regionOptions.find((option) => option.code === row.region.trim())?.label ?? '')
   const hasMessages = Object.keys(errors).length > 0
-  const { calculation: result } = calculation
 
   return (
     <div
@@ -91,7 +108,7 @@ export function MaterialRow({
     >
       <div className={ITEM_GRID_CLASS}>
         {/* No */}
-        <div className="flex items-center justify-center text-neutral-500">{index + 1}</div>
+        <div className="flex items-center justify-center text-neutral-500">{number}</div>
 
         {/* 切断方法 / 区分 */}
         <div className="flex flex-col gap-1">
@@ -109,7 +126,8 @@ export function MaterialRow({
           />
           <CodeField
             {...fieldProps('region')}
-            listTitle="区分"
+            // スプライス専用の受注では、区分の欄は切断区分（1 寸法切 / 2 アイトレ / 9 加工）になる
+            listTitle={isSplice ? '切断区分' : '区分'}
             options={regionOptions}
             code={row.region}
             onCodeChange={(code) => setField('region', code)}
@@ -208,12 +226,13 @@ export function MaterialRow({
             showErrorText={false}
           />
           <span className="flex h-[34px] items-center justify-end rounded bg-neutral-100 px-2 tabular-nums dark:bg-neutral-800">
-            {result.status === 'incomplete' ? '' : result.totalWeight.toFixed(2)}
+            {/* 重量は単価と切り離して表示する（単価が未確定・別途見積もりでも、寸法などがそろえば出す） */}
+            {result.weight ? result.weight.totalWeight.toFixed(2) : ''}
           </span>
         </div>
 
         {/* 仕入単価 / 仕入金額 */}
-        <PriceCell calculation={result} pricingError={calculation.pricingError} />
+        <PriceCell price={result.price} pricingError={pricingError} />
 
         {/* 摘要（「-」で移動する。Enter の順路には含めない） */}
         <div className="flex items-center">

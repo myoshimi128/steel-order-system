@@ -7,6 +7,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { isDigitsOnly } from '@/lib/master-number'
+import { SAME_AS_CUSTOMER_CODE } from '@/lib/order-entry/constants'
 import { createClient } from '@/lib/supabase-server'
 
 export type DeliveryDestinationFormState = { error: string } | undefined
@@ -40,6 +41,11 @@ function readDeliveryDestinationForm(
   // （DB 側でも delivery_destinations_code_digits_check で同じ制限をかけている）
   if (!isDigitsOnly(code.trim())) {
     return { ok: false, error: '納入先コードは数字のみで入力してください' }
+  }
+  // 「0」は受注登録画面の入れ先の「0 売り先と同じ」に使うため、納入先のコードにはできない
+  // （DB 側でも delivery_destinations_code_not_zero_check で同じ制限をかけている）
+  if (code.trim() === SAME_AS_CUSTOMER_CODE) {
+    return { ok: false, error: '「0」は「売り先と同じ」に使うため、納入先コードにはできません' }
   }
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '納入先名を入力してください' }

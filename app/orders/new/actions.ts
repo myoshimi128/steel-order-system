@@ -10,11 +10,18 @@
 // 登録は DB の関数 create_order で 1 つの transaction として行い、途中で失敗したら全体を取り消す。
 
 import { getCurrentUser } from '@/lib/auth'
-import { buildOrderItemPayload, buildOrderPayload, type OrderItemPayload } from '@/lib/order-entry/build-order-payload'
+import {
+  buildOrderItemPayload,
+  buildOrderPayload,
+  buildProcessPayload,
+  type OrderItemPayload,
+} from '@/lib/order-entry/build-order-payload'
 import { calculateItem, pricingConditionsKey, pricingConditionsOf } from '@/lib/order-entry/calculate-item'
 import { INITIAL_ITEM_ROW } from '@/lib/order-entry/item-row'
-import type { ItemErrors, ItemRowValues } from '@/lib/order-entry/item-types'
+import { isProcessRow } from '@/lib/order-entry/item-structure'
+import type { ItemContext, ItemErrors, ItemRowValues } from '@/lib/order-entry/item-types'
 import { loadOrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
+import { resolveProcessRow } from '@/lib/order-entry/process-row'
 import { resolveItemRow } from '@/lib/order-entry/resolve-item'
 import {
   hasErrors,
@@ -92,7 +99,9 @@ export async function createOrder(
   const headerErrors = validateOrderHeader(header, { deliveryMethodRequiresNote })
 
   // --- 明細の確認 ---
-  const itemsValidation = validateOrderItems(items, masters.items, INITIAL_ITEM_ROW)
+  // スプライス専用の受注かどうかとショットの有無（ヘッダーの値）で、明細の区分の解釈と単価が変わる
+  const context: ItemContext = { isSplice: header.isSplice, spliceShot: header.spliceShot }
+  const itemsValidation = validateOrderItems(items, masters.items, INITIAL_ITEM_ROW, context)
 
   if (hasErrors(headerErrors) || hasItemErrors(itemsValidation)) {
     return {
@@ -108,11 +117,30 @@ export async function createOrder(
   // 同じ条件の行は価格マスタの行を使い回す（1 回の登録の中だけのキャッシュ）
   const pricingCache = new Map<string, PricingMasters>()
   const itemPayloads: OrderItemPayload[] = []
-  for (const [index, row] of itemsValidation.targetRows.entries()) {
-    const resolved = resolveItemRow(row, masters.items)
+  for (const row of itemsValidation.targetRows) {
+    // 加工の行は、直前に登録した材料の行（母材）の processes に入れる。
+    // 確認（validateOrderItems）で、母材のない加工の行がないことは確認済み
+    if (isProcessRow(row)) {
+      const parent = itemPayloads[itemPayloads.length - 1]
+      const processPayload = buildProcessPayload(
+        resolveProcessRow(row, masters.items),
+        // 加工の行の行番号は、母材ごとに 1 から振る
+        parent.processes.length + 1,
+        row.fieldNote,
+      )
+      if (!processPayload) {
+        return { ok: false, message: `${parent.line_no} 行目の加工の行を登録できません` }
+      }
+      parent.processes.push(processPayload)
+      continue
+    }
+
+    // 行番号は、保存する材料の行（空の行を除いたもの）の並び順で 1 から振る
+    const lineNo = itemPayloads.length + 1
+    const resolved = resolveItemRow(row, masters.items, context)
     const conditions = pricingConditionsOf(resolved, header.orderDate)
     if (!conditions) {
-      return { ok: false, message: `${index + 1} 行目の単価を計算できません` }
+      return { ok: false, message: `${lineNo} 行目の単価を計算できません` }
     }
     const key = pricingConditionsKey(conditions)
     let pricingMasters = pricingCache.get(key)
@@ -123,14 +151,13 @@ export async function createOrder(
     const payload = buildOrderItemPayload(
       resolved,
       calculateItem(resolved, pricingMasters, header.orderDate),
-      // 行番号は、保存する行（空の行を除いたもの）の並び順で 1 から振る
-      index + 1,
+      lineNo,
       row.fieldNote,
     )
     if (!payload) {
-      return { ok: false, message: `${index + 1} 行目の単価を計算できません` }
+      return { ok: false, message: `${lineNo} 行目の単価を計算できません` }
     }
-    itemPayloads.push(payload)
+    itemPayloads.push({ ...payload, processes: [] })
   }
 
   // --- 登録（ヘッダーと明細を 1 つの transaction で） ---
