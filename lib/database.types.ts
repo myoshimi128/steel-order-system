@@ -389,6 +389,7 @@ export type Database = {
           quantity: number | null
           remarks: string | null
           spec: string | null
+          spec_fields: Json | null
           unit_price: number | null
         }
         Insert: {
@@ -400,6 +401,7 @@ export type Database = {
           quantity?: number | null
           remarks?: string | null
           spec?: string | null
+          spec_fields?: Json | null
           unit_price?: number | null
         }
         Update: {
@@ -411,6 +413,7 @@ export type Database = {
           quantity?: number | null
           remarks?: string | null
           spec?: string | null
+          spec_fields?: Json | null
           unit_price?: number | null
         }
         Relationships: [
@@ -722,6 +725,7 @@ export type Database = {
         Row: {
           category: string | null
           id: string
+          input_shape: string
           is_active: boolean
           name: string
           number: number | null
@@ -729,6 +733,7 @@ export type Database = {
         Insert: {
           category?: string | null
           id?: string
+          input_shape?: string
           is_active?: boolean
           name: string
           number?: number | null
@@ -736,6 +741,7 @@ export type Database = {
         Update: {
           category?: string | null
           id?: string
+          input_shape?: string
           is_active?: boolean
           name?: string
           number?: number | null
