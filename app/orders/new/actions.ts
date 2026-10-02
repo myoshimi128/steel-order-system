@@ -123,7 +123,8 @@ export async function createOrder(
     if (isProcessRow(row)) {
       const parent = itemPayloads[itemPayloads.length - 1]
       const processPayload = buildProcessPayload(
-        resolveProcessRow(row, masters.items),
+        // 穴・曲げの数量は画面から送られた値を使わず、項目と母材の枚数からここで計算し直す
+        resolveProcessRow(row, masters.items, parent.quantity),
         // 加工の行の行番号は、母材ごとに 1 から振る
         parent.processes.length + 1,
         row.fieldNote,

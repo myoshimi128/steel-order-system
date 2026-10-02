@@ -12,7 +12,7 @@ export default async function ProcessTypesPage() {
   const supabase = await createClient()
   const { data: processTypes, error } = await supabase
     .from('process_types')
-    .select('id, number, name, category, is_active')
+    .select('id, number, name, category, input_shape, is_active')
     // 番号が未設定の行を先頭に出し、入力漏れに気づけるようにする
     .order('number', { nullsFirst: true })
 
@@ -42,6 +42,7 @@ export default async function ProcessTypesPage() {
             <th className="py-2 pr-4">番号</th>
             <th className="py-2 pr-4">加工名</th>
             <th className="py-2 pr-4">区分</th>
+            <th className="py-2 pr-4">入力の形</th>
             <th className="py-2 pr-4">状態</th>
             {isAdmin && <th className="py-2 pr-4" />}
           </tr>
@@ -59,6 +60,7 @@ export default async function ProcessTypesPage() {
               </td>
               <td className="py-2 pr-4">{processType.name}</td>
               <td className="py-2 pr-4">{processType.category ?? ''}</td>
+              <td className="py-2 pr-4">{processType.input_shape}</td>
               <td className="py-2 pr-4">
                 {processType.is_active ? '有効' : '無効'}
               </td>

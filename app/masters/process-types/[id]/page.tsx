@@ -24,7 +24,7 @@ export default async function EditProcessTypePage(
   const supabase = await createClient()
   const { data: processType } = await supabase
     .from('process_types')
-    .select('id, number, name, category, is_active')
+    .select('id, number, name, category, input_shape, is_active')
     .eq('id', id)
     .single()
 

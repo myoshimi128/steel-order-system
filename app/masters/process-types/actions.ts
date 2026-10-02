@@ -7,13 +7,27 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
+import { PROCESS_INPUT_SHAPES, type ProcessInputShape } from '@/lib/order-entry/constants'
 import { createClient } from '@/lib/supabase-server'
 
 export type ProcessTypeFormState = { error: string } | undefined
 
 type ParsedProcessTypeForm =
-  | { ok: true; values: { number: number; name: string; category: string | null } }
+  | {
+      ok: true
+      values: {
+        number: number
+        name: string
+        category: string | null
+        input_shape: ProcessInputShape
+      }
+    }
   | { ok: false; error: string }
+
+// 入力の形として正しい値か（DB のチェック制約と同じ値の一覧で確かめる）
+function isProcessInputShape(value: FormDataEntryValue | null): value is ProcessInputShape {
+  return PROCESS_INPUT_SHAPES.some((shape) => shape.value === value)
+}
 
 function readProcessTypeForm(formData: FormData): ParsedProcessTypeForm {
   // 番号は受注登録画面で加工方法を選ぶときに入力する値。
@@ -25,9 +39,14 @@ function readProcessTypeForm(formData: FormData): ParsedProcessTypeForm {
 
   const name = formData.get('name')
   const category = formData.get('category')
+  // 入力の形は、受注登録画面の加工の項目の入力欄を切り替える
+  const inputShape = formData.get('input_shape')
 
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '加工名を入力してください' }
+  }
+  if (!isProcessInputShape(inputShape)) {
+    return { ok: false, error: '入力の形を選択してください' }
   }
 
   return {
@@ -39,6 +58,7 @@ function readProcessTypeForm(formData: FormData): ParsedProcessTypeForm {
         typeof category === 'string' && category.trim()
           ? category.trim()
           : null,
+      input_shape: inputShape,
     },
   }
 }
