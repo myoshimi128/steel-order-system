@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sortByCode, type CodeOption } from '@/lib/code-input/code-option'
 import type { Database } from '@/lib/database.types'
 import { SAME_AS_CUSTOMER_OPTION } from './constants'
-import type { ItemMasters, SpecialProductTypeMaster } from './item-types'
+import type { ItemMasters, ProcessTypeMaster, SpecialProductTypeMaster } from './item-types'
 import type { HeaderMasterOptions } from './use-order-header'
 
 export type OrderEntryMasters = {
@@ -74,7 +74,8 @@ export async function loadOrderEntryMasters(
       )
       .eq('is_active', true),
     // 加工方法（加工の行）。番号が未設定の行は画面の選択肢から外す（item-options.ts）
-    supabase.from('process_types').select('id, number, name').eq('is_active', true),
+    // 入力の形（input_shape）で、加工の項目の入力欄と数量の求め方を切り替える
+    supabase.from('process_types').select('id, number, name, input_shape').eq('is_active', true),
   ])
 
   const deliveryMethodRows = rowsOf(deliveryMethods, '配達方法')
@@ -117,7 +118,13 @@ export async function loadOrderEntryMasters(
           dimension_shape: row.dimension_shape as SpecialProductTypeMaster['dimension_shape'],
         }),
       ),
-      processTypes: rowsOf(processTypes, '加工種別'),
+      // input_shape も CHECK 制約で入力の形の値に限定されている
+      processTypes: rowsOf(processTypes, '加工種別').map(
+        (row): ProcessTypeMaster => ({
+          ...row,
+          input_shape: row.input_shape as ProcessTypeMaster['input_shape'],
+        }),
+      ),
     },
   }
 }

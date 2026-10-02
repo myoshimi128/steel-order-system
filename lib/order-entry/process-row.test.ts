@@ -13,7 +13,7 @@ function process(values: Parameters<typeof itemRow>[0]) {
 
 describe('resolveProcessRow', () => {
   it('加工方法の番号から加工種別を引く。番号が未設定の加工種別は選べない', () => {
-    expect(process({ processType: '11' }).processTypeId).toBe('proc-kiri')
+    expect(process({ processType: '20' }).processTypeId).toBe('proc-kiri')
     expect(process({ processType: '' }).processTypeId).toBeNull()
   })
 

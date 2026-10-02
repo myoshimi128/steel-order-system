@@ -18,8 +18,8 @@ function row(key: string, region = '1', extra: Record<string, string> = {}) {
 // 1 材料(m1) └加工(p1) └加工(p2) / 2 材料(m2) / 3 材料(m3) └加工(p3)
 const ROWS = [
   row('m1', '1', { quantity: '4' }),
-  row('p1', '9', { processType: '11' }),
-  row('p2', '9', { processType: '14' }),
+  row('p1', '9', { processType: '20' }),
+  row('p2', '9', { processType: '22' }),
   row('m2'),
   row('m3'),
   row('p3', '9'),
@@ -79,7 +79,7 @@ describe('copyMaterialWithChildren（「*」の複写）', () => {
     expect(keys(result)).toEqual(['m1', 'p1', 'p2', 'm2', 'm3', 'p3', 'target', 'new1', 'new2'])
     // 写し先は写し元の材料の行の内容（数量も含む）、行の ID は写し先のまま
     expect(result[6]).toMatchObject({ key: 'target', region: '1', quantity: '4' })
-    expect(result[7]).toMatchObject({ region: '9', processType: '11' })
+    expect(result[7]).toMatchObject({ region: '9', processType: '20' })
   })
 
   it('途中の行に写した場合も、写した加工の行は写し先のすぐ下に入る', () => {

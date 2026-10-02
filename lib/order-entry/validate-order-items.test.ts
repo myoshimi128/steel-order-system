@@ -6,8 +6,11 @@ import { checkItemRow, checkRows, hasItemErrors, validateOrderItems } from './va
 // すべて正しく入力された行（SS400・レーザー寸法切・9mm）
 const VALID = { cuttingMethod: '3', region: '1', material: '0', thickness: '9', width: '100', length: '200', quantity: '10' }
 
-// すべて正しく入力された加工の行（キリ孔・48 個・単価 30）
-const PROCESS = { region: '9', processType: '11', spec: '1S / 12孔 38φ', quantity: '48', priceUnit: '1', unitPrice: '30' }
+// すべて正しく入力された、自由入力の形の加工の行（ショット・1 個・単価 30）
+const PROCESS = { region: '9', processType: '22', spec: '通常', quantity: '1', priceUnit: '1', unitPrice: '30' }
+
+// すべて正しく入力された、穴の形の加工の行（キリ孔 1S/ 12孔 38φ・単価 30）
+const HOLE_PROCESS = { region: '9', processType: '20', holesPerPiece: '12', holeDiameter: '38', priceUnit: '1', unitPrice: '30' }
 
 // スプライス専用の受注（ショット有）
 const SPLICE_CONTEXT = { isSplice: true, spliceShot: true }
@@ -134,6 +137,65 @@ describe('checkRows（加工の行）', () => {
       INITIAL_ITEM_ROW,
     )
     expect(checks[1].liveErrors.unitPrice).toBeDefined()
+  })
+})
+
+describe('checkRows（項目で入力する加工の行）', () => {
+  // 加工の行の解釈結果（数量など）を取り出す
+  function processOf(check: ReturnType<typeof checkRows>[number]) {
+    if (check.kind !== 'process') {
+      throw new Error('加工の行ではありません')
+    }
+    return check
+  }
+
+  it('穴の数量は 1 枚あたりの孔数 × 母材の枚数（数量の欄は入力しなくてよい）', () => {
+    const checks = checkRows([keyed('m1', VALID), keyed('p1', HOLE_PROCESS)], ITEM_MASTERS, INITIAL_ITEM_ROW)
+    const process = processOf(checks[1])
+    expect(process.errors).toEqual({})
+    // 12 孔 × 10 枚 = 120
+    expect(process.resolved.quantity).toBe(120)
+  })
+
+  it('母材の枚数を変えると、穴の数量も追随する', () => {
+    const checks = checkRows(
+      [keyed('m1', { ...VALID, quantity: '3' }), keyed('p1', HOLE_PROCESS)],
+      ITEM_MASTERS,
+      INITIAL_ITEM_ROW,
+    )
+    expect(processOf(checks[1]).resolved.quantity).toBe(36)
+  })
+
+  it('母材の枚数がまだなければ、数量は求まらない（加工の行のエラーにはしない）', () => {
+    const checks = checkRows(
+      [keyed('m1', { ...VALID, quantity: '' }), keyed('p1', HOLE_PROCESS)],
+      ITEM_MASTERS,
+      INITIAL_ITEM_ROW,
+    )
+    const process = processOf(checks[1])
+    expect(process.resolved.quantity).toBeNull()
+    expect(process.errors).toEqual({})
+  })
+
+  it('穴の孔数・穴径は必須', () => {
+    const checks = checkRows(
+      [keyed('m1', VALID), keyed('p1', { ...HOLE_PROCESS, holesPerPiece: '', holeDiameter: '' })],
+      ITEM_MASTERS,
+      INITIAL_ITEM_ROW,
+    )
+    expect(checks[1].errors.holesPerPiece).toBeDefined()
+    expect(checks[1].errors.holeDiameter).toBeDefined()
+  })
+
+  it('曲げの数量は母材の枚数。ヶ所・曲げ方は初期値（1ヶ所・90°）のままでよい', () => {
+    const checks = checkRows(
+      [keyed('m1', VALID), keyed('p1', { region: '9', processType: '24', priceUnit: '1' })],
+      ITEM_MASTERS,
+      INITIAL_ITEM_ROW,
+    )
+    const process = processOf(checks[1])
+    expect(process.errors).toEqual({})
+    expect(process.resolved.quantity).toBe(10)
   })
 })
 

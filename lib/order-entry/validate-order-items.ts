@@ -15,6 +15,7 @@ import {
   hasAnyProduct,
   isBlankRow,
   NORMAL_ORDER_CONTEXT,
+  parseQuantity,
   resolveItemRow,
   type ResolvedItem,
 } from './resolve-item'
@@ -175,7 +176,9 @@ export function checkRows(
   return rows.map((row, index): RowCheck => {
     if (isProcessRow(row)) {
       const parentIndex = parentIndexOf(rows, index, (candidate) => isBlankRow(candidate, initialRow))
-      return { kind: 'process', ...checkProcessRow(row, masters, parentIndex >= 0) }
+      // 母材の枚数（穴・曲げの数量の計算に使う）。母材の枚数を変えると、ここから数量が計算し直される
+      const parentQuantity = parentIndex >= 0 ? parseQuantity(rows[parentIndex].quantity) : null
+      return { kind: 'process', ...checkProcessRow(row, masters, parentIndex >= 0, parentQuantity) }
     }
     return { kind: 'material', ...checkItemRow(row, masters, context) }
   })

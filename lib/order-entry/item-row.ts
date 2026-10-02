@@ -16,6 +16,7 @@ import {
   resolveRegion,
 } from './item-options'
 import { isProcessRow } from './item-structure'
+import { isQuantityAutomatic, processInputShapeOf, specInputFields } from './process-shapes'
 import type {
   DimensionKind,
   ItemContext,
@@ -59,6 +60,13 @@ export const EMPTY_ITEM_VALUES: Omit<ItemRowValues, 'key'> = {
   // 加工の行だけで使う欄。単位の初期値は 1 個
   processType: '',
   spec: '',
+  holesPerPiece: '',
+  holeDiameter: '',
+  // 曲げのヶ所・曲げ方は「0 1ヶ所」「0 90°」が初期値（いつもの曲げなら Enter だけで進める）
+  bendCount: USUAL_VALUE_CODE,
+  bendCountFree: '',
+  bendStyle: USUAL_VALUE_CODE,
+  bendStyleFree: '',
   priceUnit: '1',
   unitPrice: '',
 }
@@ -166,19 +174,24 @@ const DIMENSION_FIELDS: Record<DimensionKind, ItemFieldName[]> = {
   plateSize: ['plateSize'],
 }
 
-// 加工の行の入力順: 区分 → 加工方法 → 加工内容 → 数量 → 単位 → 仕入単価
-const PROCESS_FIELDS: ItemFieldName[] = [
-  'region',
-  'processType',
-  'spec',
-  'quantity',
-  'priceUnit',
-  'unitPrice',
-]
+// 加工の行の入力順。品名の位置の欄は、加工種別の入力の形で変わる（process-shapes/）。
+//   自由入力: 区分 → 加工方法 → 加工内容 → 数量 → 単位 → 仕入単価
+//   穴      : 区分 → 加工方法 → 孔数 → 穴径 → 単位 → 仕入単価
+//   曲げ    : 区分 → 加工方法 → ヶ所（→ ヶ所数）→ 曲げ方（→ 曲げ方の文字）→ 単位 → 仕入単価
+// 穴・曲げの数量は自動で求めるため、入力順に含めない
+function processFieldOrder(row: ItemRowValues, masters: ItemMasters): ItemFieldName[] {
+  const shape = processInputShapeOf(row, masters)
+  const fields: ItemFieldName[] = ['region', 'processType', ...specInputFields(shape, row)]
+  if (!isQuantityAutomatic(shape)) {
+    fields.push('quantity')
+  }
+  fields.push('priceUnit', 'unitPrice')
+  return fields
+}
 
 // 1 行分の入力順。
 //   材料の行: 切断方法 → 区分 → 種類 → 材質 → 製鋼法 → メーカー → 板厚 → 寸法 → 数量
-//   加工の行: 区分 → 加工方法 → 加工内容 → 数量 → 単位 → 仕入単価
+//   加工の行: 区分 → 加工方法 → 加工の項目（入力の形による）→ 数量（自由入力のみ）→ 単位 → 仕入単価
 // 入力しない欄（定尺で固定された区分、材質のない種類の材質、「—」の製鋼法）は含めない。
 // 摘要は Enter の順路に含めない（「-」で移動する）
 export function itemFieldOrder(
@@ -188,7 +201,7 @@ export function itemFieldOrder(
   context: ItemContext = NORMAL_ORDER_CONTEXT,
 ): string[] {
   if (isProcessRow(row)) {
-    return PROCESS_FIELDS.map((field) => itemFieldId(row.key, field))
+    return processFieldOrder(row, masters).map((field) => itemFieldId(row.key, field))
   }
 
   const fields: ItemFieldName[] = ['cuttingMethod']

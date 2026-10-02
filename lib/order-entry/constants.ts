@@ -115,6 +115,46 @@ export const PROCESS_PRICE_UNIT_OPTIONS: readonly CodeOption<ProcessPriceUnit>[]
   { code: '2', label: 'kg', value: 'kg' },
 ]
 
+// --- 加工種別の「入力の形」（process_types.input_shape の値域と一致させる） ---
+// 加工の行の項目の入力欄と、数量の求め方を決める（docs/basic-design.md「加工の入力項目」）
+export type ProcessInputShape = '自由入力' | '穴' | '曲げ'
+
+// 加工種別マスタの画面で選ぶ入力の形の一覧（label は選択肢に添える説明）
+export const PROCESS_INPUT_SHAPES: readonly { value: ProcessInputShape; label: string }[] = [
+  { value: '自由入力', label: '自由入力（加工内容を文字で入力。数量は手入力）' },
+  { value: '穴', label: '穴（1 枚あたりの孔数・穴径。数量は孔数 × 枚数）' },
+  { value: '曲げ', label: '曲げ（ヶ所・曲げ方。数量は材料と同じ枚数）' },
+]
+
+// 加工方法が決まっていない（または存在しない番号の）加工の行は、自由入力の形として扱う
+export const DEFAULT_PROCESS_INPUT_SHAPE: ProcessInputShape = '自由入力'
+
+// 曲げのヶ所・曲げ方で「フリー」（数字・文字を入力する）を表す番号
+export const FREE_INPUT_CODE = '9'
+
+// --- 曲げのヶ所 ---
+// 値はヶ所数。9 フリーは右に現れる欄に数字で入力するため、値は null
+export const BEND_COUNT_OPTIONS: readonly CodeOption<number | null>[] = [
+  { code: '0', label: '1ヶ所', value: 1 },
+  { code: '2', label: '2ヶ所', value: 2 },
+  { code: '3', label: '3ヶ所', value: 3 },
+  { code: '4', label: '4ヶ所', value: 4 },
+  { code: FREE_INPUT_CODE, label: 'フリー', value: null },
+]
+
+// --- 曲げ方 ---
+// 値は spec_fields.bend_style に保存する値。二方・三方・四方は単価の追加料金の判定に使う。
+// 9 フリーは「曲げ」を除いた部分（R、85° など）を右に現れる欄に文字で入力する
+export type BendStyle = '90°' | '二方' | '三方' | '四方' | 'フリー'
+
+export const BEND_STYLE_OPTIONS: readonly CodeOption<BendStyle>[] = [
+  { code: '0', label: '90°', value: '90°' },
+  { code: '2', label: '二方', value: '二方' },
+  { code: '3', label: '三方', value: '三方' },
+  { code: '4', label: '四方', value: '四方' },
+  { code: FREE_INPUT_CODE, label: 'フリー', value: 'フリー' },
+]
+
 // --- 製鋼法（order_items.steel_making の値域と一致させる） ---
 export type SteelMakingValue = '電炉材' | '高炉材'
 

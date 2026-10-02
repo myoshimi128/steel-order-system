@@ -141,21 +141,27 @@ describe('buildProductName', () => {
 
 describe('buildProcessPayload', () => {
   // 加工の行の入力値から payload を作る（行番号は 2 とする）
-  function processPayloadOf(values: Partial<ReturnType<typeof createProcessRow>>, remarks = '') {
+  // parentQuantity は母材の枚数（穴・曲げの数量の計算に使う）
+  function processPayloadOf(
+    values: Partial<ReturnType<typeof createProcessRow>>,
+    remarks = '',
+    parentQuantity: number | null = null,
+  ) {
     const row = { ...createProcessRow(), ...values }
-    return buildProcessPayload(resolveProcessRow(row, ITEM_MASTERS), 2, remarks)
+    return buildProcessPayload(resolveProcessRow(row, ITEM_MASTERS, parentQuantity), 2, remarks)
   }
 
-  it('加工方法・加工内容・数量・単位・仕入単価・摘要を保存する', () => {
+  it('自由入力の形: 加工方法・加工内容・数量・単位・仕入単価・摘要を保存する', () => {
     expect(
       processPayloadOf(
-        { processType: '11', spec: ' 12孔 38φ ', quantity: '12', priceUnit: '1', unitPrice: '150' },
+        { processType: '22', spec: ' 1S/ 2孔 30X12φ ', quantity: '12', priceUnit: '1', unitPrice: '150' },
         ' 面取り ',
       ),
     ).toEqual({
       line_no: 2,
-      process_type_id: 'proc-kiri',
-      spec: '12孔 38φ',
+      process_type_id: 'proc-shot',
+      spec: '1S/ 2孔 30X12φ',
+      spec_fields: null,
       quantity: 12,
       unit_price: 150,
       price_unit: '個',
@@ -164,13 +170,48 @@ describe('buildProcessPayload', () => {
   })
 
   it('仕入単価・加工内容が空欄なら NULL で保存する（単価未定）', () => {
-    expect(processPayloadOf({ processType: '14', quantity: '1', priceUnit: '2' })).toMatchObject({
+    expect(processPayloadOf({ processType: '22', quantity: '1', priceUnit: '2' })).toMatchObject({
       process_type_id: 'proc-shot',
       spec: null,
       unit_price: null,
       price_unit: 'kg',
       remarks: null,
     })
+  })
+
+  it('穴の形: 項目を spec_fields に保存し、加工内容（spec）は保存しない。数量は 孔数 × 母材の枚数', () => {
+    expect(
+      processPayloadOf(
+        // 画面の数量の欄に何か残っていても使わない
+        { processType: '20', holesPerPiece: '12', holeDiameter: '38', quantity: '999', priceUnit: '1' },
+        '',
+        4,
+      ),
+    ).toMatchObject({
+      process_type_id: 'proc-kiri',
+      spec: null,
+      spec_fields: { shape: '穴', holes_per_piece: 12, hole_diameter: 38 },
+      quantity: 48,
+    })
+  })
+
+  it('曲げの形: 曲げ方がフリーなら入力した文字も保存する。数量は母材の枚数', () => {
+    expect(
+      processPayloadOf(
+        { processType: '24', bendCount: '9', bendCountFree: '5', bendStyle: '9', bendStyleFree: ' R ' },
+        '',
+        7,
+      ),
+    ).toMatchObject({
+      process_type_id: 'proc-bend',
+      spec: null,
+      spec_fields: { shape: '曲げ', bend_count: 5, bend_style: 'フリー', bend_style_note: 'R' },
+      quantity: 7,
+    })
+  })
+
+  it('穴・曲げで母材の枚数が決まっていなければ作らない', () => {
+    expect(processPayloadOf({ processType: '24' }, '', null)).toBeNull()
   })
 
   it('加工方法がなければ作らない', () => {
