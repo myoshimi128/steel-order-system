@@ -3,7 +3,7 @@
 // 受注登録（新規）の Server Action。
 //
 //   fetchPricingRows: 明細 1 行分の条件に該当する価格マスタの行を取得する（画面の単価の自動計算に使う）
-//   createOrder     : ヘッダーと明細をまとめて 1 回で登録する
+//   createOrder     : ヘッダー・明細・補助エリア（スタンプ・フリーコメント）をまとめて 1 回で登録する
 //
 // 画面側でも同じ確認・計算をしているが、画面を経由しない呼び出しもありうるため、
 // サーバー側でもう一度確認し、重量・仕入単価も計算し直す（画面から送られた単価は使わない）。
@@ -21,6 +21,11 @@ import { INITIAL_ITEM_ROW } from '@/lib/order-entry/item-row'
 import { isProcessRow } from '@/lib/order-entry/item-structure'
 import type { ItemContext, ItemErrors, ItemRowValues } from '@/lib/order-entry/item-types'
 import { loadOrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
+import {
+  buildOrderAuxPayload,
+  validateOrderAux,
+  type OrderAuxInput,
+} from '@/lib/order-entry/order-aux'
 import { resolveProcessRow } from '@/lib/order-entry/process-row'
 import { resolveItemRow } from '@/lib/order-entry/resolve-item'
 import {
@@ -84,6 +89,7 @@ export type CreateOrderResult =
 export async function createOrder(
   header: OrderHeaderInput,
   items: ItemRowValues[],
+  aux: OrderAuxInput,
 ): Promise<CreateOrderResult> {
   if (!(await canEnterOrders())) {
     return { ok: false, message: '受注を登録する権限がありません' }
@@ -103,13 +109,16 @@ export async function createOrder(
   const context: ItemContext = { isSplice: header.isSplice, spliceShot: header.spliceShot }
   const itemsValidation = validateOrderItems(items, masters.items, INITIAL_ITEM_ROW, context)
 
-  if (hasErrors(headerErrors) || hasItemErrors(itemsValidation)) {
+  // --- 補助エリア（スタンプ・フリーコメント）の確認 ---
+  const auxError = validateOrderAux(aux, masters.aux.stamps)
+
+  if (hasErrors(headerErrors) || hasItemErrors(itemsValidation) || auxError) {
     return {
       ok: false,
       headerErrors,
       itemErrors: itemsValidation.rowErrors,
       itemsError: itemsValidation.itemsError,
-      message: '入力内容を確認してください',
+      message: auxError ?? '入力内容を確認してください',
     }
   }
 
@@ -161,9 +170,10 @@ export async function createOrder(
     itemPayloads.push({ ...payload, processes: [] })
   }
 
-  // --- 登録（ヘッダーと明細を 1 つの transaction で） ---
+  // --- 登録（ヘッダー・明細・スタンプを 1 つの transaction で） ---
+  // フリーコメントとスタンプは、ヘッダーの JSON（p_order）に入れて渡す
   const { data: orderNo, error } = await supabase.rpc('create_order', {
-    p_order: buildOrderPayload(header, deliveryMethodRequiresNote),
+    p_order: { ...buildOrderPayload(header, deliveryMethodRequiresNote), ...buildOrderAuxPayload(aux) },
     p_items: itemPayloads,
   })
   if (error || !orderNo) {

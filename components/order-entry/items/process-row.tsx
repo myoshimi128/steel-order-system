@@ -18,6 +18,7 @@ import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { PROCESS_PRICE_UNIT_OPTIONS } from '@/lib/order-entry/constants'
 import { firstItemFieldId, itemFieldId } from '@/lib/order-entry/item-row'
 import type { ItemErrors, ItemFieldName } from '@/lib/order-entry/item-types'
+import type { ProcessNoticeMaster } from '@/lib/order-entry/notices'
 import type { ProcessCalculation, ResolvedProcess } from '@/lib/order-entry/process-row'
 import { useItemRowKeyboard } from '@/lib/order-entry/use-item-row-keyboard'
 import type { OrderItemsState } from '@/lib/order-entry/use-order-items'
@@ -30,6 +31,8 @@ type ProcessRowProps = {
   items: OrderItemsState
   // 行の解釈結果（入力の形・自動で求めた数量）
   resolved: ResolvedProcess
+  // この行に当てはまる加工の注意事項（表示のみ。登録は止めない）
+  notices: readonly ProcessNoticeMaster[]
   calculation: ProcessCalculation
   errors: ItemErrors
   // スプライス専用の受注か（区分の一覧の見出しが「切断区分」になる）
@@ -55,6 +58,7 @@ export function ProcessRow({
   index,
   items,
   resolved,
+  notices,
   calculation,
   errors,
   isSplice,
@@ -192,6 +196,15 @@ export function ProcessRow({
         </div>
 
         <RowMessages errors={errors} />
+
+        {/* 加工の注意事項（例: 穴径 30φ 以上のキリ孔 →「精度注意」）。エラーと区別するため色を変える */}
+        {notices.length > 0 && (
+          <ul className="col-span-full px-12 pt-1 text-xs text-amber-700 dark:text-amber-400">
+            {notices.map((notice) => (
+              <li key={notice.id}>注意: {notice.body}</li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   )

@@ -11,6 +11,11 @@ import {
   regionOptions,
 } from '@/lib/order-entry/item-options'
 import { materialNumbers } from '@/lib/order-entry/item-structure'
+import {
+  processNoticeTargetOf,
+  processNoticesFor,
+  type ProcessNoticeMaster,
+} from '@/lib/order-entry/notices'
 import type { ItemTotals } from '@/lib/order-entry/item-totals'
 import type { ItemMasters } from '@/lib/order-entry/item-types'
 import type { ItemRowCalculation } from '@/lib/order-entry/use-item-calculations'
@@ -26,6 +31,8 @@ type OrderItemsTableProps = {
   calculations: readonly ItemRowCalculation[]
   totals: ItemTotals
   masters: ItemMasters
+  // 加工の注意事項（当てはまる加工の行のすぐ下に出す）
+  processNotices: readonly ProcessNoticeMaster[]
   // スプライス専用の受注か（区分の欄が切断区分になる）
   isSplice: boolean
   navigation: FieldNavigation
@@ -37,6 +44,7 @@ export function OrderItemsTable({
   calculations,
   totals,
   masters,
+  processNotices,
   isSplice,
   navigation,
   onNotice,
@@ -87,6 +95,11 @@ export function OrderItemsTable({
                 index={index}
                 items={items}
                 resolved={check.resolved}
+                // 母材の板厚・この行の穴径が条件に当てはまる加工の注意事項
+                notices={processNoticesFor(
+                  processNotices,
+                  processNoticeTargetOf(items.rows, items.checks, index),
+                )}
                 calculation={result.calculation}
                 errors={errors}
                 isSplice={isSplice}

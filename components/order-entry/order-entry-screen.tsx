@@ -1,11 +1,11 @@
 'use client'
 
-// 受注登録画面の全体。ヘッダー・明細・キー操作の案内・登録ボタンを並べる。
-// 補助エリア（注意事項・スタンプ・フリーコメント）は次の作業で追加する。
+// 受注登録画面の全体。ヘッダー・明細・キー操作の案内・補助エリア・登録ボタンを並べる。
 //
-//   入力値: useOrderHeader（ヘッダー）・useOrderItems（明細）
+//   入力値: useOrderHeader（ヘッダー）・useOrderItems（明細）・useOrderAux（スタンプ・フリーコメント）
 //   計算  : useItemCalculations（重量・仕入単価・合計）
-//   欄の移動: useFieldNavigation（ヘッダー → 明細の各行 → 登録ボタン の順）
+//   注意事項: notices.ts（得意先と明細の内容から、受注に関係するものだけに絞り込む。表示のみ）
+//   欄の移動: useFieldNavigation（ヘッダー → 明細の各行 → スタンプの番号 → フリーコメント → 登録ボタン の順）
 // ここでは保存の流れ（確認 → Server Action の呼び出し → 結果の表示）だけを扱う。
 
 import { useEffect, useState, useTransition, type KeyboardEvent } from 'react'
@@ -19,6 +19,13 @@ import { useOrderHeader } from '@/lib/order-entry/use-order-header'
 import { useOrderItems } from '@/lib/order-entry/use-order-items'
 import { hasErrors } from '@/lib/order-entry/validate-order-header'
 import { hasItemErrors } from '@/lib/order-entry/validate-order-items'
+import { customerNoticesFor, orderNoticeConditions } from '@/lib/order-entry/notices'
+import {
+  FREE_COMMENT_FIELD_ID,
+  STAMP_CODE_FIELD_ID,
+  useOrderAux,
+} from '@/lib/order-entry/use-order-aux'
+import { AuxArea } from './support-area/aux-area'
 import { OrderHeader } from './header/order-header'
 import { KeyGuide } from './items/key-guide'
 import { OrderItemsTable } from './items/order-items-table'
@@ -44,7 +51,19 @@ export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
     header.values.orderDate,
   )
 
-  // 画面全体の入力順: ヘッダーの欄 → 明細の各行の欄 → 登録ボタン
+  // 補助エリア。得意先を選ぶと、その得意先の指定スタンプにチェックが入る
+  const aux = useOrderAux(masters.aux, header.customerId)
+  // 得意先の注意事項。得意先・切断方法・加工種別の条件がすべて受注に当てはまるものだけ。
+  // 得意先を選んだとき・明細を入力したときに、描画のたびに絞り込み直す
+  const notices = customerNoticesFor(
+    masters.aux.customerNotices,
+    orderNoticeConditions(header.customerId, items.checks),
+    masters.items.processTypes,
+  )
+  // スプライス専用の受注でショットが有なら「ショット加工」を自動で出す（保存はしない）
+  const showShotStamp = header.isSplice && header.spliceShot === true
+
+  // 画面全体の入力順: ヘッダーの欄 → 明細の各行の欄 → スタンプの番号 → フリーコメント → 登録ボタン
   const fieldOrder = [
     ...header.fieldOrder.filter((id) => id !== 'submit'),
     ...items.rows.flatMap((row, index) => {
@@ -56,6 +75,8 @@ export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
           : { needsMaterial: false, steelMakingApplicable: false }
       return itemFieldOrder(row, flags, masters.items, context)
     }),
+    STAMP_CODE_FIELD_ID,
+    FREE_COMMENT_FIELD_ID,
     'submit',
   ]
   const navigation = useFieldNavigation(fieldOrder)
@@ -104,13 +125,15 @@ export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
     // startTransition の中で呼ぶと、保存中（isPending）の状態を使ってボタンを押せなくできる
     const headerInput = header.toInput()
     const itemRows = items.rows
+    const auxInput = aux.toInput()
     startTransition(async () => {
-      const response = await createOrder(headerInput, itemRows)
+      const response = await createOrder(headerInput, itemRows, auxInput)
       if (response.ok) {
         setStatus({ kind: 'success', text: `受注No. ${response.orderNo} を登録しました` })
         // 次の受注を続けて入力できるよう、初期値に戻して最初の欄へ移る
         header.reset()
         items.reset()
+        aux.reset()
         navigation.focusFirst()
         return
       }
@@ -152,12 +175,21 @@ export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
         calculations={calculations}
         totals={totals}
         masters={masters.items}
+        processNotices={masters.aux.processNotices}
         isSplice={header.isSplice}
         navigation={navigation}
         onNotice={(text) => setStatus({ kind: 'info', text })}
       />
 
       <KeyGuide />
+
+      <AuxArea
+        aux={aux}
+        notices={notices}
+        hasCustomer={header.customerId !== null}
+        showShotStamp={showShotStamp}
+        navigation={navigation}
+      />
 
       <footer className="flex shrink-0 items-center justify-end gap-4 border-t border-neutral-200 px-6 py-3 dark:border-neutral-800">
         {status && (
