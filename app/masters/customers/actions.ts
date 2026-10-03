@@ -1,6 +1,6 @@
 'use server'
 
-// 得意先マスタの登録・更新を行う Server Action。
+// 得意先マスタの登録・更新を行う Server Action。得意先の指定スタンプ（customer_stamps）も一緒に保存する。
 // 書き込み権限そのものは RLS（customers_admin_all）でも強制されているため、
 // ここでの role チェックは画面側の親切のため（実装方針: クライアント側の表示制御と
 // RLS の両方で権限を強制する）。admin 以外が万一フォームを直接送信しても、
@@ -10,6 +10,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { isDigitsOnly } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
 export type CustomerFormState = { error: string } | undefined
 
@@ -57,6 +59,53 @@ function readCustomerForm(formData: FormData): ParsedCustomerForm {
   }
 }
 
+// 得意先の指定スタンプを、フォームでチェックしたものに合わせる。
+// 受注登録画面で得意先を選んだ時点で、ここに登録したスタンプにチェックが入る。
+// 今の登録内容と比べ、外したものを削除し、新しくチェックしたものを追加する（差分だけを書き込む）。
+// 失敗したらメッセージを返す
+async function saveCustomerStamps(
+  supabase: SupabaseServerClient,
+  customerId: string,
+  formData: FormData
+): Promise<string | null> {
+  // チェックボックスは同じ名前で複数送られるため getAll で受け取る（チェックしていないものは送られない）
+  const selected = new Set(
+    formData.getAll('stamp_ids').filter((value): value is string => typeof value === 'string')
+  )
+
+  const { data: current, error: selectError } = await supabase
+    .from('customer_stamps')
+    .select('stamp_id')
+    .eq('customer_id', customerId)
+  if (selectError) {
+    return `指定スタンプの取得に失敗しました: ${selectError.message}`
+  }
+  const currentIds = new Set((current ?? []).map((row) => row.stamp_id))
+
+  const removed = [...currentIds].filter((id) => !selected.has(id))
+  const added = [...selected].filter((id) => !currentIds.has(id))
+
+  if (removed.length > 0) {
+    const { error } = await supabase
+      .from('customer_stamps')
+      .delete()
+      .eq('customer_id', customerId)
+      .in('stamp_id', removed)
+    if (error) {
+      return `指定スタンプの削除に失敗しました: ${error.message}`
+    }
+  }
+  if (added.length > 0) {
+    const { error } = await supabase
+      .from('customer_stamps')
+      .insert(added.map((stampId) => ({ customer_id: customerId, stamp_id: stampId })))
+    if (error) {
+      return `指定スタンプの登録に失敗しました: ${error.message}`
+    }
+  }
+  return null
+}
+
 export async function createCustomer(
   _prevState: CustomerFormState,
   formData: FormData
@@ -67,10 +116,20 @@ export async function createCustomer(
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('customers').insert(parsed.values)
+  // 指定スタンプの登録に得意先の id が必要なため、登録した行の id を受け取る
+  const { data: created, error } = await supabase
+    .from('customers')
+    .insert(parsed.values)
+    .select('id')
+    .single()
 
-  if (error) {
-    return { error: `登録に失敗しました: ${error.message}` }
+  if (error || !created) {
+    return { error: `登録に失敗しました: ${error?.message ?? '不明なエラー'}` }
+  }
+
+  const stampError = await saveCustomerStamps(supabase, created.id, formData)
+  if (stampError) {
+    return { error: stampError }
   }
 
   // 一覧のキャッシュを最新化してから一覧に戻る
@@ -101,6 +160,11 @@ export async function updateCustomer(
 
   if (error) {
     return { error: `更新に失敗しました: ${error.message}` }
+  }
+
+  const stampError = await saveCustomerStamps(supabase, customerId, formData)
+  if (stampError) {
+    return { error: stampError }
   }
 
   revalidatePath('/masters/customers')

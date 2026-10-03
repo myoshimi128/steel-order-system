@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth'
+import { createClient } from '@/lib/supabase-server'
 import { CustomerForm } from '../customer-form'
 
 // 得意先の新規登録画面。admin 以外は DB 側の RLS でも拒否されるが、
@@ -16,10 +17,17 @@ export default async function NewCustomerPage() {
     )
   }
 
+  // 指定スタンプの選択肢（番号順）
+  const supabase = await createClient()
+  const { data: stamps } = await supabase
+    .from('stamps')
+    .select('id, number, body, is_active')
+    .order('number')
+
   return (
     <main className="mx-auto max-w-md px-6 py-8">
       <h1 className="mb-6 text-lg font-semibold">得意先の新規登録</h1>
-      <CustomerForm mode="create" />
+      <CustomerForm mode="create" stamps={stamps ?? []} designatedStampIds={[]} />
     </main>
   )
 }

@@ -17,9 +17,14 @@ type Customer = {
   is_active: boolean
 }
 
-type CustomerFormProps =
-  | { mode: 'create' }
-  | { mode: 'edit'; customer: Customer }
+// スタンプの選択肢（page.tsx でサーバーから取得して渡す）
+type StampOption = { id: string; number: number; body: string; is_active: boolean }
+
+type CustomerFormProps = {
+  stamps: StampOption[]
+  // 今の指定スタンプの id（新規登録では空）
+  designatedStampIds: string[]
+} & ({ mode: 'create' } | { mode: 'edit'; customer: Customer })
 
 export function CustomerForm(props: CustomerFormProps) {
   const action =
@@ -81,6 +86,34 @@ export function CustomerForm(props: CustomerFormProps) {
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
+
+      {/* 指定スタンプ: 受注登録画面で、この得意先を選んだ時点でチェックが入るスタンプ */}
+      <fieldset className="flex flex-col gap-1">
+        <legend className="text-sm">指定スタンプ</legend>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          受注登録画面でこの得意先を選ぶと、チェックした文言に最初からチェックが入ります
+        </p>
+        {props.stamps.length === 0 && (
+          <p className="text-xs text-neutral-400 dark:text-neutral-500">
+            スタンプが登録されていません（スタンプマスタで登録します）
+          </p>
+        )}
+        {props.stamps.map((stamp) => (
+          <label key={stamp.id} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="stamp_ids"
+              value={stamp.id}
+              defaultChecked={props.designatedStampIds.includes(stamp.id)}
+            />
+            <span className="w-6 text-right tabular-nums text-neutral-500">{stamp.number}</span>
+            {stamp.body}
+            {!stamp.is_active && (
+              <span className="text-xs text-neutral-400">（無効）</span>
+            )}
+          </label>
+        ))}
+      </fieldset>
 
       {/* 有効フラグは新規登録時には常に true で作られるため、編集画面にのみ置く */}
       {props.mode === 'edit' && (

@@ -22,11 +22,16 @@ export default async function EditCustomerPage(
   }
 
   const supabase = await createClient()
-  const { data: customer } = await supabase
-    .from('customers')
-    .select('id, code, name, name_kana, sales_rep, is_active')
-    .eq('id', id)
-    .single()
+  // 得意先・スタンプの選択肢（番号順）・今の指定スタンプをまとめて取得する
+  const [{ data: customer }, { data: stamps }, { data: customerStamps }] = await Promise.all([
+    supabase
+      .from('customers')
+      .select('id, code, name, name_kana, sales_rep, is_active')
+      .eq('id', id)
+      .single(),
+    supabase.from('stamps').select('id, number, body, is_active').order('number'),
+    supabase.from('customer_stamps').select('stamp_id').eq('customer_id', id),
+  ])
 
   if (!customer) {
     notFound()
@@ -35,7 +40,12 @@ export default async function EditCustomerPage(
   return (
     <main className="mx-auto max-w-md px-6 py-8">
       <h1 className="mb-6 text-lg font-semibold">得意先の編集</h1>
-      <CustomerForm mode="edit" customer={customer} />
+      <CustomerForm
+        mode="edit"
+        customer={customer}
+        stamps={stamps ?? []}
+        designatedStampIds={(customerStamps ?? []).map((row) => row.stamp_id)}
+      />
     </main>
   )
 }
