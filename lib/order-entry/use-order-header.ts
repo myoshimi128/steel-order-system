@@ -116,6 +116,8 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
   const dueDateType = findCodeOption(DUE_DATE_TYPE_OPTIONS, values.dueDateType)?.value ?? null
   const deliveryMethodId =
     findCodeOption(masters.deliveryMethods, values.deliveryMethodId)?.value ?? null
+  // 選んだ得意先の id。補助エリアの注意事項の絞り込みと、指定スタンプのチェックに使う
+  const customerId = findCodeOption(masters.customers, values.customerId)?.value ?? null
 
   // 表示を切り替える欄の条件
   const needsDueDate = dueDateTypeNeedsDate(dueDateType)
@@ -171,7 +173,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
       spliceShot: isSplice
         ? (findCodeOption(SHOT_OPTIONS, values.spliceShot)?.value ?? null)
         : null,
-      customerId: findCodeOption(masters.customers, values.customerId)?.value ?? null,
+      customerId,
       customerContact: values.customerContact.trim(),
       deliveryDestinationId:
         findCodeOption(masters.destinations, values.deliveryDestinationId)?.value ?? null,
@@ -227,6 +229,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     setErrors,
     isSplice,
     spliceShot,
+    customerId,
     needsDueDate,
     requiresDeliveryNote,
     fieldOrder,
