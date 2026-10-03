@@ -2,11 +2,13 @@
 
 // 明細の加工の行（1 段）。直上の材料の行（母材）にぶら下がる（docs/screen-design.md「加工の行（1 段）」）。
 //
-//   | └ | 区分 | 加工方法（種類〜材質の位置） | 加工内容（品名の位置） | 数量 | 単位・仕入単価 | 摘要 |
+//   | └ | 区分 | 加工方法（種類〜材質の位置） | 加工の項目（品名の位置） | 数量 | 単位・仕入単価 | 摘要 |
 //
 // 数量・仕入単価・摘要は、材料の行と縦の位置を揃える（同じ列の幅 ITEM_GRID_CLASS を使う）。
 // 切断方法は表示しない（1 段に収めるため。加工の行の切断方法は母材のもの）。
-// 入力順: 区分 → 加工方法 → 加工内容 → 数量 → 単位 → 仕入単価（仕入単価の後は次の行へ）
+// 加工の項目の入力欄は、加工種別の入力の形（自由入力 / 穴 / 曲げ）で切り替える（process-shapes/）。
+// 穴・曲げの数量は母材の枚数から自動で求め、グレーで表示する。
+// 入力順: 区分 → 加工方法 → 加工の項目 → 数量（自由入力のみ）→ 単位 → 仕入単価（仕入単価の後は次の行へ）
 
 import { CodeField } from '@/components/code-input/code-field'
 import { NumericField } from '@/components/code-input/numeric-field'
@@ -16,15 +18,18 @@ import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { PROCESS_PRICE_UNIT_OPTIONS } from '@/lib/order-entry/constants'
 import { firstItemFieldId, itemFieldId } from '@/lib/order-entry/item-row'
 import type { ItemErrors, ItemFieldName } from '@/lib/order-entry/item-types'
-import type { ProcessCalculation } from '@/lib/order-entry/process-row'
+import type { ProcessCalculation, ResolvedProcess } from '@/lib/order-entry/process-row'
 import { useItemRowKeyboard } from '@/lib/order-entry/use-item-row-keyboard'
 import type { OrderItemsState } from '@/lib/order-entry/use-order-items'
 import { ITEM_GRID_CLASS } from './item-grid'
+import { ProcessSpecFields } from './process-shapes/process-spec-fields'
 import { RowMessages } from './row-messages'
 
 type ProcessRowProps = {
   index: number
   items: OrderItemsState
+  // 行の解釈結果（入力の形・自動で求めた数量）
+  resolved: ResolvedProcess
   calculation: ProcessCalculation
   errors: ItemErrors
   // スプライス専用の受注か（区分の一覧の見出しが「切断区分」になる）
@@ -49,6 +54,7 @@ function amountText(calculation: ProcessCalculation): string {
 export function ProcessRow({
   index,
   items,
+  resolved,
   calculation,
   errors,
   isSplice,
@@ -114,27 +120,33 @@ export function ProcessRow({
           />
         </div>
 
-        {/* 加工内容（品名の位置。文字で入力する） */}
+        {/* 加工の項目（品名の位置）。加工種別の入力の形で入力欄を切り替える */}
         <div className="min-w-0">
-          <TextField
-            {...fieldProps('spec')}
-            value={row.spec}
-            onValueChange={(value) => setField('spec', value)}
-            error={errors.spec}
-            widthClass="w-full"
-            showErrorText={false}
+          <ProcessSpecFields
+            shape={resolved.shape}
+            row={row}
+            errors={errors}
+            fieldProps={fieldProps}
+            onChange={setField}
           />
         </div>
 
-        {/* 数量 */}
-        <NumericField
-          {...fieldProps('quantity')}
-          value={row.quantity}
-          onValueChange={(value) => setField('quantity', value)}
-          error={errors.quantity}
-          widthClass="w-full"
-          showErrorText={false}
-        />
+        {/* 数量。穴・曲げは母材の枚数から自動で求めるため、グレーの表示にして入力させない */}
+        {resolved.quantityAutomatic ? (
+          <span className="flex h-[34px] items-center justify-end rounded bg-neutral-100 px-2 tabular-nums dark:bg-neutral-800">
+            {/* 母材の枚数がまだ入力されていなければ「—」 */}
+            {resolved.quantity?.toLocaleString('ja-JP') ?? '—'}
+          </span>
+        ) : (
+          <NumericField
+            {...fieldProps('quantity')}
+            value={row.quantity}
+            onValueChange={(value) => setField('quantity', value)}
+            error={errors.quantity}
+            widthClass="w-full"
+            showErrorText={false}
+          />
+        )}
 
         {/* 単位（1 個 / 2 kg）と仕入単価（手入力。空欄は単価未定） */}
         <div className="flex flex-col items-end">

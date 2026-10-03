@@ -81,6 +81,38 @@ describe('createEmptyItemRow の初期値', () => {
 describe('itemFieldOrder', () => {
   const flags = { needsMaterial: true, steelMakingApplicable: true }
 
+  it('加工の行の入力順は、加工種別の入力の形で変わる（穴・曲げは数量を入力しない）', () => {
+    const order = (processType: string) =>
+      itemFieldOrder(itemRow({ region: '9', processType }), flags, ITEM_MASTERS)
+    // 自由入力（ショット）
+    expect(order('22')).toEqual([
+      'row-1:region',
+      'row-1:processType',
+      'row-1:spec',
+      'row-1:quantity',
+      'row-1:priceUnit',
+      'row-1:unitPrice',
+    ])
+    // 穴（キリ孔）
+    expect(order('20')).toEqual([
+      'row-1:region',
+      'row-1:processType',
+      'row-1:holesPerPiece',
+      'row-1:holeDiameter',
+      'row-1:priceUnit',
+      'row-1:unitPrice',
+    ])
+    // 曲げ
+    expect(order('24')).toEqual([
+      'row-1:region',
+      'row-1:processType',
+      'row-1:bendCount',
+      'row-1:bendStyle',
+      'row-1:priceUnit',
+      'row-1:unitPrice',
+    ])
+  })
+
   it('寸法切は 板厚 → 縦 → 横 → 数量 の順', () => {
     expect(itemFieldOrder(itemRow({ region: '1' }), flags, ITEM_MASTERS)).toEqual([
       'row-1:cuttingMethod',

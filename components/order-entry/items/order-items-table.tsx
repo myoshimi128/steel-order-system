@@ -86,6 +86,7 @@ export function OrderItemsTable({
                 key={row.key}
                 index={index}
                 items={items}
+                resolved={check.resolved}
                 calculation={result.calculation}
                 errors={errors}
                 isSplice={isSplice}

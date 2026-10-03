@@ -5,6 +5,10 @@
 import { useActionState } from 'react'
 import { NumberField } from '@/components/masters/number-field'
 import {
+  DEFAULT_PROCESS_INPUT_SHAPE,
+  PROCESS_INPUT_SHAPES,
+} from '@/lib/order-entry/constants'
+import {
   createProcessType,
   updateProcessType,
   type ProcessTypeFormState,
@@ -16,6 +20,8 @@ type ProcessType = {
   number: number | null
   name: string
   category: string | null
+  // 入力の形（DB 上は text 列。CHECK 制約で入力の形の値に限定されている）
+  input_shape: string
   is_active: boolean
 }
 
@@ -67,6 +73,26 @@ export function ProcessTypeForm(props: ProcessTypeFormProps) {
           placeholder="アイトレ、SPL など"
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="input_shape" className="text-sm">
+          入力の形
+        </label>
+        {/* 受注登録画面の加工の行で、加工の項目の入力欄と数量の求め方を切り替える */}
+        <select
+          id="input_shape"
+          name="input_shape"
+          required
+          defaultValue={processType?.input_shape ?? DEFAULT_PROCESS_INPUT_SHAPE}
+          className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          {PROCESS_INPUT_SHAPES.map((shape) => (
+            <option key={shape.value} value={shape.value}>
+              {shape.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {props.mode === 'edit' && (

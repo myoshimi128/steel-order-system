@@ -1,6 +1,10 @@
 // 加工の行（区分「9 加工」の行）の解釈・確認・仕入金額の計算。
 //
 // 加工の行は、それより上にあるいちばん近い材料の行（母材）にぶら下がる（item-structure.ts）。
+// 加工の内容は、加工種別の「入力の形」に応じた項目で入力する（process-shapes/）。
+//   自由入力: 加工内容を文字で、数量を手入力する
+//   穴・曲げ: 項目（孔数・穴径、ヶ所・曲げ方）を入力し、数量は母材の枚数から自動で求める
+//             （穴 = 1 枚あたりの孔数 × 母材の枚数、曲げ = 母材の枚数）
 // 仕入単価は MVP では手入力で、空欄のまま登録できる（単価未定として数える）。
 //   単位 個: 仕入金額 = 仕入単価 × 数量
 //   単位 kg: 仕入金額 = 仕入単価 × 母材の合計重量（母材の単価の根拠にした重量。角重量、ササラは使用材重量）
@@ -10,14 +14,32 @@ import { findCodeOption } from '@/lib/code-input/code-option'
 import { ceilToYen } from '@/lib/pricing/rounding'
 import { calcTotalWeight } from '@/lib/pricing/weight'
 import type { ItemCalculation } from './calculate-item'
-import { PROCESS_PRICE_UNIT_OPTIONS, type ProcessPriceUnit } from './constants'
+import {
+  PROCESS_PRICE_UNIT_OPTIONS,
+  type ProcessInputShape,
+  type ProcessPriceUnit,
+} from './constants'
 import { processTypeOptions } from './item-options'
 import type { ItemErrors, ItemMasters, ItemRowValues } from './item-types'
+import {
+  automaticQuantity,
+  checkProcessSpec,
+  isQuantityAutomatic,
+  processInputShapeOf,
+  type ProcessSpec,
+  type ProcessSpecCheck,
+} from './process-shapes'
 import { parseQuantity } from './resolve-item'
 
 export type ResolvedProcess = {
   processTypeId: string | null
-  spec: string
+  // 加工種別の入力の形（加工方法が決まっていなければ自由入力）
+  shape: ProcessInputShape
+  // 項目を解釈したもの。項目がそろっていない・誤っている場合は null
+  spec: ProcessSpec | null
+  // 数量を自動で求める形か（穴・曲げ）
+  quantityAutomatic: boolean
+  // 加工数量。自由入力は入力値、穴・曲げは母材の枚数から求めた値（求まらなければ null）
   quantity: number | null
   priceUnit: ProcessPriceUnit | null
   // 空欄（単価未定）は null
@@ -35,15 +57,44 @@ function parseUnitPrice(text: string): number | null {
   return Number(trimmed)
 }
 
-export function resolveProcessRow(row: ItemRowValues, masters: ItemMasters): ResolvedProcess {
+// 行を解釈し、項目の確認の結果も一緒に返す（checkProcessRow で項目のエラーに使う）
+function resolveWithSpecCheck(
+  row: ItemRowValues,
+  masters: ItemMasters,
+  parentQuantity: number | null,
+): { resolved: ResolvedProcess; specCheck: ProcessSpecCheck } {
+  const shape = processInputShapeOf(row, masters)
+  const specCheck = checkProcessSpec(shape, row)
+  const quantityAutomatic = isQuantityAutomatic(shape)
+  // 穴・曲げの数量は画面の入力値を使わず、項目と母材の枚数から求める
+  // （保存時もサーバー側でこの計算をし直す。docs/table-design.md「加工数量の保存」）
+  const quantity = quantityAutomatic
+    ? specCheck.spec
+      ? automaticQuantity(specCheck.spec, parentQuantity)
+      : null
+    : parseQuantity(row.quantity)
   return {
-    processTypeId: findCodeOption(processTypeOptions(masters), row.processType)?.value ?? null,
-    spec: row.spec.trim(),
-    quantity: parseQuantity(row.quantity),
-    priceUnit: findCodeOption(PROCESS_PRICE_UNIT_OPTIONS, row.priceUnit)?.value ?? null,
-    unitPrice: parseUnitPrice(row.unitPrice),
-    unitPriceEntered: row.unitPrice.trim() !== '',
+    resolved: {
+      processTypeId: findCodeOption(processTypeOptions(masters), row.processType)?.value ?? null,
+      shape,
+      spec: specCheck.spec,
+      quantityAutomatic,
+      quantity,
+      priceUnit: findCodeOption(PROCESS_PRICE_UNIT_OPTIONS, row.priceUnit)?.value ?? null,
+      unitPrice: parseUnitPrice(row.unitPrice),
+      unitPriceEntered: row.unitPrice.trim() !== '',
+    },
+    specCheck,
   }
+}
+
+// 加工の行を解釈する。parentQuantity は母材の枚数（穴・曲げの数量の計算に使う。決まっていなければ null）
+export function resolveProcessRow(
+  row: ItemRowValues,
+  masters: ItemMasters,
+  parentQuantity: number | null = null,
+): ResolvedProcess {
+  return resolveWithSpecCheck(row, masters, parentQuantity).resolved
 }
 
 export type ProcessRowCheck = {
@@ -52,15 +103,17 @@ export type ProcessRowCheck = {
   liveErrors: ItemErrors
 }
 
-// 加工の行の確認。hasParent は、この行より上に材料の行（母材）があるか
+// 加工の行の確認。hasParent は、この行より上に材料の行（母材）があるか。
+// parentQuantity は母材の枚数（決まっていなければ null）
 export function checkProcessRow(
   row: ItemRowValues,
   masters: ItemMasters,
   hasParent: boolean,
+  parentQuantity: number | null = null,
 ): ProcessRowCheck {
-  const resolved = resolveProcessRow(row, masters)
-  const errors: ItemErrors = {}
-  const liveErrors: ItemErrors = {}
+  const { resolved, specCheck } = resolveWithSpecCheck(row, masters, parentQuantity)
+  const errors: ItemErrors = { ...specCheck.errors }
+  const liveErrors: ItemErrors = { ...specCheck.liveErrors }
 
   // 加工の行は材料の行にぶら下がるため、材料の行より前（明細の先頭）には置けない
   if (!hasParent) {
@@ -73,10 +126,14 @@ export function checkProcessRow(
     liveErrors.processType = '存在しない番号です'
   }
 
-  if (!row.quantity.trim()) {
-    errors.quantity = '加工の数量を入力してください'
-  } else if (resolved.quantity === null) {
-    liveErrors.quantity = '数量は 1 以上の整数で入力してください'
+  // 数量は自由入力の形のときだけ確認する。
+  // 穴・曲げの数量は自動で求めるため、母材の枚数の誤りは母材の行のエラーとして出る
+  if (!resolved.quantityAutomatic) {
+    if (!row.quantity.trim()) {
+      errors.quantity = '加工の数量を入力してください'
+    } else if (resolved.quantity === null) {
+      liveErrors.quantity = '数量は 1 以上の整数で入力してください'
+    }
   }
 
   if (!row.priceUnit.trim()) {

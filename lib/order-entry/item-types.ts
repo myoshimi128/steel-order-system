@@ -1,6 +1,7 @@
 // 受注明細（材料の行）で使う型の定義。
 
 import type { CuttingType, SpecialProductTypeRow } from '@/lib/pricing/types'
+import type { ProcessInputShape } from './constants'
 
 // --- 明細の入力に使うマスタ（page.tsx でサーバーから取得して渡す） ---
 
@@ -65,6 +66,8 @@ export type ProcessTypeMaster = {
   // 番号が未設定の加工種別は、受注登録画面では選べない
   number: number | null
   name: string
+  // 入力の形（加工の項目の入力欄と、数量の求め方を決める）
+  input_shape: ProcessInputShape
 }
 
 // --- 明細の行の入力値 ---
@@ -97,8 +100,21 @@ export type ItemRowValues = {
   // --- 加工の行だけで使う欄 ---
   // 加工方法（加工種別マスタの番号）
   processType: string
-  // 加工内容（例: 1S / 12孔 38φ）
+  // 加工内容（自由入力の形の加工だけで使う。例: 1S/ 2孔 30X12φ）
   spec: string
+  // --- 加工の項目（入力の形が「穴」の加工） ---
+  // 1 枚あたりの孔数
+  holesPerPiece: string
+  // 穴径（mm）
+  holeDiameter: string
+  // --- 加工の項目（入力の形が「曲げ」の加工） ---
+  // ヶ所の番号（0 1ヶ所 / 2〜4 / 9 フリー）と、9 フリーのときに入力するヶ所数
+  bendCount: string
+  bendCountFree: string
+  // 曲げ方の番号（0 90° / 2 二方 / 3 三方 / 4 四方 / 9 フリー）と、9 フリーのときに入力する文字
+  // （「曲げ」を除いた部分。R、85° など）
+  bendStyle: string
+  bendStyleFree: string
   // 単位の番号（1 個 / 2 kg）
   priceUnit: string
   // 加工の仕入単価（手入力。空欄は単価未定）

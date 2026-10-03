@@ -7,6 +7,7 @@ import { roundTo } from '@/lib/pricing/rounding'
 import type { ItemCalculation } from './calculate-item'
 import { SAME_AS_CUSTOMER_DESTINATION } from './constants'
 import type { ResolvedProcess } from './process-row'
+import { specFieldsJson } from './process-shapes'
 import type { ResolvedItem } from './resolve-item'
 import type { OrderHeaderInput } from './validate-order-header'
 
@@ -99,15 +100,20 @@ export function buildOrderItemPayload(
 
 // 加工の行 1 行分（order_item_processes の列名に合わせる）。
 // 材料の行の payload の processes に入れ、create_order で母材の id を付けて登録する。
-// 入力がそろっていない行（加工方法・数量・単位がない）は null を返す
+// 入力がそろっていない行（加工方法・項目・数量・単位がない）は null を返す。
+// 穴・曲げの数量は、呼び出し側で母材の枚数を渡して解釈し直した値（resolveProcessRow）を使う
 export function buildProcessPayload(process: ResolvedProcess, lineNo: number, remarks: string) {
-  if (!process.processTypeId || process.quantity === null || !process.priceUnit) {
+  if (!process.processTypeId || !process.spec || process.quantity === null || !process.priceUnit) {
     return null
   }
+  const { spec } = process
   return {
     line_no: lineNo,
     process_type_id: process.processTypeId,
-    spec: nullIfEmpty(process.spec),
+    // 自由入力の形は加工内容を文字で保存する。項目で入力する形は項目（spec_fields）だけを保存し、
+    // 伝票の文は項目から組み立てる（同じ内容を 2 か所に持たない）
+    spec: spec.shape === '自由入力' ? nullIfEmpty(spec.text) : null,
+    spec_fields: specFieldsJson(spec),
     quantity: process.quantity,
     // 仕入単価が空欄なら単価未定（NULL）のまま登録する
     unit_price: process.unitPrice,

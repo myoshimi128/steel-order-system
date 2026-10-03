@@ -47,10 +47,12 @@ export const ITEM_MASTERS: ItemMasters = {
     { ...BETAMARU, number: 7, name: 'ベタ丸', is_splice_order_type: false, dimension_shape: '円' },
   ],
   processTypes: [
-    { id: 'proc-kiri', number: 11, name: 'キリ孔' },
-    { id: 'proc-shot', number: 14, name: 'ショット' },
+    { id: 'proc-laser', number: 11, name: 'レーザー・プラズマ孔', input_shape: '穴' },
+    { id: 'proc-kiri', number: 20, name: 'キリ孔', input_shape: '穴' },
+    { id: 'proc-shot', number: 22, name: 'ショット', input_shape: '自由入力' },
+    { id: 'proc-bend', number: 24, name: '曲げ', input_shape: '曲げ' },
     // 番号が未設定の加工種別は、受注登録画面では選べない
-    { id: 'proc-unnumbered', number: null, name: '番号なし' },
+    { id: 'proc-unnumbered', number: null, name: '番号なし', input_shape: '自由入力' },
   ],
 }
 

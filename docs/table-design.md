@@ -276,13 +276,33 @@
 | `id` | uuid | PK |
 | `name` | text | 加工名（穴あけ、キリ孔、曲げ、開先、ショット、タップ孔、マーキング、ピアス孔、切り込みなど） |
 | `category` | text | 集計用の区分（アイトレ、SPL など） |
+| `input_shape` | text | 入力の形。`自由入力` / `穴` / `曲げ`。既定 `自由入力`。受注登録画面の加工の項目の入力欄を切り替える |
 | `is_active` | boolean | 有効フラグ |
 
 注意事項は `notices` テーブルに切り出す。
 
+`input_shape`（入力の形）は、加工の行の項目（`order_item_processes.spec_fields`）の入力欄と、数量の求め方を決める（basic-design.md「加工の入力項目」）。加工種別の名前で分岐せずに済むよう、データとして持つ（`special_product_types.dimension_shape` と同じ考え方）。初期データは、レーザー・プラズマ孔・ガス孔・キリ孔を `穴`、曲げを `曲げ`、それ以外を `自由入力` とする（列の追加は `supabase/migrations/20261002100000_add_process_input_shapes.sql`、値の設定は seed 005）。形を追加するたびに、チェック制約の値の一覧を新しいマイグレーションで広げる（予定: ピアス孔・長孔・中抜き・タップ孔・開先・マーキング・切り込み・入力項目なし（ショット））。
+
+加工の最低単価は、単価の自動計算を実装する際に列を追加する（MVP では持たない）。
+
 `category` はショット加工量明細のような集計に使用する。
 
-受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を持つ（初期データは seed 004。11 キリ孔 / 12 タップ孔 / 13 曲げ / 14 ショット / 15 開先 / 21 レーザー孔 / 22 プラズマ孔 / 23 ピアス孔 / 24 長孔 / 25 中抜き / 26 切り込み / 27 マーキング）。
+受注登録画面の番号入力のため、番号の列 `number`（integer、一意）を持つ。
+
+**番号は加工の順番**
+
+番号は、現場で加工する順番に合わせて振る。番号の並びがそのまま工程の流れになるため、受注入力で加工の行を上から工程順に並べやすく、一覧（「/」）でも工程順に並ぶ。
+
+| 番号 | 区分 | 加工種別 |
+| --- | --- | --- |
+| 10 番台 | 切断機で行う加工 | 11 レーザー・プラズマ孔 / 12 ガス孔 / 13 中抜き / 14 長孔 / 15 ピアス孔 / 16 マーキング / 17 切り込み |
+| 20 番台 | 二次加工（工程順） | 20 キリ孔 / 21 タップ孔 / 22 ショット / 23 開先 / 24 曲げ |
+
+- 曲げは、曲げた後にほかの加工ができないため、二次加工の最後に置く
+- 新しい加工種別を追加するときも、加工の順番に合う番号を選ぶ（10 番台・20 番台の中で空いている番号）
+- レーザー孔とプラズマ孔は単価が同じため、1 つの加工種別（レーザー・プラズマ孔）にまとめている。統合前のプラズマ孔の行は、受注から参照されている可能性があるため削除せず、無効にして番号を空にしている
+
+初期データは seed 004。当初は 11 キリ孔 / 21 レーザー孔 のような番号で投入していたため、投入済みの DB では seed 005 で振り直す（番号の一意制約にぶつからないよう、対象の行の番号をいったん空にしてから振り直す）。
 
 画面から登録された行に番号のないものがある可能性があるため、NULL 可で始めている。マスタ画面では番号を必須にしており、全行に番号が入った後で NOT NULL にする。
 
@@ -433,7 +453,7 @@
 ヘッダーと明細は、DB の関数 `create_order(p_order jsonb, p_items jsonb)` で 1 回にまとめて登録し、採番された受注番号を返す。Supabase のクライアント（PostgREST）は複数の insert を 1 つの transaction にまとめられないため、関数にしている。関数の中の処理は 1 つの transaction で実行されるため、明細の登録で失敗すると、ヘッダーの登録と受注番号の採番も取り消される。
 
 - 引数はそれぞれ `orders`・`order_items` の列名をキーにした JSON（明細は配列で 1 件以上）
-- 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）
+- 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）。加工の項目（`spec_fields`）も JSON のまま受け取って登録する
 - `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
 - 起案者（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
@@ -492,8 +512,9 @@
 | `order_item_id` | uuid | FK → `order_items` |
 | `line_no` | integer | 行番号 |
 | `process_type_id` | uuid | FK → `process_types` |
-| `spec` | text | 加工内容（例: キリ孔 1S/12 孔 38φ） |
-| `quantity` | integer | 加工数量 |
+| `spec` | text | 加工内容（自由入力の形の加工のみ。例: `1S/ 2孔 30X12φ`）。項目で入力する加工は NULL |
+| `spec_fields` | jsonb | 加工の項目（項目で入力する加工のみ。自由入力の形は NULL）。形は後述 |
+| `quantity` | integer | 加工数量。穴・曲げは母材の枚数から自動計算した値 |
 | `price_unit` | text | 単価の単位。`個` / `kg`。既定は `個` |
 | `unit_price` | numeric | 加工の仕入単価。MVP では手入力 |
 | `remarks` | text | 摘要 |
@@ -501,6 +522,28 @@
 1 つの材料に複数の加工（穴あけ + 曲げ + ショット）が付くケースを表現するため、受注明細の子テーブルとする。加工指示書では加工が重量ゼロの別行として印字されるが、これは材料重量を二重に計上しないための表示上の処理である。
 
 加工の仕入金額は `price_unit` で求め方が変わる。`個` は「仕入単価 × 数量」、`kg` は「仕入単価 × 母材の合計重量」とする。重量建ての加工の重量は材料の重量と一致するため、加工明細に重量カラムは持たない。親の `order_items` の重量（単価の根拠にした重量。`square_weight`、ササラは `material_weight`）と数量から算出する。同じ値を 2 箇所に保持すると、寸法修正時にずれる原因となる。
+
+**加工の項目（spec_fields）**
+
+項目で入力する加工は、入力の形に応じた項目を `spec_fields` に 1 つの JSON オブジェクトとしてまとめて保存する。入力の形ごとに項目が異なり、今後も形を 1 つずつ追加していくため、形ごとに列を増やさず JSON にしている。中身の確認は保存する側（Server Action）で行い、DB ではオブジェクトであることだけをチェック制約で確かめる。
+
+`shape` に保存した時点の入力の形を持たせる。あとで加工種別マスタの `input_shape` が変わっても、保存済みの行の項目を正しく読めるようにするためである。
+
+| 入力の形 | `spec_fields` の例 |
+| --- | --- |
+| 穴 | `{"shape": "穴", "holes_per_piece": 12, "hole_diameter": 38}` |
+| 曲げ | `{"shape": "曲げ", "bend_count": 2, "bend_style": "二方", "bend_style_note": null}` |
+| 曲げ（曲げ方がフリー） | `{"shape": "曲げ", "bend_count": 1, "bend_style": "フリー", "bend_style_note": "R"}` |
+
+- `holes_per_piece`: 1 枚あたりの孔数（整数）、`hole_diameter`: 穴径（mm）
+- `bend_count`: ヶ所数（整数。9 フリーで入力した数もここに入る）
+- `bend_style`: `90°` / `二方` / `三方` / `四方` / `フリー`。単価の追加料金（二方・三方・四方）の判定に使えるよう、選択肢の値で持つ。`フリー` のときだけ `bend_style_note` に入力した文（「曲げ」を除いた部分。`R`、`85°` など）を入れる。伝票の文は「〇ヶ所 〇曲げ」の形に組み立てる（`1ヶ所 90°曲げ`、`1ヶ所 R曲げ`）
+
+伝票に載せる文（加工内容）は `spec_fields` から組み立て、`spec` には保存しない。同じ内容を 2 箇所に持つと、食い違う原因になるためである。
+
+**加工数量の保存**
+
+穴・曲げの数量は母材の枚数から計算できる値だが、`quantity` に保存する。自由入力の加工と同じ列で、印刷・集計・仕入金額の計算ができるようにするためである（材料の行の重量を保存しているのと同じ扱い）。食い違いを防ぐため、数量は画面の入力値を使わず、受注を保存するたびに保存する側で `spec_fields` と母材の枚数から計算し直す。
 
 ### shipments（出荷実績）
 
@@ -650,6 +693,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `material_extras.material_id` に一意制約（材質ごとに1行）
 - `plate_types` `materials` `special_product_types` は `name` に一意制約
 - `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約
+- `process_types.input_shape` は入力の形の値の一覧に限る。`order_item_processes.spec_fields` は NULL か JSON オブジェクト
 - `customers` `delivery_destinations` `manufacturers` の `code` は数字のみ（`delivery_destinations` はさらに `0` を禁止。`manufacturers` はさらに `0` を禁止し、一意制約）
 - `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス）
 - `orders` のスプライス関連の列（`is_splice` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
@@ -735,7 +779,7 @@ DB の関数は `security definer`（関数所有者の権限で実行）とし�
 
 - `order_items_factory_view` に次の列がない: `cutting_type`・`special_product_type_id`・`steel_making`・`plate_size`・`outer_diameter`・`inner_diameter`・`actual_weight`・`material_weight`・`price_unit`
 - `order_items_factory_view` の重量の列名が、`square_weight` へのリネーム前の `unit_weight` のまま（ビューはリネーム後の列を指しているが、ビュー上の列名は古い）
-- `order_item_processes_factory_view` に `price_unit`（加工の単位）がない
+- `order_item_processes_factory_view` に `price_unit`（加工の単位）・`spec_fields`（加工の項目）がない
 
 現場ロール（factory）は MVP では運用しないため急ぎではないが、現場用伝票など現場ロールがビューを使う機能を実装する前に、新しいマイグレーションでビューを作り直す。作り直す際も、単価列（`cutting_unit_price`・`sales_unit_price`・加工の `unit_price`）は引き続き除外する。
 
