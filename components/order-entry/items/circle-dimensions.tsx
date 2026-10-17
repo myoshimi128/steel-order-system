@@ -24,7 +24,7 @@ export function CircleDimensions({ withInnerDiameter, ...props }: CircleDimensio
         onValueChange={(value) => onChange('outerDiameter', value)}
         error={errors.outerDiameter}
         allowDecimal
-        widthClass="w-24"
+        widthClass="w-[4.25rem]"
         showErrorText={false}
       />
       {withInnerDiameter && (
@@ -37,7 +37,7 @@ export function CircleDimensions({ withInnerDiameter, ...props }: CircleDimensio
             onValueChange={(value) => onChange('innerDiameter', value)}
             error={errors.innerDiameter}
             allowDecimal
-            widthClass="w-24"
+            widthClass="w-[4.25rem]"
             showErrorText={false}
           />
         </>

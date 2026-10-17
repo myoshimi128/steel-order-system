@@ -41,6 +41,20 @@ export function createEmptyItemRow(): ItemRowValues {
   }
 }
 
+// 画面を開いたときの最初の空の行。
+// 行の ID を乱数（randomUUID）にすると、サーバーでの描画とブラウザでの描画で別の ID になり、
+// 欄の id 属性が食い違う（React のハイドレーションのエラーになる）。
+// 最初の 1 行はサーバーでも描画されるため、決まった ID にする。
+// あとから追加する行はブラウザの中だけで作られるため、乱数の ID のままでよい
+export const INITIAL_ITEM_ROW_KEY = 'initial-row'
+
+export function createInitialItemRow(): ItemRowValues {
+  return {
+    key: INITIAL_ITEM_ROW_KEY,
+    ...EMPTY_ITEM_VALUES,
+  }
+}
+
 // 空の行の入力値（key 以外）。何も入力していない行かの判定にも使う
 export const EMPTY_ITEM_VALUES: Omit<ItemRowValues, 'key'> = {
   cuttingMethod: '',

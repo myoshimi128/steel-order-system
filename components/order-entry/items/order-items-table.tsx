@@ -57,12 +57,23 @@ export function OrderItemsTable({
   const numbers = materialNumbers(items.rows)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // 見出し・明細の行・合計を 1 つのスクロールの枠に入れ、見出しは上端、合計は下端に固定する（sticky）。
+    // 見出しや合計を枠の外に置くと、明細の行の側にだけスクロールバーの幅が入り、列の位置がずれるため。
+    // scroll-pt / scroll-pb は、キー操作で欄を移ったときに、その欄が固定した見出し・合計の下に隠れないようにする余白。
+    //
+    // 左右の余白は、受注のヘッダー部分・下の 3 つの枠と端を揃えるためのもの（左 24px、右 16px＋スクロールバー 8px＝24px）。
+    // scrollbar-gutter: stable で、明細が少なくスクロールバーが出ないときもその幅を空けておき、右端の位置を変えない。
+    // スクロールバーの幅は globals.css の scroll-thin で 8px に決めている
+    <div className="scroll-thin min-h-0 flex-1 scroll-pt-14 scroll-pb-12 overflow-y-auto pl-6 pr-4 [scrollbar-gutter:stable]">
       {/* 見出し */}
       <div
-        className={`${ITEM_GRID_CLASS} bg-slate-900 py-2 text-xs font-semibold text-white dark:bg-slate-800`}
+        className={`${ITEM_GRID_CLASS} sticky top-0 z-10 bg-slate-900 py-2 text-xs font-semibold text-white dark:bg-slate-800`}
       >
-        <HeaderCell top="No" />
+        {/* No の列は見出しの文字を出さない（帯の左端が詰まって見えるため）。
+            列の位置は残し、読み上げ用にだけ「No」を入れておく */}
+        <div>
+          <span className="sr-only">No</span>
+        </div>
         <HeaderCell top="切断方法" bottom={isSplice ? '切断区分' : '区分'} />
         <HeaderCell top="種類" bottom="製鋼法" />
         <HeaderCell top="材質" bottom="メーカー" />
@@ -74,15 +85,15 @@ export function OrderItemsTable({
 
       {/* スプライス専用の受注の案内 */}
       {isSplice && (
-        <p className="border-b border-blue-100 bg-blue-50 px-6 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+        <p className="border-b border-blue-100 bg-blue-50 px-3 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
           <span className="font-semibold">スプライス専用の受注</span>
           　明細はすべてスプライス。ショットの有無は受注単位。切断区分は 1 寸法切 ／ 2
           アイトレ（アイトレは別途見積もり）／ 9 加工
         </p>
       )}
 
-      {/* 明細の行（この部分だけスクロールする） */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* 明細の行 */}
+      <div>
         {items.rows.map((row, index) => {
           const check = items.checks[index]
           const result = calculations[index]
@@ -133,11 +144,14 @@ export function OrderItemsTable({
           return null
         })}
         {items.itemsError && (
-          <p className="px-6 py-2 text-sm text-red-600 dark:text-red-400">{items.itemsError}</p>
+          <p className="px-3 py-2 text-sm text-red-600 dark:text-red-400">{items.itemsError}</p>
         )}
       </div>
 
-      <OrderItemsTotals totals={totals} />
+      {/* 合計は枠の下端に固定する（明細が少なければ最後の行のすぐ下に出る） */}
+      <div className="sticky bottom-0 z-10">
+        <OrderItemsTotals totals={totals} />
+      </div>
     </div>
   )
 }

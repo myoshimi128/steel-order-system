@@ -9,3 +9,10 @@ export type CurrentUser = {
   name: string
   role: UserRole
 }
+
+// role をそのまま表示すると事務側が読みづらいため、日本語の名前に変換する（ヘッダーの表示などで使う）
+export const ROLE_LABEL: Record<UserRole, string> = {
+  office: '事務',
+  factory: '現場',
+  admin: '管理者',
+}

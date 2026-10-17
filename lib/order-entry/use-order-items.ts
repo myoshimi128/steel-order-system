@@ -14,6 +14,7 @@ import { useState } from 'react'
 import {
   applyItemFieldChange,
   createEmptyItemRow,
+  createInitialItemRow,
   createProcessRow,
   INITIAL_ITEM_ROW,
   itemFieldId,
@@ -40,7 +41,8 @@ import { checkRows, validateOrderItems, type OrderItemsValidation } from './vali
 export type CopyRowResult = { ok: true } | { ok: false; message: string }
 
 export function useOrderItems(masters: ItemMasters, context: ItemContext) {
-  const [rows, setRows] = useState<ItemRowValues[]>(() => [createEmptyItemRow()])
+  // 最初の行はサーバーでも描画するため、決まった ID の行にする（item-row.ts の createInitialItemRow）
+  const [rows, setRows] = useState<ItemRowValues[]>(() => [createInitialItemRow()])
   // 保存しようとしたときに出たエラー（画面側の確認・サーバーからの応答）。行の key ごと
   const [submitErrors, setSubmitErrors] = useState<Record<string, ItemErrors>>({})
   // 明細全体のエラー（明細が 1 行もない など）

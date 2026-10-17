@@ -9,7 +9,7 @@
 // ここでは保存の流れ（確認 → Server Action の呼び出し → 結果の表示）だけを扱う。
 
 import { useEffect, useState, useTransition, type KeyboardEvent } from 'react'
-import { createOrder } from '@/app/orders/new/actions'
+import { createOrder } from '@/app/(main)/orders/new/actions'
 import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { itemFieldId, itemFieldOrder } from '@/lib/order-entry/item-row'
 import type { ItemFieldName } from '@/lib/order-entry/item-types'
@@ -154,11 +154,12 @@ export function OrderEntryScreen({ masters, today }: OrderEntryScreenProps) {
   }
 
   return (
-    // 画面の高さ（上部のユーザー表示の分を除く）に収め、明細の部分だけをスクロールさせる。
+    // 画面の高さ（共通レイアウトのヘッダーの分を除く）に収め、明細の部分だけをスクロールさせる。
+    // ヘッダーの高さは globals.css の --header-height で持つ。
     // ↑↓ による欄の移動は、ここ（画面全体の外枠）でまとめて受け取る
     <div
       onKeyDown={navigation.handleArrowKeys}
-      className="flex h-[calc(100dvh-41px)] min-h-0 flex-col"
+      className="flex h-[calc(100dvh-var(--header-height))] min-h-0 flex-col"
     >
       {/* ヘッダーは固定表示（明細が増えても見失わないようにする） */}
       <div className="shrink-0">

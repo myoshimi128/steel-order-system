@@ -26,7 +26,8 @@ export default async function NewOrderPage() {
   const masters = await loadOrderEntryMasters(supabase)
 
   return (
-    <main className="mx-auto flex w-[1280px] flex-1 flex-col">
+    // 幅は固定せず、共通レイアウトのサイドメニューを除いた残り（閉じた状態で 1216px）いっぱいに広げる
+    <main className="flex min-w-0 flex-1 flex-col">
       <h1 className="sr-only">受注登録</h1>
       {/* 今日の日付はサーバー（日本時間）で求めて渡す。
           ブラウザ側で求めると、サーバーでの描画結果と日付がずれる可能性があるため */}

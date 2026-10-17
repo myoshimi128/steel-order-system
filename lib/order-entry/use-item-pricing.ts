@@ -11,7 +11,7 @@
 //     （重量・単価の計算は、取得済みの行を使って画面側の lib/pricing で行う）
 
 import { useEffect, useRef, useState } from 'react'
-import { fetchPricingRows } from '@/app/orders/new/actions'
+import { fetchPricingRows } from '@/app/(main)/orders/new/actions'
 import type { PricingRowConditions } from '@/lib/pricing/fetch-pricing-masters'
 import type { PricingMasters } from '@/lib/pricing/types'
 import { pricingConditionsKey } from './calculate-item'

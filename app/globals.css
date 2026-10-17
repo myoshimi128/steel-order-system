@@ -1,22 +1,61 @@
 @import "tailwindcss";
 
+/*
+  明るい配色だけで使う（docs/screen-design.md「共通レイアウト」の色）。
+  Tailwind の dark: は、初期設定ではパソコンのダークモードに合わせて効く。
+  ここで「.dark クラスが付いた要素の中だけで効く」に置き換え、.dark はどこにも付けないため、
+  既存の画面に残っている dark: の指定は効かなくなる。
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* 共通レイアウトの寸法。受注登録画面の高さの計算にも使う */
+  --header-height: 64px;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
 }
 
+/*
+  色の名前。画面ごとに色の値を直接書かず、bg-navy・text-urgent のように名前で使う。
+  @theme に --color-〇〇 を書くと、Tailwind の bg-〇〇 / text-〇〇 / border-〇〇 などが使えるようになる。
+*/
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* アクセント（ヘッダー・主なボタン・選択中の項目） */
+  --color-navy: #1b365d;
+  --color-navy-hover: #142a49;
+  /* 選択中のメニューなど、ネイビーを薄くした背景 */
+  --color-navy-soft: #e8edf4;
+  /* 至急・要相談・重要・必須の印と、入力のエラーにだけ使う赤 */
+  --color-urgent: #c0392b;
+  /* 画面の地の色（白いカードの外側の薄いグレー） */
+  --color-canvas: #f5f6f8;
+  /* 区切り線 */
+  --color-line: #e2e5ea;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/*
+  幅を決めた細いスクロールバー（8px）。
+  OS の既定のスクロールバーは幅が環境によって違い、表の右端の位置がずれるため、
+  右端を揃えたいスクロールの枠（受注登録の明細）ではこのクラスで幅を決める。
+  ::-webkit-scrollbar は Chrome・Edge で効く書き方
+*/
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: #c4c9d2;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 body {
