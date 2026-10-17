@@ -22,7 +22,8 @@ type DimensionFieldsProps = DimensionInputProps & {
 
 export function DimensionFields({ kind, regionLabel, ...props }: DimensionFieldsProps) {
   return (
-    <div className="flex items-center gap-1.5">
+    // 間隔は 4px（gap-1）。1280px の画面で、一番長いドーナツ（板厚 × 外径 × 内径）が品名の欄に収まるようにするため
+    <div className="flex items-center gap-1">
       {/* 区分名の幅は、一番長い「スプライス」（5 文字）が切れない 4.5rem（72px）にする */}
       <span className="w-[4.5rem] shrink-0 truncate text-sm text-neutral-600 dark:text-neutral-400">
         {regionLabel}
