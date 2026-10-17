@@ -26,22 +26,8 @@ $$;
 -- ---------------------------------------------------------------------
 -- 1. 営業所（加工場所・ユーザーの所属）
 -- ---------------------------------------------------------------------
-create table public.sites (
-  id         uuid primary key default gen_random_uuid(),
-  -- 画面の番号（1 本社 / 2 A営業所 / 3 B営業所）。並び順にも使う
-  number     integer not null unique check (number >= 1),
-  code       text not null unique,
-  name       text not null,
-  is_active  boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  updated_by uuid references public.users (id)
-);
-create trigger sites_touch before update on public.sites
-  for each row execute function public.intake_touch_row();
-
-insert into public.sites (number, code, name)
-values (1, 'honsha', '本社'), (2, 'a', 'A営業所'), (3, 'b', 'B営業所');
+-- sites（と orders.site_id）は、受注登録画面の作り直しの PR で前倒しして作成済み
+-- （supabase/migrations/20261017100100_create_sites_and_order_site.sql）。ここでは扱わない
 
 
 -- ---------------------------------------------------------------------
@@ -585,27 +571,14 @@ alter table public.orders
   add column intake_id    uuid not null references public.intakes (id),
   add column work_unit_id uuid not null,
   add column branch_no    integer not null,
-  add column member_class text not null default 'NONE'
-    check (member_class in ('NONE', 'DF', 'GPL', 'BH', 'SPL')),
-  add column site_id      uuid not null references public.sites (id),
   add column staff_id     uuid not null default auth.uid() references public.users (id),
   add constraint orders_unit_same_intake foreign key (work_unit_id, intake_id)
     references public.work_units (id, intake_id),
   add constraint orders_intake_branch_key unique (intake_id, branch_no);
 create index orders_work_unit_idx on public.orders (work_unit_id);
 
--- スプライス専用の受注は部材区分 SPL にまとめる（is_splice は廃止）
-alter table public.orders drop constraint orders_splice_columns_check;
-alter table public.orders drop column is_splice;
-alter table public.orders
-  add constraint orders_splice_columns_check check (
-    (member_class <> 'SPL' and joint_no is null and splice_shot is null)
-    or (
-      member_class = 'SPL'
-      and (joint_no is null or char_length(joint_no) between 1 and 10)
-      and splice_shot is not null
-    )
-  );
+-- 部材区分（member_class）の追加と is_splice の廃止は、受注登録画面の作り直しの PR で先に行う
+-- （docs/intake/basic-design.md「実装の順序」PR 2）。ここでは扱わない
 
 -- 受注No. は create_order の中で {受付No.}-{枝番} を入れるため、旧来の採番（2600001）の初期値を外す
 alter table public.orders alter column order_no drop default;
@@ -629,11 +602,10 @@ $$;
 create trigger intakes_prevent_deleting_ordered before update on public.intakes
   for each row execute function public.intakes_prevent_deleting_ordered();
 
--- create_order は 20261003100100 の版を作り直す。違いは次のとおり（明細・加工・スタンプの登録は同じ）:
---   1. p_order から intake_id・work_unit_id・member_class・site_id・staff_id を受け取る
+-- create_order は、受注登録画面の作り直しの PR の版（member_class を受け取る版）を作り直す。違いは次のとおり（明細・加工・スタンプの登録は同じ）:
+--   1. p_order から intake_id・work_unit_id・site_id・staff_id を受け取る
 --   2. orders の insert の前に private.issue_order_branch(intake_id) を呼び、branch_no と order_no を決めて insert に含める
---   3. is_splice の代わりに member_class を insert する（SPL のとき joint_no・splice_shot を入れる）
---   4. site_id が受付の加工場所と違えば、受付の site_id を更新する（変更履歴はトリガーが残す）
+--   3. site_id が受付の加工場所と違えば、受付の site_id を更新する（変更履歴はトリガーが残す）
 --   受注の insert と枝番の採番は同じ transaction の中で行われるため、登録に失敗すると枝番も取り消される
 
 -- attachments は使わない（intake_files に一本化）。参照しているコードを外したあとのマイグレーションで drop する
@@ -686,13 +658,6 @@ alter table public.intake_site_changes enable row level security;
 create policy intake_site_changes_select_office on public.intake_site_changes for select to authenticated
   using (public.current_user_role() in ('office', 'admin'));
 grant select on public.intake_site_changes to authenticated;
-
--- 営業所：参照は全ロール、登録・更新は管理者
-alter table public.sites enable row level security;
-create policy sites_select_all_roles on public.sites for select to authenticated
-  using (public.current_user_role() in ('office', 'factory', 'admin'));
-create policy sites_admin_all on public.sites for all to authenticated
-  using (public.current_user_role() = 'admin') with check (public.current_user_role() = 'admin');
 
 -- 通知：自分の部署の行だけ参照（書くのはトリガー）
 alter table public.notifications enable row level security;

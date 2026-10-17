@@ -3,21 +3,6 @@ import { applyItemFieldChange, itemFieldOrder } from './item-row'
 import { ITEM_MASTERS, itemRow } from './test-fixtures'
 
 describe('applyItemFieldChange', () => {
-  it('切断方法を 9 定尺にすると、区分も 3 定尺に固定する', () => {
-    const next = applyItemFieldChange(itemRow({ region: '1' }), 'cuttingMethod', '9', ITEM_MASTERS)
-    expect(next.region).toBe('3')
-  })
-
-  it('切断方法を定尺から戻すと、固定していた区分を空にする', () => {
-    const next = applyItemFieldChange(
-      itemRow({ cuttingMethod: '9', region: '3' }),
-      'cuttingMethod',
-      '2',
-      ITEM_MASTERS,
-    )
-    expect(next.region).toBe('')
-  })
-
   it('種類を縞板にすると、メーカーの「0 指定なし」を空にする（縞板はメーカー必須）', () => {
     const next = applyItemFieldChange(itemRow({ manufacturer: '0' }), 'plateType', '1', ITEM_MASTERS)
     expect(next.manufacturer).toBe('')
@@ -81,42 +66,32 @@ describe('createEmptyItemRow の初期値', () => {
 describe('itemFieldOrder', () => {
   const flags = { needsMaterial: true, steelMakingApplicable: true }
 
-  it('加工の行の入力順は、加工種別の入力の形で変わる（穴・曲げは数量を入力しない）', () => {
+  it('加工の行の入力順は、加工種別の入力の形で変わる（穴・曲げは数量を入力しない。単位・仕入単価は入力しない）', () => {
     const order = (processType: string) =>
-      itemFieldOrder(itemRow({ region: '9', processType }), flags, ITEM_MASTERS)
+      itemFieldOrder(itemRow({ cutRegion: '9', processType }), flags, ITEM_MASTERS)
     // 自由入力（ショット）
     expect(order('22')).toEqual([
-      'row-1:region',
       'row-1:processType',
       'row-1:spec',
       'row-1:quantity',
-      'row-1:priceUnit',
-      'row-1:unitPrice',
     ])
     // 穴（キリ孔）
     expect(order('20')).toEqual([
-      'row-1:region',
       'row-1:processType',
       'row-1:holesPerPiece',
       'row-1:holeDiameter',
-      'row-1:priceUnit',
-      'row-1:unitPrice',
     ])
     // 曲げ
     expect(order('24')).toEqual([
-      'row-1:region',
       'row-1:processType',
       'row-1:bendCount',
       'row-1:bendStyle',
-      'row-1:priceUnit',
-      'row-1:unitPrice',
     ])
   })
 
-  it('寸法切は 板厚 → 縦 → 横 → 数量 の順', () => {
-    expect(itemFieldOrder(itemRow({ region: '1' }), flags, ITEM_MASTERS)).toEqual([
-      'row-1:cuttingMethod',
-      'row-1:region',
+  it('寸法切は 切断・区分 → 種類 → … → 板厚 → 縦 → 横 → 数量 の順', () => {
+    expect(itemFieldOrder(itemRow({ cutRegion: '41' }), flags, ITEM_MASTERS)).toEqual([
+      'row-1:cutRegion',
       'row-1:plateType',
       'row-1:material',
       'row-1:steelMaking',
@@ -128,15 +103,15 @@ describe('itemFieldOrder', () => {
     ])
   })
 
-  it('定尺は区分（固定）と製鋼法（—）を飛ばし、板厚の後に定尺サイズを入力する', () => {
+  it('定尺（71）は製鋼法（—）を飛ばし、板厚の後に定尺サイズを入力する', () => {
     expect(
       itemFieldOrder(
-        itemRow({ cuttingMethod: '9', region: '3' }),
+        itemRow({ cutRegion: '71' }),
         { needsMaterial: true, steelMakingApplicable: false },
         ITEM_MASTERS,
       ),
     ).toEqual([
-      'row-1:cuttingMethod',
+      'row-1:cutRegion',
       'row-1:plateType',
       'row-1:material',
       'row-1:manufacturer',
@@ -146,8 +121,8 @@ describe('itemFieldOrder', () => {
     ])
   })
 
-  it('ベタ丸は板厚の後に直径だけを入力する', () => {
-    const order = itemFieldOrder(itemRow({ region: '7' }), flags, ITEM_MASTERS)
+  it('ベタ丸（47 レーザーベタ丸）は板厚の後に直径だけを入力する', () => {
+    const order = itemFieldOrder(itemRow({ cutRegion: '47' }), flags, ITEM_MASTERS)
     expect(order.slice(-3)).toEqual(['row-1:thickness', 'row-1:outerDiameter', 'row-1:quantity'])
   })
 })

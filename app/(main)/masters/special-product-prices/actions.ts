@@ -9,7 +9,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 
+// 切断方法の条件で選べる値（special_product_prices_cutting_method_check と同じ）
+const CUTTING_METHODS: readonly string[] = ['シャーリング', 'ガス', 'プラズマ', 'レーザー']
+
 export type SpecialProductPriceFormState = { error: string } | undefined
+
+// 切断方法の条件で選べる値（special_product_prices_cutting_method_check と同じ） CUTTING_METHODS: readonly string[] = ['シャーリング', 'ガス', 'プラズマ', 'レーザー']
 
 type ParsedSpecialProductPriceForm =
   | {
@@ -17,6 +22,8 @@ type ParsedSpecialProductPriceForm =
       values: {
         special_product_type_id: string
         plate_type_id: string
+        // 切断方法の条件。null は切断方法を問わない（ベタ丸・ドーナツはレーザーだけ。docs/table-design.md）
+        cutting_method: string | null
         thickness_min: number
         thickness_max: number
         unit_price: number
@@ -30,6 +37,7 @@ function readSpecialProductPriceForm(
 ): ParsedSpecialProductPriceForm {
   const specialProductTypeId = formData.get('special_product_type_id')
   const plateTypeId = formData.get('plate_type_id')
+  const cuttingMethodRaw = formData.get('cutting_method')
   const thicknessMinRaw = formData.get('thickness_min')
   const thicknessMaxRaw = formData.get('thickness_max')
   const unitPriceRaw = formData.get('unit_price')
@@ -63,11 +71,18 @@ function readSpecialProductPriceForm(
     return { ok: false, error: '適用開始日を入力してください' }
   }
 
+  // 切断方法は空欄（問わない）か、決まった値のどれか
+  const cuttingMethod = typeof cuttingMethodRaw === 'string' && cuttingMethodRaw ? cuttingMethodRaw : null
+  if (cuttingMethod !== null && !CUTTING_METHODS.includes(cuttingMethod)) {
+    return { ok: false, error: '切断方法を正しく選択してください' }
+  }
+
   return {
     ok: true,
     values: {
       special_product_type_id: specialProductTypeId,
       plate_type_id: plateTypeId,
+      cutting_method: cuttingMethod,
       thickness_min: thicknessMin,
       thickness_max: thicknessMax,
       unit_price: unitPrice,

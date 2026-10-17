@@ -1,7 +1,7 @@
 'use client'
 
-// 受注登録画面の補助エリア。得意先の注意事項・スタンプ・フリーコメントの 3 つの枠を横に並べる
-// （docs/screen-design.md「補助エリア」）。入力順は 明細 → スタンプの番号 → フリーコメント → 登録ボタン。
+// ③ 伝票の指示の下段。得意先の注意事項・スタンプ・フリーコメントの 3 つの枠を横に並べる
+// （docs/screen-design.md「③ 伝票の指示」）。入力順は 摘要 → スタンプの番号 → フリーコメント → 登録ボタン。
 
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import type { DisplayedNotice } from '@/lib/order-entry/notices'
@@ -24,7 +24,7 @@ type AuxAreaProps = {
 
 export function AuxArea({ aux, notices, hasCustomer, showShotStamp, navigation }: AuxAreaProps) {
   return (
-    <div className="grid h-44 shrink-0 grid-cols-3 gap-3 px-6 pb-2">
+    <div className="grid h-48 shrink-0 grid-cols-3 gap-3 border-t border-line p-3">
       <CustomerNoticePanel notices={notices} hasCustomer={hasCustomer} />
       <StampPanel
         aux={aux}

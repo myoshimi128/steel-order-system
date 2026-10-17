@@ -3,7 +3,7 @@
 // 受注登録画面のヘッダーの入力値を管理するカスタムフック。
 //
 //   ・各欄の入力値（番号の欄は打った番号、文字・日付の欄はその値）を持つ
-//   ・スプライス・納期種別・配達の値に応じて、表示する欄と入力順を決める
+//   ・部材区分（SPL はスプライス専用の受注）・納期種別・配達の値に応じて、表示する欄と入力順を決める
 //   ・保存用の値（OrderHeaderInput）への変換と、保存前の確認（必須項目など）
 //
 // 画面の部品（components/order-entry/header/*）はこのフックの戻り値を表示するだけにする
@@ -14,10 +14,11 @@ import { findCodeOption, type CodeOption } from '@/lib/code-input/code-option'
 import {
   DUE_DATE_TYPE_OPTIONS,
   dueDateTypeNeedsDate,
+  MEMBER_CLASS_OPTIONS,
   PROCESSING_TYPE_OPTIONS,
   SAME_AS_CUSTOMER_CODE,
   SHOT_OPTIONS,
-  SPLICE_OPTIONS,
+  SPLICE_MEMBER_CLASS,
 } from './constants'
 import {
   validateOrderHeader,
@@ -29,7 +30,7 @@ import {
 // エラーを出す欄は、保存用の値（OrderHeaderInput）と同じ名前にしている
 export type HeaderFieldId =
   | 'processingType'
-  | 'isSplice'
+  | 'memberClass'
   | 'jointNo'
   | 'spliceShot'
   | 'orderDate'
@@ -41,6 +42,7 @@ export type HeaderFieldId =
   | 'dueDate'
   | 'deliveryMethodId'
   | 'deliveryMethodNote'
+  | 'siteId'
 
 // 各欄の入力値。番号の欄（処理区分・売り先など）は、打った番号の文字列を持つ
 export type HeaderValues = Record<HeaderFieldId, string>
@@ -55,17 +57,24 @@ export type HeaderMasterOptions = {
   deliveryMethods: readonly CodeOption<string>[]
   // 文字の入力が必要な配達方法（フリー）の id
   deliveryMethodIdsRequiringNote: readonly string[]
+  // 加工場所（営業所。番号＝sites.number、値＝id）
+  sites: readonly CodeOption<string>[]
 }
 
-// スプライスを 1 にしたときのショットの初期値（1 有）
+// 加工場所の初期値（1 本社）。ユーザーの所属する営業所の列（users.site_id）ができたら、その営業所にする。
+// 受付の機能ができたら、受付の加工場所を初期値にする
+const DEFAULT_SITE_CODE = '1'
+
+// 部材区分を SPL（スプライス専用の受注）にしたときのショットの初期値（1 有）
 const SPLICE_SHOT_DEFAULT_CODE = '1'
 
 // 新規入力の初期値。
-// 処理区分（0 新規）・スプライス（0 通常）・受注日（今日）は初期値があるため、Enter だけで進める
+// 処理区分（0 新規）・部材区分（0 無分類）・受注日（今日）・納期（3 後報）・配達（0 宵積み）は初期値があるため、
+// Enter だけで進める。受付の機能ができたら、納期・配達などの初期値は受付の値にする
 function initialValues(today: string): HeaderValues {
   return {
     processingType: '0',
-    isSplice: '0',
+    memberClass: '0',
     jointNo: '',
     spliceShot: '',
     orderDate: today,
@@ -74,10 +83,14 @@ function initialValues(today: string): HeaderValues {
     // 入れ先は「0 売り先と同じ」を初期値にする（Enter だけで進める）
     deliveryDestinationId: SAME_AS_CUSTOMER_CODE,
     projectName: '',
-    dueDateType: '',
+    // 納期の初期値は 3 後報（日付なし。受付の「未定」に当たる）
+    dueDateType: '3',
     dueDate: '',
-    deliveryMethodId: '',
+    // 配達の初期値は 0 宵積み（いつもの値）
+    deliveryMethodId: '0',
     deliveryMethodNote: '',
+    // 加工場所の初期値は当面 1 本社
+    siteId: DEFAULT_SITE_CODE,
   }
 }
 
@@ -85,12 +98,13 @@ function initialValues(today: string): HeaderValues {
 // 番号が入力されているのに選択肢にない場合は「存在しない番号」として扱う
 type CodeFieldId =
   | 'processingType'
-  | 'isSplice'
+  | 'memberClass'
   | 'spliceShot'
   | 'customerId'
   | 'deliveryDestinationId'
   | 'dueDateType'
   | 'deliveryMethodId'
+  | 'siteId'
 
 export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
   const [values, setValues] = useState<HeaderValues>(() => initialValues(today))
@@ -99,16 +113,19 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
   // 番号の欄ごとの選択肢
   const codeOptions: Record<CodeFieldId, readonly CodeOption<unknown>[]> = {
     processingType: PROCESSING_TYPE_OPTIONS,
-    isSplice: SPLICE_OPTIONS,
+    memberClass: MEMBER_CLASS_OPTIONS,
     spliceShot: SHOT_OPTIONS,
     customerId: masters.customers,
     deliveryDestinationId: masters.destinations,
     dueDateType: DUE_DATE_TYPE_OPTIONS,
     deliveryMethodId: masters.deliveryMethods,
+    siteId: masters.sites,
   }
 
   // 番号から選んだ値を引く（見つからなければ undefined）
-  const isSplice = findCodeOption(SPLICE_OPTIONS, values.isSplice)?.value ?? false
+  // 部材区分（未選択・存在しない番号は無分類として扱う）。SPL ならスプライス専用の受注
+  const memberClass = findCodeOption(MEMBER_CLASS_OPTIONS, values.memberClass)?.value ?? 'NONE'
+  const isSplice = memberClass === SPLICE_MEMBER_CLASS
   // スプライス専用の受注のショット加工の有無（未選択は null）。明細の単価の計算に使う
   const spliceShot = isSplice
     ? (findCodeOption(SHOT_OPTIONS, values.spliceShot)?.value ?? null)
@@ -124,31 +141,34 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
   const requiresDeliveryNote =
     deliveryMethodId !== null && masters.deliveryMethodIdsRequiringNote.includes(deliveryMethodId)
 
-  // 入力順（左上から右下）。表示されない欄は入れない。
-  // 受注 No. は新規では入力できないため含めない。最後は登録ボタン
+  // 入力順（① 受注情報の画面の並びどおり、左上から右下）。表示されない欄は入れない。
+  // 受注 No.・受付 No. は入力できないため含めない。最後は登録ボタン（画面を進めるボタン）
+  //   処理区分 → 受注日 → 売り先 → 納期 → 客先担当 → 配達 → 工事名 → 入れ先 → 加工場所 → 部材区分（→ 継手番号 → ショット）
   const fieldOrder: string[] = [
     'processingType',
-    'isSplice',
-    ...(isSplice ? ['jointNo', 'spliceShot'] : []),
     'orderDate',
     'customerId',
-    'customerContact',
-    'deliveryDestinationId',
-    'projectName',
     'dueDateType',
     ...(needsDueDate ? ['dueDate'] : []),
+    'customerContact',
     'deliveryMethodId',
     ...(requiresDeliveryNote ? ['deliveryMethodNote'] : []),
+    'projectName',
+    'deliveryDestinationId',
+    'siteId',
+    'memberClass',
+    ...(isSplice ? ['jointNo', 'spliceShot'] : []),
     'submit',
   ]
 
   // 欄の値を変える。その欄に出ていたエラーは消す（入力し直したため）。
-  // スプライスを 1 にしたとき、ショットが空欄なら初期値の 1 有を入れる（スプライスはショット有が多いため）。
-  // 一度入力したショットは、スプライスを 0 に戻してまた 1 にしても、そのまま残す
+  // 部材区分を SPL にしたとき、ショットが空欄なら初期値の 1 有を入れる（スプライスはショット有が多いため）。
+  // 一度入力したショットは、部材区分を SPL 以外に戻してまた SPL にしても、そのまま残す
   function setValue(field: HeaderFieldId, value: string) {
     setValues((current) => {
       const next = { ...current, [field]: value }
-      const becomesSplice = field === 'isSplice' && findCodeOption(SPLICE_OPTIONS, value)?.value === true
+      const becomesSplice =
+        field === 'memberClass' && findCodeOption(MEMBER_CLASS_OPTIONS, value)?.value === SPLICE_MEMBER_CLASS
       if (becomesSplice && next.spliceShot.trim() === '') {
         next.spliceShot = SPLICE_SHOT_DEFAULT_CODE
       }
@@ -168,6 +188,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
   function toInput(): OrderHeaderInput {
     return {
       orderDate: values.orderDate,
+      memberClass,
       isSplice,
       jointNo: isSplice ? values.jointNo.trim() : '',
       spliceShot: isSplice
@@ -182,6 +203,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
       dueDate: needsDueDate ? values.dueDate : '',
       deliveryMethodId,
       deliveryMethodNote: requiresDeliveryNote ? values.deliveryMethodNote.trim() : '',
+      siteId: findCodeOption(masters.sites, values.siteId)?.value ?? null,
     }
   }
 
@@ -227,6 +249,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     errors,
     setValue,
     setErrors,
+    memberClass,
     isSplice,
     spliceShot,
     customerId,

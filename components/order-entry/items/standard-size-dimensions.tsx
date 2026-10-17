@@ -20,8 +20,9 @@ export function StandardSizeDimensions(props: DimensionInputProps) {
         code={row.plateSize}
         onCodeChange={(code) => onChange('plateSize', code)}
         error={errors.plateSize}
-        codeWidthClass="w-10"
-        nameWidthClass="w-14"
+        codeWidthClass="w-6"
+        nameWidthClass="w-10"
+        dense
         showErrorText={false}
       />
     </>

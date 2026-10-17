@@ -16,11 +16,23 @@ export const PROCESSING_TYPE_OPTIONS: readonly CodeOption<ProcessingType>[] = [
   { code: '2', label: '削除', value: 'delete' },
 ]
 
-// --- スプライス（通常の受注か、スプライス専用の受注か） ---
-export const SPLICE_OPTIONS: readonly CodeOption<boolean>[] = [
-  { code: '0', label: '通常', value: false },
-  { code: '1', label: 'スプライス', value: true },
+// --- 部材区分（orders.member_class の値域と一致させる） ---
+// 部品ごとに受注を分けるときに使い、後の工程管理で利用する。
+// SPL を選んだ受注がスプライス専用の受注になる（以前の「スプライス 0 / 1」の欄の代わり。
+// 部材区分とは別にスプライスの印を持つと食い違うおそれがあるため、1 つにまとめた）
+export type MemberClass = 'NONE' | 'DF' | 'GPL' | 'BH' | 'SPL'
+
+// 並び順は画面イメージ（S-06c）に合わせ、0 無分類を最後に置く
+export const MEMBER_CLASS_OPTIONS: readonly CodeOption<MemberClass>[] = [
+  { code: '1', label: 'DF', value: 'DF' },
+  { code: '2', label: 'GPL', value: 'GPL' },
+  { code: '3', label: 'BH', value: 'BH' },
+  { code: '4', label: 'SPL', value: 'SPL' },
+  { code: '0', label: '無分類', value: 'NONE' },
 ]
+
+// スプライス専用の受注になる部材区分
+export const SPLICE_MEMBER_CLASS: MemberClass = 'SPL'
 
 // --- ショット（スプライス専用の受注のショット加工の有無） ---
 export const SHOT_OPTIONS: readonly CodeOption<boolean>[] = [
@@ -67,43 +79,43 @@ export const SAME_AS_CUSTOMER_OPTION: CodeOption<string> = {
 // 明細（材料の行）
 // ============================================================
 
-// --- 切断方法 ---
-// 9 定尺は切断を伴わない定尺売り。選ぶと区分も 3 定尺に固定され、cutting_method は NULL で保存する
-export type CuttingMethodChoice = 'シャーリング' | 'ガス' | 'レーザー' | 'プラズマ' | '定尺'
+// --- 切断・区分（切断方法と区分をまとめた 2 桁の番号） ---
+// docs/screen-design.md「切断・区分の番号」。十の位が切断方法、一の位が区分。
+//   11 シャー寸法切 / 12 シャー型切り / 21・31・41 寸法切 / 22・32・42 アイトレ /
+//   25・27・28 など 特殊製品（一の位は特殊製品種別マスタの番号）/ 71 定尺 / 9 加工
+// 組み合わせの一覧は lib/order-entry/item-options.ts の cutRegionEntries で作る。
+//
+// 定尺売りは切断を伴わないが、画面の扱いをそろえるため、切断方法の値として '定尺' を持つ
+// （保存時は cutting_method を NULL にする）
+export type CuttingMethodChoice = 'シャーリング' | 'ガス' | 'プラズマ' | 'レーザー' | '定尺'
 
-export const CUTTING_METHOD_OPTIONS: readonly CodeOption<CuttingMethodChoice>[] = [
-  { code: '1', label: 'シャーリング', value: 'シャーリング' },
-  { code: '2', label: 'ガス', value: 'ガス' },
-  { code: '3', label: 'レーザー', value: 'レーザー' },
-  { code: '4', label: 'プラズマ', value: 'プラズマ' },
-  { code: '9', label: '定尺', value: '定尺' },
+// 十の位（切断方法）。short は表の中に出す短い名前（例: 「シャー寸法切」）
+export type CuttingMethodDigit = {
+  digit: string
+  value: Exclude<CuttingMethodChoice, '定尺'>
+  short: string
+  // 特殊製品（ササラ・ベタ丸・ドーナツ）を作る切断方法か（シャーリングでは作らない）
+  makesSpecialProducts: boolean
+}
+
+export const CUTTING_METHOD_DIGITS: readonly CuttingMethodDigit[] = [
+  { digit: '1', value: 'シャーリング', short: 'シャー', makesSpecialProducts: false },
+  { digit: '2', value: 'ガス', short: 'ガス', makesSpecialProducts: true },
+  { digit: '3', value: 'プラズマ', short: 'プラズマ', makesSpecialProducts: true },
+  { digit: '4', value: 'レーザー', short: 'レーザー', makesSpecialProducts: true },
 ]
 
-// --- 区分（固定の分） ---
-// ササラ・ベタ丸・ドーナツは特殊製品種別マスタの番号で選ぶ（lib/order-entry/item-options.ts で合わせて作る）
-export type FixedRegion = '寸法切' | 'アイトレ' | '定尺' | '加工'
+// 一の位（区分）のうち固定のもの。1 寸法切 / 2 アイトレ（シャーリングでは「型切り」と表示する）
+export const CUT_TYPE_DIGITS = { 寸法切: '1', アイトレ: '2' } as const
 
-export const FIXED_REGION_OPTIONS: readonly CodeOption<FixedRegion>[] = [
-  { code: '1', label: '寸法切', value: '寸法切' },
-  { code: '2', label: 'アイトレ', value: 'アイトレ' },
-  { code: '3', label: '定尺', value: '定尺' },
-  { code: '9', label: '加工', value: '加工' },
-]
+// シャーリングのアイトレの表示名。保存する値はアイトレのまま（新しい切断区分は作らない）
+export const SHEARING_IRREGULAR_CUT_LABEL = '型切り'
 
-// 切断方法 9 定尺を選んだときに固定する区分の番号
-export const STANDARD_REGION_CODE = '3'
+// 71 定尺（定尺売り）
+export const STANDARD_CUT_REGION_CODE = '71'
 
-// 区分 9 加工（この番号の行は加工の行になる）
+// 9 加工（この番号の行は加工の行になる。同じ欄で続けて加工方法の番号を打つ）
 export const PROCESS_REGION_CODE = '9'
-
-// --- スプライス専用の受注の区分（切断区分） ---
-// スプライス専用の受注では、区分の欄は切断区分になる（明細はすべてスプライス）。
-// 番号は通常の受注の区分と同じ（1 寸法切 / 2 アイトレ / 9 加工）
-export const SPLICE_REGION_OPTIONS: readonly CodeOption<FixedRegion>[] = [
-  { code: '1', label: '寸法切', value: '寸法切' },
-  { code: '2', label: 'アイトレ', value: 'アイトレ' },
-  { code: PROCESS_REGION_CODE, label: '加工', value: '加工' },
-]
 
 // --- 加工の行の単位（order_item_processes.price_unit の値域と一致させる） ---
 //   個: 仕入金額 = 仕入単価 × 数量

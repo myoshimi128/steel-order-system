@@ -3,7 +3,7 @@
 
 export function NotApplicable() {
   return (
-    <span className="flex h-[34px] items-center justify-center rounded border border-dashed border-neutral-200 text-neutral-400 dark:border-neutral-800">
+    <span className="flex h-7 items-center justify-center rounded border border-dashed border-line text-neutral-400">
       —
     </span>
   )

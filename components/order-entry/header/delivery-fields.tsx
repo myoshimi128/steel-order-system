@@ -1,7 +1,7 @@
 'use client'
 
 // 配達の欄。フリー（delivery_methods.requires_note が true）を選んだときだけ、
-// 文字を入力する欄を表示する。
+// 文字を入力する欄を表示する。項目名「配達」は欄の上（FormItem）に出すため、ここでは付けない。
 
 import { CodeField } from '@/components/code-input/code-field'
 import { TextField } from '@/components/code-input/text-field'
@@ -20,7 +20,7 @@ export function DeliveryFields({ header, navigation, options }: DeliveryFieldsPr
     <div className="flex items-start gap-2">
       <CodeField
         {...navigation.fieldProps('deliveryMethodId')}
-        label="配達"
+        listTitle="配達"
         options={options}
         code={header.values.deliveryMethodId}
         onCodeChange={(code) => header.setValue('deliveryMethodId', code)}

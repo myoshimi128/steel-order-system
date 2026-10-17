@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { regionOptions } from './item-options'
+import { cutRegionOptions, resolveCutRegion } from './item-options'
 import {
   fitsInStandardPlate,
   isBlankRow,
@@ -99,7 +99,7 @@ describe('parsePositiveNumber / parseQuantity', () => {
 describe('resolveItemRow', () => {
   it('ベタ丸の外径 300 は定尺に収まるため、定尺の商品を使う', () => {
     const resolved = resolveItemRow(
-      itemRow({ cuttingMethod: '3', region: '7', material: '0', thickness: '9', outerDiameter: '300', quantity: '10' }),
+      itemRow({ cutRegion: '47', material: '0', thickness: '9', outerDiameter: '300', quantity: '10' }),
       ITEM_MASTERS,
     )
     expect(resolved.dimensionKind).toBe('circle')
@@ -112,7 +112,7 @@ describe('resolveItemRow', () => {
     expect(checkered.steelMakingApplicable).toBe(false)
     expect(checkered.steelMaking).toBeNull()
 
-    const standard = resolveItemRow(itemRow({ cuttingMethod: '9', region: '3' }), ITEM_MASTERS)
+    const standard = resolveItemRow(itemRow({ cutRegion: '71' }), ITEM_MASTERS)
     expect(standard.steelMakingApplicable).toBe(false)
   })
 
@@ -138,16 +138,56 @@ describe('resolveItemRow', () => {
   })
 })
 
-describe('regionOptions', () => {
-  it('固定の区分と特殊製品種別を番号順に並べ、スプライス受注用の種別は出さない', () => {
-    expect(regionOptions(ITEM_MASTERS).map((option) => `${option.code} ${option.label}`)).toEqual([
-      '1 寸法切',
-      '2 アイトレ',
-      '3 定尺',
-      '5 ササラ',
-      '7 ベタ丸',
+describe('cutRegionOptions（切断・区分の 2 桁の番号）', () => {
+  it('寸法切・アイトレ（シャーは型切り）・特殊製品（ガス・プラズマ・レーザー）・71 定尺・9 加工を番号順に並べる', () => {
+    expect(cutRegionOptions(ITEM_MASTERS).map((option) => `${option.code} ${option.label}`)).toEqual([
       '9 加工',
+      '11 シャー寸法切',
+      '12 シャー型切り',
+      '21 ガス寸法切',
+      '22 ガスアイトレ',
+      '25 ガスササラ',
+      '27 ガスベタ丸',
+      '31 プラズマ寸法切',
+      '32 プラズマアイトレ',
+      '35 プラズマササラ',
+      '37 プラズマベタ丸',
+      '41 レーザー寸法切',
+      '42 レーザーアイトレ',
+      '45 レーザーササラ',
+      '47 レーザーベタ丸',
+      '71 定尺',
     ])
+  })
+
+  it('スプライス専用の受注では、寸法切・アイトレ（スプライス）と 9 加工だけ', () => {
+    expect(cutRegionOptions(ITEM_MASTERS, true).map((option) => option.code)).toEqual([
+      '9', '11', '12', '21', '22', '31', '32', '41', '42',
+    ])
+  })
+})
+
+describe('resolveCutRegion', () => {
+  it('12 シャー型切りは、切断区分をアイトレとして解釈する（新しい切断区分は作らない）', () => {
+    expect(resolveCutRegion('12', ITEM_MASTERS)).toMatchObject({
+      cuttingMethod: 'シャーリング',
+      region: { kind: 'cut', cuttingType: 'アイトレ' },
+    })
+  })
+
+  it('47 はレーザーのベタ丸（切断方法と特殊製品種別）', () => {
+    const entry = resolveCutRegion('47', ITEM_MASTERS)
+    expect(entry?.cuttingMethod).toBe('レーザー')
+    expect(entry?.region).toMatchObject({ kind: 'special', type: { name: 'ベタ丸' } })
+  })
+
+  it('シャーリングと特殊製品の組み合わせ（17）はない', () => {
+    expect(resolveCutRegion('17', ITEM_MASTERS)).toBeNull()
+  })
+
+  it('71 定尺は切断方法を「定尺」、9 は加工の行として解釈する', () => {
+    expect(resolveCutRegion('71', ITEM_MASTERS)).toMatchObject({ cuttingMethod: '定尺', region: { kind: 'standard' } })
+    expect(resolveCutRegion('9', ITEM_MASTERS)).toMatchObject({ cuttingMethod: null, region: { kind: 'process' } })
   })
 })
 

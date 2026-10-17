@@ -1,6 +1,6 @@
 // 明細（材料の行）の入力値を解釈する処理。
 //
-//   ・番号から切断方法・区分・種類・材質・製鋼法・メーカーを引く
+//   ・番号から切断方法・区分（切断・区分の 2 桁の番号）・種類・材質・製鋼法・メーカーを引く
 //   ・板厚・寸法・数量を数値にする
 //   ・定尺・大板を判定し、商品（products）を特定する
 //   ・縞板の単位質量を引く
@@ -10,7 +10,6 @@
 
 import { findCodeOption } from '@/lib/code-input/code-option'
 import {
-  CUTTING_METHOD_OPTIONS,
   PLATE_SIZE_OPTIONS,
   STANDARD_PLATE_LENGTH,
   STANDARD_PLATE_WIDTH,
@@ -24,7 +23,7 @@ import {
   manufacturerOptionsFor,
   materialOptionsFor,
   requiresManufacturer,
-  resolveRegion,
+  resolveCutRegion,
 } from './item-options'
 import type {
   DimensionKind,
@@ -197,9 +196,11 @@ export function resolveItemRow(
   masters: ItemMasters,
   context: ItemContext = NORMAL_ORDER_CONTEXT,
 ): ResolvedItem {
-  const cuttingMethod = findCodeOption(CUTTING_METHOD_OPTIONS, row.cuttingMethod)?.value ?? null
-  // スプライス専用の受注では、区分の欄は切断区分（1 寸法切 / 2 アイトレ）と 9 加工
-  const region = resolveRegion(row.region, masters, context.isSplice)
+  // 切断・区分の番号（2 桁）から、切断方法と区分を引く。
+  // スプライス専用の受注では、寸法切・アイトレの番号をスプライス（切断区分つき）として解釈する
+  const cutRegion = resolveCutRegion(row.cutRegion, masters, context.isSplice)
+  const cuttingMethod: CuttingMethodChoice | null = cutRegion?.cuttingMethod ?? null
+  const region: Region | null = cutRegion?.region ?? null
   // ショットの有無はスプライス受注用の種別の行だけで使う（ほかの特殊製品の単価はショットなしの行）
   const isSpliceRow = region?.kind === 'special' && region.type.is_splice_order_type
   const hasShot = isSpliceRow ? context.spliceShot : false

@@ -18,9 +18,9 @@ function keyed(key: string, values: Parameters<typeof itemRow>[0]) {
 }
 
 // レーザー（3）・寸法切・SS400 9mm の材料の行
-const LASER_ROW = { cuttingMethod: '3', region: '1', material: '0', thickness: '9', width: '100', length: '200', quantity: '10' }
+const LASER_ROW = { cutRegion: '41', material: '0', thickness: '9', width: '100', length: '200', quantity: '10' }
 // キリ孔（20）の加工の行
-const KIRI_ROW = { region: '9', processType: '20', holesPerPiece: '4', holeDiameter: '32' }
+const KIRI_ROW = { cutRegion: '9', processType: '20', holesPerPiece: '4', holeDiameter: '32' }
 
 const CUSTOMER = 'customer-1'
 
@@ -96,7 +96,7 @@ describe('customerNoticesFor（得意先の注意事項）', () => {
 
   it('定尺売りは切断方法の条件に含めない', () => {
     const conditions = conditionsOf([
-      keyed('m1', { cuttingMethod: '9', region: '3', material: '0', thickness: '9', plateSize: '1', quantity: '1' }),
+      keyed('m1', { cutRegion: '71', material: '0', thickness: '9', plateSize: '1', quantity: '1' }),
     ])
     expect([...conditions.cuttingMethods]).toEqual([])
   })
@@ -156,7 +156,7 @@ describe('processNoticesFor（加工の注意事項）', () => {
   })
 
   it('板厚は母材（材料の行）の板厚で判定する', () => {
-    const bend = { region: '9', processType: '24' }
+    const bend = { cutRegion: '9', processType: '24' }
     expect(noticeIdsFor({ ...LASER_ROW, thickness: '16' }, bend)).toEqual(['bend-13'])
     expect(noticeIdsFor(LASER_ROW, bend)).toEqual([])
   })

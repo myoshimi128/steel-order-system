@@ -7,7 +7,7 @@
 //   ・保存時の確認（errors）: 上記に加えて、未入力の必須項目など
 // 加工の行の確認は process-row.ts にある。
 
-import { regionOptions } from './item-options'
+import { resolveCutRegion } from './item-options'
 import { isProcessRow, parentIndexOf } from './item-structure'
 import type { ItemContext, ItemErrors, ItemMasters, ItemRowValues } from './item-types'
 import { checkProcessRow, type ProcessRowCheck } from './process-row'
@@ -55,24 +55,16 @@ export function checkItemRow(
     return false
   }
 
-  // --- 切断方法・区分 ---
-  checkCode('cuttingMethod', resolved.cuttingMethod !== null, '切断方法')
-  if (checkCode('region', resolved.region !== null, '区分')) {
-    // スプライスの 0 / 1 を切り替えた後に、切り替え後の受注で使えない区分の行が残っている場合
-    // （例: 通常の受注で入れた 7 ベタ丸の行のまま、スプライス専用の受注に切り替えた）
-    const usableInOtherOrder = regionOptions(masters, !context.isSplice).some(
-      (option) => option.code === row.region.trim(),
-    )
-    if (row.region.trim() && usableInOtherOrder) {
-      liveErrors.region = context.isSplice
-        ? 'スプライス専用の受注では使えない区分です（1 寸法切 / 2 アイトレ / 9 加工）'
-        : '通常の受注では使えない区分です'
+  // --- 切断・区分（切断方法と区分をまとめた 2 桁の番号） ---
+  if (checkCode('cutRegion', resolved.region !== null, '切断・区分')) {
+    // 部材区分を SPL とそれ以外の間で切り替えた後に、切り替え後の受注で使えない番号の行が残っている場合
+    // （例: 通常の受注で入れた 47 レーザーベタ丸の行のまま、スプライス専用の受注に切り替えた）
+    const usableInOtherOrder = resolveCutRegion(row.cutRegion, masters, !context.isSplice) !== null
+    if (row.cutRegion.trim() && usableInOtherOrder) {
+      liveErrors.cutRegion = context.isSplice
+        ? 'スプライス専用の受注では使えない番号です（寸法切 11・21・31・41 / アイトレ 12・22・32・42 / 9 加工）'
+        : '通常の受注では使えない番号です'
     }
-  } else if (resolved.cuttingMethod === '定尺' && resolved.region?.kind !== 'standard') {
-    // 画面では切断方法を定尺にすると区分も定尺に固定されるが、念のため確認する
-    errors.region = '切断方法が定尺のときは、区分も定尺にしてください'
-  } else if (resolved.region?.kind === 'standard' && resolved.cuttingMethod !== null && resolved.cuttingMethod !== '定尺') {
-    errors.region = '定尺売りは、切断方法を 9 定尺にしてください'
   }
 
   // --- 種類・材質・製鋼法 ---

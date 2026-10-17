@@ -60,6 +60,7 @@ export async function loadOrderEntryMasters(
     processNotices,
     stamps,
     customerStamps,
+    sites,
   ] = await Promise.all([
     supabase.from('customers').select('id, code, name, name_kana').eq('is_active', true),
     supabase.from('delivery_destinations').select('id, code, name, name_kana').eq('is_active', true),
@@ -99,6 +100,8 @@ export async function loadOrderEntryMasters(
     // スタンプは番号順に並べる（番号を打って付け外しする）
     supabase.from('stamps').select('id, number, body').eq('is_active', true).order('number'),
     supabase.from('customer_stamps').select('customer_id, stamp_id'),
+    // 加工場所（営業所）。番号順に並べる
+    supabase.from('sites').select('id, number, name').eq('is_active', true).order('number'),
   ])
 
   const deliveryMethodRows = rowsOf(deliveryMethods, '配達方法')
@@ -119,6 +122,9 @@ export async function loadOrderEntryMasters(
       deliveryMethodIdsRequiringNote: deliveryMethodRows
         .filter((row) => row.requires_note)
         .map((row) => row.id),
+      sites: rowsOf(sites, '営業所').map(
+        (row): CodeOption<string> => ({ code: String(row.number), label: row.name, value: row.id }),
+      ),
     },
     items: {
       plateTypes: rowsOf(plateTypes, '種類'),

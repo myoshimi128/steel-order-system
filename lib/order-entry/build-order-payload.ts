@@ -28,7 +28,8 @@ export function buildOrderPayload(
 ) {
   return {
     order_date: input.orderDate,
-    is_splice: input.isSplice,
+    // 部材区分。SPL がスプライス専用の受注（以前の is_splice の代わり）
+    member_class: input.memberClass,
     // 通常の受注では継手番号・ショットを保存しない（orders_splice_columns_check）。
     // スプライス専用の受注でも、継手番号は任意のため空欄なら NULL
     joint_no: input.isSplice ? nullIfEmpty(input.jointNo) : null,
@@ -44,6 +45,8 @@ export function buildOrderPayload(
     due_date: nullIfEmpty(input.dueDate),
     delivery_method_id: input.deliveryMethodId,
     delivery_method_note: deliveryMethodRequiresNote ? nullIfEmpty(input.deliveryMethodNote) : null,
+    // 加工場所（営業所）
+    site_id: input.siteId,
   }
 }
 
@@ -90,7 +93,7 @@ export function buildOrderItemPayload(
     square_weight: weightValue(weights.squareWeight),
     actual_weight: weightValue(weights.actualWeight),
     material_weight: weightValue(weights.materialWeight),
-    // 別途見積もりは仕入単価を空欄（NULL）のまま登録し、受注の修正で後から入力する
+    // 別途見積もりは仕入単価を空欄（NULL）のまま登録し、仕入入力の画面で後から入力する
     cutting_unit_price: price.status === 'priced' ? price.unitPrice : null,
     price_unit: price.status === 'priced' ? price.priceUnit : null,
     manufacturer_specified_id: item.manufacturerId,

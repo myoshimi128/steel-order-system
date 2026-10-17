@@ -18,7 +18,10 @@ export function RectangleDimensions(props: DimensionInputProps) {
         onValueChange={(value) => onChange('width', value)}
         error={errors.width}
         allowDecimal
-        widthClass="w-[5.5rem]"
+        // 幅は固定（60px。5 桁まで入る）
+        widthClass="w-[3.75rem]"
+        placeholder="縦"
+        dense
         showErrorText={false}
       />
       <span className="text-neutral-400">×</span>
@@ -28,7 +31,9 @@ export function RectangleDimensions(props: DimensionInputProps) {
         onValueChange={(value) => onChange('length', value)}
         error={errors.length}
         allowDecimal
-        widthClass="w-[5.5rem]"
+        widthClass="w-[3.75rem]"
+        placeholder="横"
+        dense
         showErrorText={false}
       />
     </>

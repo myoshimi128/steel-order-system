@@ -5,12 +5,20 @@
 // 最終的な制約は DB（NOT NULL・チェック制約・外部キー）でも強制されるが、
 // ここで先に確認することで、どの欄が問題かを画面に示せるようにする。
 
-import { dueDateTypeNeedsDate, JOINT_NO_MAX_LENGTH, type DueDateType } from './constants'
+import {
+  dueDateTypeNeedsDate,
+  JOINT_NO_MAX_LENGTH,
+  type DueDateType,
+  type MemberClass,
+} from './constants'
 
 // 保存に使うヘッダーの値。番号ではなく、保存する値（id など）に変換した後のもの
 export type OrderHeaderInput = {
   // 受注日 'YYYY-MM-DD'
   orderDate: string
+  // 部材区分。SPL がスプライス専用の受注
+  memberClass: MemberClass
+  // スプライス専用の受注か（部材区分が SPL）。memberClass から求めた値
   isSplice: boolean
   // 継手番号（スプライス専用の受注のみ。任意）
   jointNo: string
@@ -29,6 +37,8 @@ export type OrderHeaderInput = {
   deliveryMethodId: string | null
   // 配達がフリーのときの文字
   deliveryMethodNote: string
+  // 加工場所（営業所の id）。未選択は null
+  siteId: string | null
 }
 
 // 欄ごとのエラー。キーは OrderHeaderInput の項目名
@@ -76,6 +86,10 @@ export function validateOrderHeader(
     errors.deliveryMethodId = '配達を選択してください'
   } else if (context.deliveryMethodRequiresNote && !input.deliveryMethodNote.trim()) {
     errors.deliveryMethodNote = '配達の内容を入力してください'
+  }
+
+  if (!input.siteId) {
+    errors.siteId = '加工場所を選択してください'
   }
 
   return errors

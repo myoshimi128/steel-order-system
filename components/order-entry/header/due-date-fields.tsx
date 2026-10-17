@@ -2,6 +2,7 @@
 
 // 納期の欄（種別＋日付）。
 // 種別が確定・仮納期のときだけ日付の欄を表示する。後報（待ち）・最短出荷（急ぎ）は日付なし。
+// 項目名「納期」は欄の上（FormItem）に出すため、ここでは付けない。
 
 import { CodeField } from '@/components/code-input/code-field'
 import { DateField } from '@/components/code-input/date-field'
@@ -20,7 +21,7 @@ export function DueDateFields({ header, navigation, today }: DueDateFieldsProps)
     <div className="flex items-start gap-2">
       <CodeField
         {...navigation.fieldProps('dueDateType')}
-        label="納期"
+        listTitle="納期"
         options={DUE_DATE_TYPE_OPTIONS}
         code={header.values.dueDateType}
         onCodeChange={(code) => header.setValue('dueDateType', code)}

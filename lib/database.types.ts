@@ -613,12 +613,13 @@ export type Database = {
           due_date_type: string
           field_note: string | null
           id: string
-          is_splice: boolean
           joint_no: string | null
+          member_class: string
           order_date: string
           order_no: string
           project_name: string | null
           remarks: string | null
+          site_id: string
           splice_shot: boolean | null
           status: string
           updated_at: string
@@ -636,12 +637,13 @@ export type Database = {
           due_date_type: string
           field_note?: string | null
           id?: string
-          is_splice?: boolean
           joint_no?: string | null
+          member_class?: string
           order_date: string
           order_no?: string
           project_name?: string | null
           remarks?: string | null
+          site_id?: string
           splice_shot?: boolean | null
           status?: string
           updated_at?: string
@@ -659,12 +661,13 @@ export type Database = {
           due_date_type?: string
           field_note?: string | null
           id?: string
-          is_splice?: boolean
           joint_no?: string | null
+          member_class?: string
           order_date?: string
           order_no?: string
           project_name?: string | null
           remarks?: string | null
+          site_id?: string
           splice_shot?: boolean | null
           status?: string
           updated_at?: string
@@ -922,8 +925,39 @@ export type Database = {
           },
         ]
       }
+      sites: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          number: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          number: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          number?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       special_product_prices: {
         Row: {
+          cutting_method: string | null
           has_shot: boolean
           id: string
           plate_type_id: string
@@ -934,6 +968,7 @@ export type Database = {
           valid_from: string
         }
         Insert: {
+          cutting_method?: string | null
           has_shot?: boolean
           id?: string
           plate_type_id: string
@@ -944,6 +979,7 @@ export type Database = {
           valid_from: string
         }
         Update: {
+          cutting_method?: string | null
           has_shot?: boolean
           id?: string
           plate_type_id?: string

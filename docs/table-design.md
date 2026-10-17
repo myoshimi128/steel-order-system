@@ -29,7 +29,7 @@
 | `customer_stamps` | 得意先ごとに既定でチェックするスタンプ |
 | `users` | ユーザー。ロール・部署・営業所を含む |
 | `delivery_methods` | 配達方法（宵積み / 2便 / 置場引取 など） |
-| `sites` | 営業所（本社 / A営業所 / B営業所）。加工場所とユーザーの所属。docs/intake/table-design.md |
+| `sites` | 営業所（本社 / A営業所 / B営業所）。加工場所とユーザーの所属。番号（1〜3）で選ぶ。受注登録画面の作り直しで前倒しして作成（`supabase/migrations/20261017100100_create_sites_and_order_site.sql`）。列の説明は docs/intake/table-design.md |
 
 ### トランザクション系
 
@@ -266,11 +266,20 @@
 | `special_product_type_id` | uuid | FK → `special_product_types` |
 | `plate_type_id` | uuid | FK → `plate_types` |
 | `has_shot` | boolean | ショット加工の有無（スプライスのみ使用。受注の `orders.splice_shot` で引き当てる） |
+| `cutting_method` | text | 切断方法の条件。NULL は「切断方法を問わない」。値（`ガス` / `プラズマ` / `レーザー` など）が入っている行は、その切断方法の明細だけに使う |
 | `thickness_min` / `thickness_max` | numeric | 板厚区分 |
 | `unit_price` | numeric | kg 単価 |
 | `valid_from` | date | 適用開始日 |
 
-スプライスは切断・キリ孔・ショットを含むセット価格のため、切断方法によって単価が変わらない。ササラ・ベタ丸・ドーナツも同様に切断方法に依存しない。
+スプライスは切断・キリ孔・ショットを含むセット価格のため、切断方法によって単価が変わらない。ササラも切断方法によらず同じ単価を使う。
+
+ベタ丸・ドーナツの単価はレーザーで切る場合のもので、ガス・プラズマで切る場合は別途見積もりとする（basic-design.md「特殊製品の単価」の「切断方法の条件」）。種別名で分岐せずにこれを表すため、切断方法の条件（`cutting_method`）を持たせる。
+
+- ササラ・スプライスの行は `cutting_method` を NULL（切断方法を問わない）で登録する
+- ベタ丸・ドーナツの行は `cutting_method` を `レーザー` で登録する。ガス・プラズマの明細には当てはまる行がないため、既存の「単価の行が登録されていない組み合わせは別途見積もり」の決まりで別途見積もりになる
+- 価格マスタの行を取り出す関数（`get_pricing_rows`）は、明細の切断方法と一致する行と、`cutting_method` が NULL の行だけを返す。単価の計算（`lib/pricing`）は変えない
+- 一意制約（同じ条件の行を 2 つ登録しない）に `cutting_method` を加える。NULL 同士も同じ条件とみなす（`nulls not distinct`）
+- 既存の行のうち、ベタ丸・ドーナツの行はマイグレーションで `レーザー` にする
 
 材質エキストラと高炉材加算はいずれにも適用する。
 
@@ -363,7 +372,7 @@
 | `priority` | integer | 表示順（小さいほど上） |
 | `is_active` | boolean | 有効フラグ |
 
-得意先・切断方法・加工種別のうち、指定した条件がすべて受注に当てはまったら、受注登録画面の補助エリアに表示する。切断方法と加工種別は、受注のどこかの行にあれば当てはまるとする。
+得意先・切断方法・加工種別のうち、指定した条件がすべて受注に当てはまったら、受注登録画面（② 注文内容の明細の上と ③ 伝票の指示）に表示する。切断方法と加工種別は、受注のどこかの行にあれば当てはまるとする。
 
 | 指定した条件 | 表示する受注 |
 | --- | --- |
@@ -452,7 +461,7 @@
 | `work_unit_id` | uuid | FK → `work_units`。どの加工区分から起票したか。NOT NULL。受付と同じ受付の加工区分に限る（`(work_unit_id, intake_id)` の複合外部キー） |
 | `branch_no` | integer | 枝番。`intake_id` + `branch_no` で一意 |
 | `member_class` | text | 部材区分。`NONE`（無分類）/ `DF` / `GPL` / `BH` / `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注** |
-| `site_id` | uuid | FK → `sites`。加工場所。出荷待ちを加工場所ごとに分けるのに使う。NOT NULL |
+| `site_id` | uuid | FK → `sites`。加工場所。出荷待ちを加工場所ごとに分けるのに使う。NOT NULL。受注登録画面の作り直しで前倒しして追加（既存の受注は本社にした） |
 | `staff_id` | uuid | FK → `users`。担当者（自社）。画面の初期値はログイン中のユーザーで、変更できる。加工指示書に印字する |
 | `order_date` | date | 受注日。登録日を初期値とし、必要な場合のみ変更する |
 | `customer_id` | uuid | FK → `customers`。売り先（得意先） |
@@ -474,7 +483,7 @@
 
 **スプライス専用の受注**
 
-スプライスは通常の明細と混ざることがないため、受注単位で切り替える。部材区分が `SPL` の受注がスプライス専用の受注である。以前はスプライスの印（`is_splice`）を部材区分とは別に持っていたが、両者が食い違わないよう部材区分にまとめ、`is_splice` は廃止する。スプライス専用の受注では、明細はすべて `special_product_types.is_splice_order_type` が true の種別になり、ショットの有無も受注単位（`splice_shot`）で持つ。
+スプライスは通常の明細と混ざることがないため、受注単位で切り替える。部材区分が `SPL` の受注がスプライス専用の受注である。以前はスプライスの印（`is_splice`）を部材区分とは別に持っていたが、両者が食い違わないよう部材区分にまとめ、`is_splice` は廃止する。部材区分の追加と `is_splice` の廃止は、受注登録画面の作り直し（3 画面にする PR）のマイグレーションで行う。受付のテーブルより先に入れる。スプライス専用の受注では、明細はすべて `special_product_types.is_splice_order_type` が true の種別になり、ショットの有無も受注単位（`splice_shot`）で持つ。
 
 `splice_shot` が true の受注は、現場用伝票に「ショット加工」を目立つ位置に印字する。これは `order_stamps` には保存せず `splice_shot` から印字する。ショットの有無とスタンプを別々に持つと、両者が食い違うおそれがあるためである。
 
@@ -485,6 +494,8 @@
 受注の削除（受注登録画面の処理区分 2 削除）は論理削除とし、行は消さずに `deleted_at` に削除日時を入れる。`deleted_at` が入った受注は、受注一覧・現場用伝票・送り状発行などの対象から外す。誤って削除した場合の確認や、過去の受注番号の追跡ができるようにするためである。
 
 出荷実績（`shipments`）がある受注は削除できない。画面で削除を止めるだけでなく、`deleted_at` を設定する更新を DB 側でも拒否する（`before update` トリガー `orders_prevent_deleting_shipped`）。
+
+仕入入力を作るときに、このトリガーを広げ、出荷実績（送り状）がある受注は削除だけでなく修正もできないようにする（予定。basic-design.md「仕入入力」の「修正の順番」）。あわせて、仕入がある送り状は削除できないようにする（後述「Phase2 での拡張ポイント」の「仕入」）。
 
 ステータスは受注ヘッダーに 1 つ持つ。実務では同一受注内の明細がまとめて加工・出荷されるため、明細単位の管理は行わない。
 
@@ -508,7 +519,8 @@
 - 引数はそれぞれ `orders`・`order_items` の列名をキーにした JSON（明細は配列で 1 件以上）
 - 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）。加工の項目（`spec_fields`）も JSON のまま受け取って登録する
 - ヘッダーの JSON に、フリーコメント（`field_note`）と、チェックしたスタンプの id の配列（`stamp_ids`）を持つ。明細の後に `order_stamps` に登録する（スプライス専用の受注の「ショット加工」は含めない）
-- ヘッダーの JSON に、受付（`intake_id`）・加工区分（`work_unit_id`）・部材区分（`member_class`）・加工場所（`site_id`）・担当者（`staff_id`）を持つ。受注の insert の前に `private.issue_order_branch()` で枝番を採番し、受注番号を決める。加工場所が受付と違えば、受付の加工場所も更新する（docs/intake/table-design.md「関数」）。この変更は受付のテーブルを作るマイグレーションと合わせて行う
+- ヘッダーの JSON に部材区分（`member_class`）を持つ（以前の `is_splice` の代わり。受注登録画面の作り直しで変更）
+- ヘッダーの JSON に、受付（`intake_id`）・加工区分（`work_unit_id`）・加工場所（`site_id`）・担当者（`staff_id`）を持つ。受注の insert の前に `private.issue_order_branch()` で枝番を採番し、受注番号を決める。加工場所が受付と違えば、受付の加工場所も更新する（docs/intake/table-design.md「関数」）。この変更は受付のテーブルを作るマイグレーションと合わせて行う
 - `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
 - 登録の操作をした人（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
@@ -537,7 +549,7 @@
 | `square_weight` | numeric | 角重量（1 枚あたり kg）。単価計算の根拠 |
 | `actual_weight` | numeric | 実重量（1 枚あたり kg）。配送依頼用。寸法から求まるもの（寸法切・ベタ丸・ドーナツ）は自動計算、アイトレなどは送り状発行の画面で必要な行だけ手入力 |
 | `material_weight` | numeric | 使用材の重量（1 枚あたり kg）。ササラで使用。使用材の寸法から自動計算 |
-| `cutting_unit_price` | numeric | 仕入単価（各エキストラ加算後。枚単価の場合は保証重量を掛けた後の値）。マスタから自動計算。別途見積もりは NULL（単価未定）で登録し、受注の修正で入力 |
+| `cutting_unit_price` | numeric | 仕入単価（各エキストラ加算後。枚単価の場合は保証重量を掛けた後の値）。マスタから自動計算。別途見積もりは NULL（単価未定）で登録し、仕入入力の画面で入力する（予定。basic-design.md「仕入入力」） |
 | `sales_unit_price` | numeric | 売上単価。MVP では使用しない（Phase2 の営業システム連携で扱う） |
 | `price_unit` | text | kg / 枚。角重量から自動判定（ベタ丸・ドーナツは常に枚） |
 | `manufacturer_specified_id` | uuid | FK → `manufacturers`。メーカー指定。指定なしは NULL。縞板は必須 |
@@ -551,11 +563,11 @@
 
 重量は角重量と実重量を分けて保持する。請求は角重量で行い（材料としては四角で消費するため）、配送依頼には実重量を用いる。寸法切は両者が一致し、ベタ丸・ドーナツは外径・内径から両方を算出する。アイトレの実重量は受注入力では扱わず、送り状発行の画面で必要な行だけ手入力する。
 
-画面の「区分」（寸法切 / アイトレ / 定尺 / 加工 / ササラ / ベタ丸 / ドーナツ）は 1 つの番号の欄だが、保存時は `cutting_method`・`cutting_type`・`special_product_type_id`・`plate_size` に振り分ける（加工は `order_item_processes` の行になる）。スプライスは区分ではなく受注単位（部材区分 `orders.member_class = 'SPL'`）で扱う。振り分けの対応は screen-design.md「受注登録画面」を参照。
+画面の「切断・区分」（切断方法と区分をまとめた 2 桁の番号。例: 41 レーザー寸法切、47 レーザーベタ丸、71 定尺、9 加工）は 1 つの番号の欄だが、保存時は `cutting_method`・`cutting_type`・`special_product_type_id`・`plate_size` に振り分ける（加工は `order_item_processes` の行になる）。シャーリングの「型切り」（12）は、`cutting_type` を `アイトレ` として保存する（新しい切断区分は作らない）。スプライスは区分ではなく受注単位（部材区分 `orders.member_class = 'SPL'`）で扱う。振り分けの対応は screen-design.md「受注登録画面」を参照。
 
 `product_id` は必須のため、商品マスタに該当がない板厚（取り扱いのない板厚）の明細は登録できない。受注登録画面では警告を出して登録させない。
 
-`cutting_unit_price` が NULL の明細は「単価未定」（別途見積もりで単価が未入力）を表す。受注一覧の絞り込みに使う。
+`cutting_unit_price` が NULL の明細は「単価未定」（別途見積もりで単価が未入力）を表す。仕入入力の画面で、単価を入力する明細を探すのに使う。
 
 `price_unit` は 1 枚あたりの角重量から自動判定する。1.5kg 未満・2kg 未満はいずれも枚単価となり、kg 単価に最低保証重量を掛けて算出する。
 
@@ -716,7 +728,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `plate_types` / `materials` / `special_product_types` / `process_types` | 番号の列 `number`（integer、一意）を追加 |
 | `special_product_types` | `is_splice_order_type`（スプライス専用の受注で使う種別か）を追加 |
 | `delivery_methods` | 配達方法マスタを新規作成 |
-| `orders` | `is_splice` / `joint_no` / `splice_shot` / `delivery_method_id` / `delivery_method_note` / `deleted_at` を追加（`is_splice` は受付の統合で部材区分 `member_class` にまとめて廃止） |
+| `orders` | `is_splice` / `joint_no` / `splice_shot` / `delivery_method_id` / `delivery_method_note` / `deleted_at` を追加（`is_splice` は受注登録画面の作り直しで部材区分 `member_class` にまとめて廃止） |
 | `order_item_processes` | `price_unit`（個 / kg）を追加 |
 | `customers` / `delivery_destinations` | `code` を数字のみに制限するチェック制約を追加（既存データが数字のみであることを確認してから）。`delivery_destinations` はさらに `0` を禁止（「0 売り先と同じ」に使うため） |
 | `orders` | `delivery_destination_id` を NULL 可に変更（NULL は売り先と同じ） |
@@ -866,6 +878,16 @@ DB の関数は `security definer`（関数所有者の権限で実行）とし�
 実装は `supabase/migrations/20260919130000_create_rls_policies.sql`（orders/order_items/マスタ各種）、`supabase/migrations/20260924100100_create_pricing_tables_rls_policies.sql`（価格系新テーブル）を参照。
 
 ### Phase2 での拡張ポイント
+
+**仕入（予定）**
+
+仕入入力の画面（basic-design.md「仕入入力」）のためのテーブルを追加する。テーブルの形は実装時に決めるが、次の情報を持つ。
+
+- 仕入No.（採番する）・仕入日・締日
+- どの送り状（または受注）の仕入か。分納のときに送り状ごとに上げるか受注ごとに上げるかは未決事項
+- 明細ごとの確定した仕入単価・仕入金額（受注明細の `cutting_unit_price`・加工の行の `unit_price` を確認・修正した値）
+
+制約として、仕入がある送り状は削除できないようにし、送り状がある受注は修正・削除できないようにする（`orders_prevent_deleting_shipped` を広げる）。修正は「仕入を削除 → 送り状を削除 → 受注を修正」の逆順でしか行えない。
 
 **梱包（`packages`）**
 
