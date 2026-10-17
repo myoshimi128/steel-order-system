@@ -22,12 +22,13 @@ export const PROCESSING_TYPE_OPTIONS: readonly CodeOption<ProcessingType>[] = [
 // 部材区分とは別にスプライスの印を持つと食い違うおそれがあるため、1 つにまとめた）
 export type MemberClass = 'NONE' | 'DF' | 'GPL' | 'BH' | 'SPL'
 
+// 並び順は画面イメージ（S-06c）に合わせ、0 無分類を最後に置く
 export const MEMBER_CLASS_OPTIONS: readonly CodeOption<MemberClass>[] = [
-  { code: '0', label: '無分類', value: 'NONE' },
   { code: '1', label: 'DF', value: 'DF' },
   { code: '2', label: 'GPL', value: 'GPL' },
   { code: '3', label: 'BH', value: 'BH' },
   { code: '4', label: 'SPL', value: 'SPL' },
+  { code: '0', label: '無分類', value: 'NONE' },
 ]
 
 // スプライス専用の受注になる部材区分

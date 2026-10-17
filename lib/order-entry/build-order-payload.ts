@@ -45,6 +45,8 @@ export function buildOrderPayload(
     due_date: nullIfEmpty(input.dueDate),
     delivery_method_id: input.deliveryMethodId,
     delivery_method_note: deliveryMethodRequiresNote ? nullIfEmpty(input.deliveryMethodNote) : null,
+    // 加工場所（営業所）
+    site_id: input.siteId,
   }
 }
 

@@ -619,6 +619,7 @@ export type Database = {
           order_no: string
           project_name: string | null
           remarks: string | null
+          site_id: string
           splice_shot: boolean | null
           status: string
           updated_at: string
@@ -642,6 +643,7 @@ export type Database = {
           order_no?: string
           project_name?: string | null
           remarks?: string | null
+          site_id?: string
           splice_shot?: boolean | null
           status?: string
           updated_at?: string
@@ -665,6 +667,7 @@ export type Database = {
           order_no?: string
           project_name?: string | null
           remarks?: string | null
+          site_id?: string
           splice_shot?: boolean | null
           status?: string
           updated_at?: string
@@ -921,6 +924,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sites: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          number: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          number: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          number?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       special_product_prices: {
         Row: {

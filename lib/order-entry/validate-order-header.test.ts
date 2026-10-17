@@ -18,6 +18,7 @@ const VALID: OrderHeaderInput = {
   dueDate: '2026-10-05',
   deliveryMethodId: 'delivery-0',
   deliveryMethodNote: '',
+  siteId: 'site-honsha',
 }
 const NO_NOTE = { deliveryMethodRequiresNote: false }
 
@@ -121,5 +122,18 @@ describe('buildOrderPayload', () => {
       joint_no: null,
       splice_shot: null,
     })
+  })
+
+  it('部材区分と加工場所を保存する', () => {
+    expect(buildOrderPayload({ ...VALID, memberClass: 'GPL' }, false)).toMatchObject({
+      member_class: 'GPL',
+      site_id: 'site-honsha',
+    })
+  })
+})
+
+describe('validateOrderHeader（加工場所）', () => {
+  it('加工場所は必須（画面では必ず初期値が入るが、空なら止める）', () => {
+    expect(validateOrderHeader({ ...VALID, siteId: null }, NO_NOTE).siteId).toBe('加工場所を選択してください')
   })
 })

@@ -22,7 +22,7 @@ lead_time_items / lead_time_messages / lead_time_history（目安納期）
 
 | テーブル | 種類 | 内容 |
 | --- | --- | --- |
-| `sites` | 新規 | 営業所（本社／A営業所／B営業所）。加工場所とユーザーの所属に使う |
+| `sites` | 作成済み | 営業所（本社／A営業所／B営業所）。加工場所とユーザーの所属に使う。受注登録画面の作り直しの PR で前倒しして作成した |
 | `intakes` | 新規 | 受付。メール・FAX・口頭の 1 件 |
 | `intake_destinations` | 新規 | 受付の入れ先（複数・順序つき） |
 | `private.intake_no_counters` | 新規 | 受付No. の採番 |
@@ -250,7 +250,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | work_unit_id | uuid | どの加工区分から起票したか。NOT NULL。`(work_unit_id, intake_id)` → `work_units(id, intake_id)` |
 | branch_no | integer | 枝番。`(intake_id, branch_no)` で一意 |
 | member_class | text | 部材区分。`NONE` `DF` `GPL` `BH` `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注**（`is_splice` は廃止）。受注登録画面の作り直しの PR で追加済み（このマイグレーションでは扱わない） |
-| site_id | uuid | 加工場所（出荷待ちの振り分けに使う）。NOT NULL |
+| site_id | uuid | 加工場所（出荷待ちの振り分けに使う）。NOT NULL。受注登録画面の作り直しの PR で追加済み（このマイグレーションでは扱わない） |
 | staff_id | uuid | 担当者（自社）。FK → `users`。画面の初期値はログイン中のユーザー。NOT NULL |
 | order_no | text | 既存の列。`{受付No.}-{枝番}` を `create_order` の中で入れる。`private.next_order_no()` の初期値は外す |
 

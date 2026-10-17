@@ -42,6 +42,7 @@ export type HeaderFieldId =
   | 'dueDate'
   | 'deliveryMethodId'
   | 'deliveryMethodNote'
+  | 'siteId'
 
 // 各欄の入力値。番号の欄（処理区分・売り先など）は、打った番号の文字列を持つ
 export type HeaderValues = Record<HeaderFieldId, string>
@@ -56,7 +57,13 @@ export type HeaderMasterOptions = {
   deliveryMethods: readonly CodeOption<string>[]
   // 文字の入力が必要な配達方法（フリー）の id
   deliveryMethodIdsRequiringNote: readonly string[]
+  // 加工場所（営業所。番号＝sites.number、値＝id）
+  sites: readonly CodeOption<string>[]
 }
+
+// 加工場所の初期値（1 本社）。ユーザーの所属する営業所の列（users.site_id）ができたら、その営業所にする。
+// 受付の機能ができたら、受付の加工場所を初期値にする
+const DEFAULT_SITE_CODE = '1'
 
 // 部材区分を SPL（スプライス専用の受注）にしたときのショットの初期値（1 有）
 const SPLICE_SHOT_DEFAULT_CODE = '1'
@@ -82,6 +89,8 @@ function initialValues(today: string): HeaderValues {
     // 配達の初期値は 0 宵積み（いつもの値）
     deliveryMethodId: '0',
     deliveryMethodNote: '',
+    // 加工場所の初期値は当面 1 本社
+    siteId: DEFAULT_SITE_CODE,
   }
 }
 
@@ -95,6 +104,7 @@ type CodeFieldId =
   | 'deliveryDestinationId'
   | 'dueDateType'
   | 'deliveryMethodId'
+  | 'siteId'
 
 export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
   const [values, setValues] = useState<HeaderValues>(() => initialValues(today))
@@ -109,6 +119,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     deliveryDestinationId: masters.destinations,
     dueDateType: DUE_DATE_TYPE_OPTIONS,
     deliveryMethodId: masters.deliveryMethods,
+    siteId: masters.sites,
   }
 
   // 番号から選んだ値を引く（見つからなければ undefined）
@@ -130,21 +141,23 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
   const requiresDeliveryNote =
     deliveryMethodId !== null && masters.deliveryMethodIdsRequiringNote.includes(deliveryMethodId)
 
-  // 入力順（左上から右下）。表示されない欄は入れない。
-  // 受注 No. は新規では入力できないため含めない。最後は登録ボタン
+  // 入力順（① 受注情報の画面の並びどおり、左上から右下）。表示されない欄は入れない。
+  // 受注 No.・受付 No. は入力できないため含めない。最後は登録ボタン（画面を進めるボタン）
+  //   処理区分 → 受注日 → 売り先 → 納期 → 客先担当 → 配達 → 工事名 → 入れ先 → 加工場所 → 部材区分（→ 継手番号 → ショット）
   const fieldOrder: string[] = [
     'processingType',
-    'memberClass',
-    ...(isSplice ? ['jointNo', 'spliceShot'] : []),
     'orderDate',
     'customerId',
-    'customerContact',
-    'deliveryDestinationId',
-    'projectName',
     'dueDateType',
     ...(needsDueDate ? ['dueDate'] : []),
+    'customerContact',
     'deliveryMethodId',
     ...(requiresDeliveryNote ? ['deliveryMethodNote'] : []),
+    'projectName',
+    'deliveryDestinationId',
+    'siteId',
+    'memberClass',
+    ...(isSplice ? ['jointNo', 'spliceShot'] : []),
     'submit',
   ]
 
@@ -190,6 +203,7 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
       dueDate: needsDueDate ? values.dueDate : '',
       deliveryMethodId,
       deliveryMethodNote: requiresDeliveryNote ? values.deliveryMethodNote.trim() : '',
+      siteId: findCodeOption(masters.sites, values.siteId)?.value ?? null,
     }
   }
 

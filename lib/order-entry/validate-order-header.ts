@@ -37,6 +37,8 @@ export type OrderHeaderInput = {
   deliveryMethodId: string | null
   // 配達がフリーのときの文字
   deliveryMethodNote: string
+  // 加工場所（営業所の id）。未選択は null
+  siteId: string | null
 }
 
 // 欄ごとのエラー。キーは OrderHeaderInput の項目名
@@ -84,6 +86,10 @@ export function validateOrderHeader(
     errors.deliveryMethodId = '配達を選択してください'
   } else if (context.deliveryMethodRequiresNote && !input.deliveryMethodNote.trim()) {
     errors.deliveryMethodNote = '配達の内容を入力してください'
+  }
+
+  if (!input.siteId) {
+    errors.siteId = '加工場所を選択してください'
   }
 
   return errors

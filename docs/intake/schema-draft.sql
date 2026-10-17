@@ -26,22 +26,8 @@ $$;
 -- ---------------------------------------------------------------------
 -- 1. 営業所（加工場所・ユーザーの所属）
 -- ---------------------------------------------------------------------
-create table public.sites (
-  id         uuid primary key default gen_random_uuid(),
-  -- 画面の番号（1 本社 / 2 A営業所 / 3 B営業所）。並び順にも使う
-  number     integer not null unique check (number >= 1),
-  code       text not null unique,
-  name       text not null,
-  is_active  boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  updated_by uuid references public.users (id)
-);
-create trigger sites_touch before update on public.sites
-  for each row execute function public.intake_touch_row();
-
-insert into public.sites (number, code, name)
-values (1, 'honsha', '本社'), (2, 'a', 'A営業所'), (3, 'b', 'B営業所');
+-- sites（と orders.site_id）は、受注登録画面の作り直しの PR で前倒しして作成済み
+-- （supabase/migrations/20261017100100_create_sites_and_order_site.sql）。ここでは扱わない
 
 
 -- ---------------------------------------------------------------------
@@ -585,7 +571,6 @@ alter table public.orders
   add column intake_id    uuid not null references public.intakes (id),
   add column work_unit_id uuid not null,
   add column branch_no    integer not null,
-  add column site_id      uuid not null references public.sites (id),
   add column staff_id     uuid not null default auth.uid() references public.users (id),
   add constraint orders_unit_same_intake foreign key (work_unit_id, intake_id)
     references public.work_units (id, intake_id),
@@ -673,13 +658,6 @@ alter table public.intake_site_changes enable row level security;
 create policy intake_site_changes_select_office on public.intake_site_changes for select to authenticated
   using (public.current_user_role() in ('office', 'admin'));
 grant select on public.intake_site_changes to authenticated;
-
--- 営業所：参照は全ロール、登録・更新は管理者
-alter table public.sites enable row level security;
-create policy sites_select_all_roles on public.sites for select to authenticated
-  using (public.current_user_role() in ('office', 'factory', 'admin'));
-create policy sites_admin_all on public.sites for all to authenticated
-  using (public.current_user_role() = 'admin') with check (public.current_user_role() = 'admin');
 
 -- 通知：自分の部署の行だけ参照（書くのはトリガー）
 alter table public.notifications enable row level security;

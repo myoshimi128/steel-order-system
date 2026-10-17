@@ -29,7 +29,7 @@
 | `customer_stamps` | 得意先ごとに既定でチェックするスタンプ |
 | `users` | ユーザー。ロール・部署・営業所を含む |
 | `delivery_methods` | 配達方法（宵積み / 2便 / 置場引取 など） |
-| `sites` | 営業所（本社 / A営業所 / B営業所）。加工場所とユーザーの所属。docs/intake/table-design.md |
+| `sites` | 営業所（本社 / A営業所 / B営業所）。加工場所とユーザーの所属。番号（1〜3）で選ぶ。受注登録画面の作り直しで前倒しして作成（`supabase/migrations/20261017100100_create_sites_and_order_site.sql`）。列の説明は docs/intake/table-design.md |
 
 ### トランザクション系
 
@@ -461,7 +461,7 @@
 | `work_unit_id` | uuid | FK → `work_units`。どの加工区分から起票したか。NOT NULL。受付と同じ受付の加工区分に限る（`(work_unit_id, intake_id)` の複合外部キー） |
 | `branch_no` | integer | 枝番。`intake_id` + `branch_no` で一意 |
 | `member_class` | text | 部材区分。`NONE`（無分類）/ `DF` / `GPL` / `BH` / `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注** |
-| `site_id` | uuid | FK → `sites`。加工場所。出荷待ちを加工場所ごとに分けるのに使う。NOT NULL |
+| `site_id` | uuid | FK → `sites`。加工場所。出荷待ちを加工場所ごとに分けるのに使う。NOT NULL。受注登録画面の作り直しで前倒しして追加（既存の受注は本社にした） |
 | `staff_id` | uuid | FK → `users`。担当者（自社）。画面の初期値はログイン中のユーザーで、変更できる。加工指示書に印字する |
 | `order_date` | date | 受注日。登録日を初期値とし、必要な場合のみ変更する |
 | `customer_id` | uuid | FK → `customers`。売り先（得意先） |
