@@ -13,6 +13,7 @@
 import { CodeField } from '@/components/code-input/code-field'
 import { NumericField } from '@/components/code-input/numeric-field'
 import type { CodeOption } from '@/lib/code-input/code-option'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { firstItemFieldId, itemFieldId } from '@/lib/order-entry/item-row'
 import type { ItemErrors, ItemFieldName } from '@/lib/order-entry/item-types'
@@ -101,6 +102,7 @@ export function ProcessRow({
             onPrevious={handleProcessTypePrevious}
             listTitle="加工方法"
             options={processTypeOptions}
+            maxLength={CODE_LENGTHS.processType}
             code={row.processType}
             onCodeChange={(code) => setField('processType', code)}
             error={errors.processType}

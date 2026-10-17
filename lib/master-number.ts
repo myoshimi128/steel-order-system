@@ -9,13 +9,23 @@ export function isDigitsOnly(value: string): boolean {
   return /^[0-9]+$/.test(value)
 }
 
+// 決まった桁数の数字だけの文字列か（得意先・納入先は 4 桁、メーカーは 1 桁。lib/code-lengths.ts）。
+// 受注登録画面では上限の桁まで打つと自動で次の欄へ進むため、コードの桁数をそろえる
+export function isFixedDigits(value: string, digits: number): boolean {
+  return value.length === digits && isDigitsOnly(value)
+}
+
 export type ParsedMasterNumber =
   | { ok: true; value: number }
   | { ok: false; error: string }
 
-// フォームの number 欄を読み取り、0 以上の整数として返す。
+// フォームの number 欄を読み取り、整数として返す。
 // 番号はマスタ画面では必須とする（加工種別も DB 上は NULL 可だが、画面では必須）。
-export function readMasterNumber(formData: FormData): ParsedMasterNumber {
+// range を渡すと、その範囲（MASTER_NUMBER_RANGES。DB の check 制約と同じ）に入るかも確かめる
+export function readMasterNumber(
+  formData: FormData,
+  range?: { min: number; max: number },
+): ParsedMasterNumber {
   const raw = formData.get('number')
 
   if (typeof raw !== 'string' || !raw.trim()) {
@@ -25,7 +35,11 @@ export function readMasterNumber(formData: FormData): ParsedMasterNumber {
   if (!isDigitsOnly(trimmed)) {
     return { ok: false, error: '番号は 0 以上の整数で入力してください' }
   }
-  return { ok: true, value: Number(trimmed) }
+  const value = Number(trimmed)
+  if (range && (value < range.min || value > range.max)) {
+    return { ok: false, error: `番号は ${range.min}〜${range.max} で入力してください` }
+  }
+  return { ok: true, value }
 }
 
 // 特殊製品種別の番号として使えない値。

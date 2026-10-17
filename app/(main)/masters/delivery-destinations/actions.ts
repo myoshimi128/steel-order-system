@@ -6,8 +6,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { isDigitsOnly } from '@/lib/master-number'
-import { SAME_AS_CUSTOMER_CODE } from '@/lib/order-entry/constants'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
+import { isFixedDigits } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
 export type DeliveryDestinationFormState = { error: string } | undefined
@@ -37,15 +37,11 @@ function readDeliveryDestinationForm(
   if (typeof code !== 'string' || !code.trim()) {
     return { ok: false, error: '納入先コードを入力してください' }
   }
-  // 受注登録画面でテンキーだけで入力できるよう、コードは数字のみとする
-  // （DB 側でも delivery_destinations_code_digits_check で同じ制限をかけている）
-  if (!isDigitsOnly(code.trim())) {
-    return { ok: false, error: '納入先コードは数字のみで入力してください' }
-  }
-  // 「0」は受注登録画面の入れ先の「0 売り先と同じ」に使うため、納入先のコードにはできない
-  // （DB 側でも delivery_destinations_code_not_zero_check で同じ制限をかけている）
-  if (code.trim() === SAME_AS_CUSTOMER_CODE) {
-    return { ok: false, error: '「0」は「売り先と同じ」に使うため、納入先コードにはできません' }
+  // 受注登録画面でテンキーだけで入力でき、4 桁打てば自動で次の欄へ進むよう、コードは数字 4 桁とする
+  // （DB 側でも delivery_destinations_code_digits_check で同じ制限をかけている）。
+  // 入れ先の「0 売り先と同じ」は 1 桁のため、4 桁のコードとは重ならない
+  if (!isFixedDigits(code.trim(), CODE_LENGTHS.destination)) {
+    return { ok: false, error: `納入先コードは数字 ${CODE_LENGTHS.destination} 桁で入力してください` }
   }
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '納入先名を入力してください' }

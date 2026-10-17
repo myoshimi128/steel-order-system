@@ -47,7 +47,7 @@ export function ManufacturerForm(props: ManufacturerFormProps) {
           pattern="[0-9]*"
           required
           defaultValue={manufacturer?.code}
-          placeholder="220（数字のみ。0 は指定なしに使うため不可）"
+          placeholder="1（数字 1 桁。0 は指定なしに使うため不可）"
           className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>

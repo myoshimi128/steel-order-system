@@ -9,6 +9,7 @@
 import { CodeField } from '@/components/code-input/code-field'
 import { NumericField } from '@/components/code-input/numeric-field'
 import { TextField } from '@/components/code-input/text-field'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import {
   BEND_COUNT_OPTIONS,
   BEND_STYLE_OPTIONS,
@@ -27,6 +28,7 @@ export function BendSpecFields({ row, errors, fieldProps, onChange }: DimensionI
         {...fieldProps('bendCount')}
         listTitle="ヶ所"
         options={BEND_COUNT_OPTIONS}
+        maxLength={CODE_LENGTHS.bendCount}
         code={row.bendCount}
         onCodeChange={(code) => onChange('bendCount', code)}
         error={errors.bendCount}
@@ -53,6 +55,7 @@ export function BendSpecFields({ row, errors, fieldProps, onChange }: DimensionI
         {...fieldProps('bendStyle')}
         listTitle="曲げ方"
         options={BEND_STYLE_OPTIONS}
+        maxLength={CODE_LENGTHS.bendStyle}
         code={row.bendStyle}
         onCodeChange={(code) => onChange('bendStyle', code)}
         error={errors.bendStyle}

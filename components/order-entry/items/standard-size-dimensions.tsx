@@ -3,6 +3,7 @@
 // 寸法の欄（定尺売り）: 板厚 × 定尺サイズ（1 3x6 / 2 4x8 / 3 5x10）。
 
 import { CodeField } from '@/components/code-input/code-field'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import { PLATE_SIZE_OPTIONS } from '@/lib/order-entry/constants'
 import type { DimensionInputProps } from './dimension-props'
 import { ThicknessField } from './thickness-field'
@@ -17,6 +18,7 @@ export function StandardSizeDimensions(props: DimensionInputProps) {
         {...fieldProps('plateSize')}
         listTitle="定尺サイズ"
         options={PLATE_SIZE_OPTIONS}
+        maxLength={CODE_LENGTHS.plateSize}
         code={row.plateSize}
         onCodeChange={(code) => onChange('plateSize', code)}
         error={errors.plateSize}

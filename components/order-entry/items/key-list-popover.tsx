@@ -14,7 +14,7 @@ export function KeyListPopover({ onClose }: { onClose: () => void }) {
       <div
         role="dialog"
         aria-label="キー操作の一覧"
-        className="absolute bottom-full left-0 z-40 mb-2 w-[26rem] rounded border border-line bg-white p-4 text-neutral-700 shadow-lg"
+        className="absolute bottom-full left-0 z-40 mb-2 w-[32rem] rounded border border-line bg-white p-4 text-neutral-700 shadow-lg"
       >
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-navy">キー操作の一覧</h2>

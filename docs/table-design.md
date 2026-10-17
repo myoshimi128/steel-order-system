@@ -70,7 +70,7 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `code` | text | 得意先コード。数字のみ（例: 1001）。受注登録画面でテンキー入力するため |
+| `code` | text | 得意先コード。数字 4 桁（例: 1001）。受注登録画面でテンキー入力し、4 桁打つと自動で次の欄へ進むため |
 | `name` | text | 得意先名 |
 | `name_kana` | text | 得意先名のふりがな。受注登録画面の売り先の検索に使う。ひらがな・カタカナのどちらでもよい。任意（NULL 可） |
 | `sales_rep` | text | 自社側の営業担当者名 |
@@ -88,7 +88,7 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `code` | text | 納入先コード。数字のみ。受注登録画面でテンキー入力するため。`0` は受注登録画面の「0 売り先と同じ」に使うため使えない |
+| `code` | text | 納入先コード。数字 4 桁。受注登録画面でテンキー入力し、4 桁打つと自動で次の欄へ進むため。受注登録画面の「0 売り先と同じ」は 1 桁のため、4 桁のコードとは重ならない |
 | `name` | text | 納入先名 |
 | `name_kana` | text | 納入先名のふりがな。受注登録画面の入れ先の検索に使う。ひらがな・カタカナのどちらでもよい。任意（NULL 可） |
 | `address` | text | 住所 |
@@ -338,11 +338,11 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `code` | text | メーカーコード（例: 220、230）。数字のみ。`0` は使えない。一意 |
+| `code` | text | メーカーコード。数字 1 桁（1〜9）。`0` は使えない。一意 |
 | `name` | text | メーカー名（メーカーA、メーカーB、メーカーC など） |
 | `is_active` | boolean | 有効フラグ |
 
-受注登録画面の明細では、メーカーをコードで選ぶ（テンキーで入力する）。そのため得意先・納入先のコードと同じく数字のみとする。`0` は受注登録画面の「0 指定なし」（`order_items.manufacturer_specified_id` を NULL にする）に使うため、メーカーのコードには使えない。コードで 1 つのメーカーを特定するため、一意制約を設ける（`supabase/migrations/20260930100400_restrict_manufacturer_code.sql`）。
+受注登録画面の明細では、メーカーをコードで選ぶ（テンキーで入力する）。そのため得意先・納入先のコードと同じく数字のみとし、1 桁打てば自動で次の欄へ進むよう 1 桁（1〜9）に固定する（以前は 220 のような 3 桁だった。10 社以上が必要になったら桁数を見直す）。`0` は受注登録画面の「0 指定なし」（`order_items.manufacturer_specified_id` を NULL にする）に使うため、メーカーのコードには使えない。コードで 1 つのメーカーを特定するため、一意制約を設ける（`supabase/migrations/20260930100400_restrict_manufacturer_code.sql`）。
 
 ### users（ユーザー）
 
@@ -372,7 +372,7 @@
 | `priority` | integer | 表示順（小さいほど上） |
 | `is_active` | boolean | 有効フラグ |
 
-得意先・切断方法・加工種別のうち、指定した条件がすべて受注に当てはまったら、受注登録画面（② 注文内容の明細の上と ③ 伝票の指示）に表示する。切断方法と加工種別は、受注のどこかの行にあれば当てはまるとする。
+得意先・切断方法・加工種別のうち、指定した条件がすべて受注に当てはまったら、受注登録画面（② 注文内容の明細の上）に表示する。切断方法と加工種別は、受注のどこかの行にあれば当てはまるとする。
 
 | 指定した条件 | 表示する受注 |
 | --- | --- |
@@ -483,7 +483,7 @@
 
 **スプライス専用の受注**
 
-スプライスは通常の明細と混ざることがないため、受注単位で切り替える。部材区分が `SPL` の受注がスプライス専用の受注である。以前はスプライスの印（`is_splice`）を部材区分とは別に持っていたが、両者が食い違わないよう部材区分にまとめ、`is_splice` は廃止する。部材区分の追加と `is_splice` の廃止は、受注登録画面の作り直し（3 画面にする PR）のマイグレーションで行う。受付のテーブルより先に入れる。スプライス専用の受注では、明細はすべて `special_product_types.is_splice_order_type` が true の種別になり、ショットの有無も受注単位（`splice_shot`）で持つ。
+スプライスは通常の明細と混ざることがないため、受注単位で切り替える。部材区分が `SPL` の受注がスプライス専用の受注である。以前はスプライスの印（`is_splice`）を部材区分とは別に持っていたが、両者が食い違わないよう部材区分にまとめ、`is_splice` は廃止する。部材区分の追加と `is_splice` の廃止は、受注登録画面の作り直し（画面を分ける PR）のマイグレーションで行う。受付のテーブルより先に入れる。スプライス専用の受注では、明細はすべて `special_product_types.is_splice_order_type` が true の種別になり、ショットの有無も受注単位（`splice_shot`）で持つ。
 
 `splice_shot` が true の受注は、現場用伝票に「ショット加工」を目立つ位置に印字する。これは `order_stamps` には保存せず `splice_shot` から印字する。ショットの有無とスタンプを別々に持つと、両者が食い違うおそれがあるためである。
 
@@ -565,7 +565,7 @@
 
 画面の「切断・区分」（切断方法と区分をまとめた 2 桁の番号。例: 41 レーザー寸法切、47 レーザーベタ丸、71 定尺、9 加工）は 1 つの番号の欄だが、保存時は `cutting_method`・`cutting_type`・`special_product_type_id`・`plate_size` に振り分ける（加工は `order_item_processes` の行になる）。シャーリングの「型切り」（12）は、`cutting_type` を `アイトレ` として保存する（新しい切断区分は作らない）。スプライスは区分ではなく受注単位（部材区分 `orders.member_class = 'SPL'`）で扱う。振り分けの対応は screen-design.md「受注登録画面」を参照。
 
-明細ごとの摘要（`order_items.field_note`・`order_item_processes.remarks`）は使わない。特定の行について伝えたいことも、受注全体のフリーコメント（`orders.field_note`）に書く運用とした（screen-design.md「③ 伝票の指示」）。列は消さずに残し、受注登録では NULL を入れる。過去の受注に値が入っている可能性と、運用を戻す可能性があるためである。
+明細ごとの摘要（`order_items.field_note`・`order_item_processes.remarks`）は使わない。特定の行について伝えたいことも、受注全体のフリーコメント（`orders.field_note`）に書く運用とした（screen-design.md「スタンプ・フリーコメントの帯」）。列は消さずに残し、受注登録では NULL を入れる。過去の受注に値が入っている可能性と、運用を戻す可能性があるためである。
 
 `product_id` は必須のため、商品マスタに該当がない板厚（取り扱いのない板厚）の明細は登録できない。受注登録画面では警告を出して登録させない。
 
@@ -770,11 +770,13 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `material_extras.material_id` に一意制約（材質ごとに1行）
 - `plate_types` `materials` `special_product_types` は `name` に一意制約
 - `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約
-- `stamps.number` に一意制約（1 以上）
+- `stamps.number` に一意制約（1〜99）
+- 番号の範囲（受注登録画面の番号の欄の上限の桁数に合わせる。screen-design.md「番号の桁数と自動で次へ」）: `plate_types` `materials` `delivery_methods` の `number` は 0〜9、`special_product_types.number` は 0〜9（1・2・3・9 を除く）、`process_types.number` は 10〜99、`sites.number` は 1〜9（`supabase/migrations/20261017100200_restrict_code_digits.sql`）
+- `products.thickness` は数字 2 桁まで（0.1〜9.9 と 1〜99 の整数）。受注登録画面の板厚の欄が数字 2 桁で自動で次へ進むため
 - `notices.customer_id` は NOT NULL。`notices.cutting_method` は切断方法の値に限る
 - `process_notices` の範囲は正の数で、下限 ≤ 上限
 - `process_types.input_shape` は入力の形の値の一覧に限る。`order_item_processes.spec_fields` は NULL か JSON オブジェクト
-- `customers` `delivery_destinations` `manufacturers` の `code` は数字のみ（`delivery_destinations` はさらに `0` を禁止。`manufacturers` はさらに `0` を禁止し、一意制約）
+- `customers` `delivery_destinations` の `code` は数字 4 桁、`manufacturers.code` は数字 1 桁（1〜9）（`delivery_destinations` はさらに `0` を禁止。`manufacturers` はさらに `0` を禁止し、一意制約）
 - `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス）
 - `orders` のスプライス関連の列（`member_class` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
 - `orders.member_class` は部材区分の値（`NONE` `DF` `GPL` `BH` `SPL`）に限る

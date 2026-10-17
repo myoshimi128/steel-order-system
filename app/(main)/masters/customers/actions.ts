@@ -8,7 +8,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { isDigitsOnly } from '@/lib/master-number'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
+import { isFixedDigits } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
@@ -34,10 +35,10 @@ function readCustomerForm(formData: FormData): ParsedCustomerForm {
   if (typeof code !== 'string' || !code.trim()) {
     return { ok: false, error: '得意先コードを入力してください' }
   }
-  // 受注登録画面でテンキーだけで入力できるよう、コードは数字のみとする
+  // 受注登録画面でテンキーだけで入力でき、4 桁打てば自動で次の欄へ進むよう、コードは数字 4 桁とする
   // （DB 側でも customers_code_digits_check で同じ制限をかけている）
-  if (!isDigitsOnly(code.trim())) {
-    return { ok: false, error: '得意先コードは数字のみで入力してください' }
+  if (!isFixedDigits(code.trim(), CODE_LENGTHS.customer)) {
+    return { ok: false, error: `得意先コードは数字 ${CODE_LENGTHS.customer} 桁で入力してください` }
   }
   if (typeof name !== 'string' || !name.trim()) {
     return { ok: false, error: '得意先名を入力してください' }

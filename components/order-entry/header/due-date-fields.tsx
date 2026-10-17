@@ -6,6 +6,7 @@
 
 import { CodeField } from '@/components/code-input/code-field'
 import { DateField } from '@/components/code-input/date-field'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { DUE_DATE_TYPE_OPTIONS } from '@/lib/order-entry/constants'
 import type { OrderHeaderState } from '@/lib/order-entry/use-order-header'
@@ -23,6 +24,7 @@ export function DueDateFields({ header, navigation, today }: DueDateFieldsProps)
         {...navigation.fieldProps('dueDateType')}
         listTitle="納期"
         options={DUE_DATE_TYPE_OPTIONS}
+        maxLength={CODE_LENGTHS.dueDateType}
         code={header.values.dueDateType}
         onCodeChange={(code) => header.setValue('dueDateType', code)}
         error={header.errors.dueDateType}

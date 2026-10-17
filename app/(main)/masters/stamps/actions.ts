@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { MASTER_NUMBER_RANGES } from '@/lib/code-lengths'
 import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
@@ -17,13 +18,11 @@ type ParsedStampForm =
 
 function readStampForm(formData: FormData): ParsedStampForm {
   // 番号は受注登録画面でスタンプを付け外しするときに打つ値。並び順にも使う
-  const number = readMasterNumber(formData)
+  // 0 は「いつもの値」に取っておく考え方のため、スタンプの番号は 1 から。
+  // 受注登録画面の番号の欄が 2 桁までのため 99 まで（DB の stamps_number_check と同じ）
+  const number = readMasterNumber(formData, MASTER_NUMBER_RANGES.stamps)
   if (!number.ok) {
     return number
-  }
-  // 0 は「いつもの値」に取っておく考え方のため、スタンプの番号は 1 から（DB の stamps_number_check と同じ）
-  if (number.value < 1) {
-    return { ok: false, error: '番号は 1 以上で入力してください' }
   }
 
   const body = formData.get('body')

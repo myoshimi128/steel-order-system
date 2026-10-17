@@ -6,6 +6,7 @@
 import { CodeField } from '@/components/code-input/code-field'
 import { TextField } from '@/components/code-input/text-field'
 import type { CodeOption } from '@/lib/code-input/code-option'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import type { OrderHeaderState } from '@/lib/order-entry/use-order-header'
 
@@ -22,6 +23,7 @@ export function DeliveryFields({ header, navigation, options }: DeliveryFieldsPr
         {...navigation.fieldProps('deliveryMethodId')}
         listTitle="配達"
         options={options}
+        maxLength={CODE_LENGTHS.deliveryMethod}
         code={header.values.deliveryMethodId}
         onCodeChange={(code) => header.setValue('deliveryMethodId', code)}
         error={header.errors.deliveryMethodId}

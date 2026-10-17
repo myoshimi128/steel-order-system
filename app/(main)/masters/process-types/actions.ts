@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { MASTER_NUMBER_RANGES } from '@/lib/code-lengths'
 import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
 import { PROCESS_INPUT_SHAPES, type ProcessInputShape } from '@/lib/order-entry/constants'
 import { createClient } from '@/lib/supabase-server'
@@ -32,7 +33,7 @@ function isProcessInputShape(value: FormDataEntryValue | null): value is Process
 function readProcessTypeForm(formData: FormData): ParsedProcessTypeForm {
   // 番号は受注登録画面で加工方法を選ぶときに入力する値。
   // DB 上は NULL 可（番号のない既存行があるため）だが、画面からの登録・更新では必須にする
-  const number = readMasterNumber(formData)
+  const number = readMasterNumber(formData, MASTER_NUMBER_RANGES.processTypes)
   if (!number.ok) {
     return number
   }

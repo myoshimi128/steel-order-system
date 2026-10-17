@@ -12,9 +12,10 @@
 import { CodeField } from '@/components/code-input/code-field'
 import { NumericField } from '@/components/code-input/numeric-field'
 import type { CodeOption } from '@/lib/code-input/code-option'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import type { ItemCalculation } from '@/lib/order-entry/calculate-item'
-import { PROCESS_REGION_CODE, STEEL_MAKING_OPTIONS } from '@/lib/order-entry/constants'
+import { COPY_ROW_COMMAND_KEY, PROCESS_REGION_CODE, STEEL_MAKING_OPTIONS } from '@/lib/order-entry/constants'
 import type { RowEmphasis } from '@/lib/order-entry/emphasis'
 import { manufacturerOptionsFor, materialOptionsFor } from '@/lib/order-entry/item-options'
 import { firstItemFieldId, itemFieldId } from '@/lib/order-entry/item-row'
@@ -42,7 +43,7 @@ type MaterialRowProps = {
   emphasis: RowEmphasis
   cutRegionOptions: readonly CodeOption<string>[]
   plateTypeOptions: readonly CodeOption<string>[]
-  // 明細の入力を終えたときに移るボタンの ID（② の「次へ」）
+  // 明細の入力を終えたときに移る欄の ID（スタンプの番号の欄）
   finishFieldId: string
   navigation: FieldNavigation
   onNotice: (message: string) => void
@@ -82,20 +83,35 @@ export function MaterialRow({
     navigation.focusFieldLater(firstItemFieldId(items.rows[index + 1]))
   }
 
-  // 切断・区分の欄の Enter。
+  // 切断・区分の欄の Enter（2 桁を打ったとき・「9」を打ったときは自動で呼ばれる）。
   //   ・「9」なら加工の行に切り替わるため、同じ位置に出る加工方法の欄へ移る
-  //   ・何も入力していない最後の行なら、明細の入力を終えたとして「次へ」のボタンへ移る
-  function handleCutRegionNext() {
-    const code = row.cutRegion.trim()
+  //   ・何も入力していない最後の行なら、明細の入力を終えたとしてスタンプの番号の欄へ移る
+  // 自動で呼ばれたときは行の状態がまだ更新されていないため、確定した番号を引数で受け取る
+  function handleCutRegionNext(typed: string) {
+    const code = typed.trim()
     if (code === PROCESS_REGION_CODE) {
       navigation.focusFieldLater(itemFieldId(row.key, 'processType'))
       return
     }
     if (isLastRow && index > 0 && !code) {
-      navigation.focusField(finishFieldId)
+      navigation.focusFieldLater(finishFieldId)
       return
     }
     navigation.focusNext(itemFieldId(row.key, 'cutRegion'))
+  }
+
+  // 切断・区分の欄の「-」→ 行番号 → Enter。その番号の材料の行を、加工の行ごと今の行に写す
+  function copyFromRowNumber(digits: string) {
+    if (!digits) {
+      onNotice('複写する行番号を打ってから Enter を押してください')
+      return
+    }
+    const result = items.copyRow(row.key, Number(digits))
+    if (!result.ok) {
+      onNotice(result.message)
+      // 写せなかったときは、打った「-」と行番号を消す
+      setField('cutRegion', '')
+    }
   }
 
   const plateTypeId = resolved.plateType?.id ?? null
@@ -116,6 +132,8 @@ export function MaterialRow({
           onNext={handleCutRegionNext}
           listTitle="切断・区分"
           options={cutRegionOptions}
+          maxLength={CODE_LENGTHS.cutRegion}
+          command={{ key: COPY_ROW_COMMAND_KEY, onSubmit: copyFromRowNumber }}
           code={row.cutRegion}
           onCodeChange={(code) => setField('cutRegion', code)}
           error={errors.cutRegion}
@@ -130,6 +148,7 @@ export function MaterialRow({
           {...fieldProps('plateType')}
           listTitle="種類"
           options={plateTypeOptions}
+          maxLength={CODE_LENGTHS.plateType}
           code={row.plateType}
           onCodeChange={(code) => setField('plateType', code)}
           error={errors.plateType}
@@ -146,6 +165,7 @@ export function MaterialRow({
             {...fieldProps('material')}
             listTitle={`材質（${resolved.plateType?.name ?? ''}）`}
             options={materialOptionsFor(plateTypeId, masters)}
+            maxLength={CODE_LENGTHS.material}
             code={row.material}
             onCodeChange={(code) => setField('material', code)}
             error={errors.material}
@@ -165,6 +185,7 @@ export function MaterialRow({
             {...fieldProps('steelMaking')}
             listTitle="製鋼法"
             options={STEEL_MAKING_OPTIONS}
+            maxLength={CODE_LENGTHS.steelMaking}
             code={row.steelMaking}
             onCodeChange={(code) => setField('steelMaking', code)}
             error={errors.steelMaking}
@@ -183,6 +204,7 @@ export function MaterialRow({
           {...fieldProps('manufacturer')}
           listTitle="メーカー"
           options={manufacturerOptionsFor(plateTypeId, masters)}
+          maxLength={CODE_LENGTHS.manufacturer}
           code={row.manufacturer}
           onCodeChange={(code) => setField('manufacturer', code)}
           error={errors.manufacturer}

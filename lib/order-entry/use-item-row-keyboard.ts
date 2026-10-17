@@ -3,14 +3,16 @@
 // 明細の行の中のキー操作を扱うカスタムフック（docs/screen-design.md「行の操作」）。
 //
 //   *                     複写する
-//                           材料の行: 直前の材料の行を、加工の行ごと今の行に写す。
-//                                     空の行の切断・区分の欄で行番号を打ってから押すと、その番号の材料の行を写す
+//                           材料の行: 直前の材料の行を、加工の行ごと今の行に写す
 //                           加工の行: 何もしない（加工は 1 行にまとめて入力するため、写す必要がない）
+//   - → 行番号 → Enter    その番号の材料の行を写す（切断・区分の欄だけ。CodeField の command で扱う）
 //   +                     加工の行を追加する（今の材料の行の、最後の加工の行のすぐ下）
 //   F4 / Ctrl + Delete    行を削除する（材料の行は加工の行ごと）
 //   F3 / Ctrl + Insert    今の行の前に行を挿入する
 //
-// 以前は「-」でその行の摘要へ移動していたが、明細ごとの摘要を使わなくなったため、なくした。
+// 以前は「-」でその行の摘要へ移動していたが、明細ごとの摘要を使わなくなったため、行番号での複写に使う。
+// 以前は「行番号 → *」で行番号の複写をしていたが、切断・区分が 2 桁で自動で次へ進むようになり
+// （「12」と打つと 12 シャー型切りとして進む）、行番号と区別できなくなったため「-」に移した。
 //
 // これらは番号・寸法・数量の欄でだけ有効にする。文字を入れる欄（加工内容・一覧の検索の欄。
 // data-free-text の印がある欄）では普通の文字として入力する（F3・F4 は文字を入力しないため、どの欄でも効く）。
@@ -66,11 +68,8 @@ export function useItemRowKeyboard({ rowKey, items, navigation, onNotice }: UseI
     switch (event.key) {
       case '*': {
         event.preventDefault()
-        // 切断・区分の欄に打った数字は、写す材料の行の番号として扱う（空の行で使う想定）
-        const isCutRegionField = target.id === itemFieldId(rowKey, 'cutRegion')
-        const typed = isCutRegionField ? (target as HTMLInputElement).value.trim() : ''
-        const sourceNumber = /^\d+$/.test(typed) ? Number(typed) : null
-        const result = items.copyRow(rowKey, sourceNumber)
+        // 直前の材料の行を写す（行番号を指定するときは「-」→ 行番号 → Enter）
+        const result = items.copyRow(rowKey, null)
         if (!result.ok) {
           onNotice(result.message)
         }

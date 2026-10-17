@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { MASTER_NUMBER_RANGES } from '@/lib/code-lengths'
 import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
@@ -17,7 +18,7 @@ type ParsedDeliveryMethodForm =
 
 function readDeliveryMethodForm(formData: FormData): ParsedDeliveryMethodForm {
   // 番号は受注登録画面で配達を選ぶときに入力する値（lib/master-number.ts で共通の検証）
-  const number = readMasterNumber(formData)
+  const number = readMasterNumber(formData, MASTER_NUMBER_RANGES.deliveryMethods)
   if (!number.ok) {
     return number
   }

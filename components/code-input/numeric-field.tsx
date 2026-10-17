@@ -8,6 +8,7 @@
 // 行の部品（material-row.tsx）が受け取る。
 
 import type { KeyboardEvent, Ref } from 'react'
+import { countDigits } from '@/lib/code-lengths'
 import { isComposing } from '@/lib/hooks/is-composing'
 import { FieldError } from './field-error'
 
@@ -31,6 +32,9 @@ type NumericFieldProps = {
   dense?: boolean
   // エラーの文章を欄の下に出すか（明細の行では false にし、行の下にまとめて出す）
   showErrorText?: boolean
+  // 上限の桁数（小数点は数えず、数字の数で数える）。上限まで打つと Enter なしで次の欄へ進む。
+  // 省略時は上限なし（Enter で進む）
+  maxDigits?: number
 }
 
 export function NumericField({
@@ -47,6 +51,7 @@ export function NumericField({
   placeholder,
   dense = false,
   showErrorText = true,
+  maxDigits,
 }: NumericFieldProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (isComposing(event) || event.key !== 'Enter') {
@@ -64,7 +69,21 @@ export function NumericField({
   function handleChange(text: string) {
     const halfWidth = text.normalize('NFKC')
     const pattern = allowDecimal ? /[^0-9.]/g : /[^0-9]/g
-    onValueChange(halfWidth.replace(pattern, ''))
+    const next = halfWidth.replace(pattern, '')
+    if (maxDigits === undefined) {
+      onValueChange(next)
+      return
+    }
+    // 上限の桁を超える入力は受け付けない（今の値のまま）
+    const digits = countDigits(next)
+    if (digits > maxDigits) {
+      return
+    }
+    onValueChange(next)
+    // 打って上限の桁にそろったら、次の欄へ進む（1.6 は「1」「.」「6」と打った時点で進む）
+    if (digits === maxDigits && digits > countDigits(value)) {
+      onNext()
+    }
   }
 
   return (

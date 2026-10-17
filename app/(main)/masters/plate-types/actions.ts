@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { MASTER_NUMBER_RANGES } from '@/lib/code-lengths'
 import { isNumberUniqueViolation, readMasterNumber } from '@/lib/master-number'
 import { createClient } from '@/lib/supabase-server'
 
@@ -20,7 +21,7 @@ type ParsedPlateTypeForm =
 // 送られてこないため、共通のバリデーション対象にする必要がない）
 function readPlateTypeForm(formData: FormData): ParsedPlateTypeForm {
   // 番号は受注登録画面で種類を選ぶときに入力する値（lib/master-number.ts で共通の検証）
-  const number = readMasterNumber(formData)
+  const number = readMasterNumber(formData, MASTER_NUMBER_RANGES.plateTypes)
   if (!number.ok) {
     return number
   }

@@ -1,6 +1,6 @@
 'use client'
 
-// 補助エリアの「フリーコメント」の枠。受注全体のコメント（orders.field_note）で、現場用伝票に印字する。
+// ② 注文内容の下の帯の「フリーコメント」の枠。受注全体のコメント（orders.field_note）で、現場用伝票に印字する。
 // 明細ごとの摘要は使わないため、特定の行について伝えたいこと（例: 3 行目は端材を返却）もここに書く。
 // Enter で登録ボタンへ進み、改行は Ctrl+Enter で入れる（TextAreaField）。
 
@@ -18,8 +18,8 @@ type FreeCommentPanelProps = {
 export function FreeCommentPanel({ value, onValueChange, fieldProps }: FreeCommentPanelProps) {
   return (
     <AuxPanel title="フリーコメント" note="Ctrl + Enter で改行">
-      {/* 行ごとの指示もここに書くため、摘要の欄があったころより行数を多めにとる */}
-      <TextAreaField {...fieldProps} value={value} onValueChange={onValueChange} rows={10} />
+      {/* 帯の高さに合わせて 3 行分。それより長い文は欄の中でスクロールする */}
+      <TextAreaField {...fieldProps} value={value} onValueChange={onValueChange} rows={3} />
     </AuxPanel>
   )
 }

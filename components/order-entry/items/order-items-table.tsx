@@ -36,7 +36,7 @@ type OrderItemsTableProps = {
   processNotices: readonly ProcessNoticeMaster[]
   // スプライス専用の受注か・ショットの有無（切断・区分の番号の解釈が変わる）
   context: ItemContext
-  // 明細の入力を終えたときに移るボタンの ID（「次へ」）
+  // 明細の入力を終えたときに移る欄の ID（スタンプの番号の欄）
   finishFieldId: string
   navigation: FieldNavigation
   onNotice: (message: string) => void
