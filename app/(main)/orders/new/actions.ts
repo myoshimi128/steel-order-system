@@ -136,7 +136,6 @@ export async function createOrder(
         resolveProcessRow(row, masters.items, parent.quantity),
         // 加工の行の行番号は、母材ごとに 1 から振る
         parent.processes.length + 1,
-        row.fieldNote,
       )
       if (!processPayload) {
         return { ok: false, message: `${parent.line_no} 行目の加工の行を登録できません` }
@@ -162,7 +161,6 @@ export async function createOrder(
       resolved,
       calculateItem(resolved, pricingMasters, header.orderDate),
       lineNo,
-      row.fieldNote,
     )
     if (!payload) {
       return { ok: false, message: `${lineNo} 行目の単価を計算できません` }

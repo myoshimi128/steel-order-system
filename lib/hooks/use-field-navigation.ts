@@ -64,7 +64,7 @@ export function useFieldNavigation(order: readonly string[]) {
     (fromId: string, step: 1 | -1) => {
       const currentOrder = orderRef.current
       const fromIndex = currentOrder.indexOf(fromId)
-      // 入力順に含まれない欄（明細の摘要など）からは移動しない（先頭の欄へ飛んでしまうため）
+      // 入力順に含まれない欄（一覧の検索の欄など）からは移動しない（先頭の欄へ飛んでしまうため）
       if (fromIndex < 0) {
         return
       }
@@ -135,7 +135,7 @@ export function useFieldNavigation(order: readonly string[]) {
   // 次の場合は移動しない（欄の側の操作を優先する）。
   //   ・欄の側でキーを処理済み（event.defaultPrevented）: 「/」で一覧を開いているときの候補の選択など
   //   ・日本語入力の変換中: ↑↓ は変換候補の選択に使う
-  //   ・入力順に登録されていない欄（一覧の検索の欄・明細の摘要など）
+  //   ・入力順に登録されていない欄（一覧の検索の欄など）
   const handleArrowKeys = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {

@@ -67,7 +67,6 @@ export const EMPTY_ITEM_VALUES: Omit<ItemRowValues, 'key'> = {
   innerDiameter: '',
   plateSize: '',
   quantity: '',
-  fieldNote: '',
   // 加工の行だけで使う欄。単位の初期値は 1 個
   processType: '',
   spec: '',
@@ -191,7 +190,7 @@ function processFieldOrder(row: ItemRowValues, masters: ItemMasters): ItemFieldN
 //   材料の行: 切断・区分 → 種類 → 材質 → 製鋼法 → メーカー → 板厚 → 寸法 → 数量
 //   加工の行: 加工方法 → 加工の項目（入力の形による）→ 数量（自由入力のみ）
 // 入力しない欄（材質のない種類の材質、「—」の製鋼法）は含めない。
-// 摘要は ③ 伝票の指示の画面で入力するため、ここには含めない
+// 明細ごとの摘要は使わないため、入力順に含めない
 export function itemFieldOrder(
   row: ItemRowValues,
   flags: { needsMaterial: boolean; steelMakingApplicable: boolean },

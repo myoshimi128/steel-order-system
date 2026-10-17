@@ -16,7 +16,6 @@ import { createOrder } from '@/app/(main)/orders/new/actions'
 import { findCodeOption } from '@/lib/code-input/code-option'
 import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { DUE_DATE_TYPE_OPTIONS, MEMBER_CLASS_OPTIONS } from '@/lib/order-entry/constants'
-import { fieldNoteRows } from '@/lib/order-entry/field-note-rows'
 import { firstItemFieldId, itemFieldId, itemFieldOrder } from '@/lib/order-entry/item-row'
 import type { ItemFieldName } from '@/lib/order-entry/item-types'
 import type { OrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
@@ -42,7 +41,6 @@ import { OrderSummary } from './order-summary'
 import { StepIndicator } from './step-indicator'
 import { AuxArea } from './support-area/aux-area'
 import { CustomerNoticeStrip } from './support-area/customer-notice-strip'
-import { FieldNoteList } from './support-area/field-note-list'
 
 type OrderEntryScreenProps = {
   masters: OrderEntryMasters
@@ -73,7 +71,8 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
 
   // スタンプ・フリーコメント。得意先を選ぶと、その得意先の指定スタンプにチェックが入る
   const aux = useOrderAux(masters.aux, header.customerId)
-  // 得意先の注意事項。得意先・切断方法・加工種別の条件がすべて受注に当てはまるものだけ
+  // 得意先の注意事項。得意先・切断方法・加工種別の条件がすべて受注に当てはまるものだけ。
+  // ② 注文内容の明細の上に出す（③ には出さない）
   const notices = customerNoticesFor(
     masters.aux.customerNotices,
     orderNoticeConditions(header.customerId, items.checks),
@@ -85,9 +84,6 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
   // 注文書のパネルと右の中身を並べる枠の要素（幅を測るため。ref に setter を渡して受け取る）
   const [panelContainer, setPanelContainer] = useState<HTMLDivElement | null>(null)
   const panel = useDocumentPanel(panelContainer, initialPanelWidth, initialPanelOpen)
-
-  // ③ 伝票の指示の摘要の一覧（何も入力していない行は除く）
-  const noteRows = fieldNoteRows(items.rows, items.checks, masters.items, context)
 
   // 画面ごとの入力順。今の画面の欄だけを並べ、最後は画面を進めるボタン
   const infoOrder = [...header.fieldOrder.filter((id) => id !== 'submit'), TO_ITEMS_BUTTON_ID]
@@ -102,7 +98,6 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
     TO_INSTRUCTIONS_BUTTON_ID,
   ]
   const instructionsOrder = [
-    ...noteRows.map((row) => itemFieldId(row.key, 'fieldNote')),
     STAMP_CODE_FIELD_ID,
     FREE_COMMENT_FIELD_ID,
     SUBMIT_BUTTON_ID,
@@ -141,10 +136,10 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
     goTo('items', firstItemFieldId(items.rows[0]))
   }
 
-  // ② → ③。最初の摘要の欄（明細がなければスタンプの番号）へ移る
+  // ② → ③。スタンプの番号の欄へ移る
   function goToInstructions() {
     setStatus(null)
-    goTo('instructions', noteRows.length > 0 ? itemFieldId(noteRows[0].key, 'fieldNote') : STAMP_CODE_FIELD_ID)
+    goTo('instructions', STAMP_CODE_FIELD_ID)
   }
 
   // 明細のエラーのある最初の欄の ID（② の入力順で探す）
@@ -282,14 +277,7 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
           {step === 'instructions' && (
             <>
               <OrderSummary items={summary} onBackToInfo={backToInfo} />
-              <FieldNoteList rows={noteRows} items={items} navigation={navigation} />
-              <AuxArea
-                aux={aux}
-                notices={notices}
-                hasCustomer={header.customerId !== null}
-                showShotStamp={showShotStamp}
-                navigation={navigation}
-              />
+              <AuxArea aux={aux} showShotStamp={showShotStamp} navigation={navigation} />
             </>
           )}
         </div>

@@ -96,9 +96,6 @@ export type ItemRowValues = {
   plateSize: string
   // 数量（材料の行は枚数、加工の行は加工数量）
   quantity: string
-  // 摘要（材料の行は order_items.field_note、加工の行は order_item_processes.remarks）。
-  // ③ 伝票の指示の画面で入力する
-  fieldNote: string
   // --- 加工の行だけで使う欄 ---
   // 加工方法（加工種別マスタの番号）
   processType: string

@@ -1,7 +1,7 @@
 // 受注登録の 3 つの画面（docs/screen-design.md「画面の流れ」）。
 //   info         ① 受注情報
 //   items        ② 注文内容（明細）
-//   instructions ③ 伝票の指示（摘要・スタンプ・フリーコメント）
+//   instructions ③ 伝票の指示（スタンプ・フリーコメント）
 
 export type OrderEntryStep = 'info' | 'items' | 'instructions'
 
