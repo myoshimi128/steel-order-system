@@ -12,7 +12,7 @@ const AS_OF = '2026-06-01'
 
 function payloadOf(values: Parameters<typeof itemRow>[0]) {
   const resolved = resolveItemRow(itemRow(values), ITEM_MASTERS)
-  return buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1, values.fieldNote ?? '')
+  return buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1)
 }
 
 describe('buildOrderItemPayload', () => {
@@ -25,7 +25,6 @@ describe('buildOrderItemPayload', () => {
         width: '100',
         length: '200',
         quantity: '10',
-        fieldNote: ' 端材は返却 ',
       }),
     ).toMatchObject({
       product_id: 'p-ss400-9-std',
@@ -40,7 +39,8 @@ describe('buildOrderItemPayload', () => {
       actual_weight: 1.413,
       cutting_unit_price: 255,
       price_unit: '枚',
-      field_note: '端材は返却',
+      // 明細ごとの摘要は使わないため、常に NULL
+      field_note: null,
     })
   })
 
@@ -88,7 +88,7 @@ describe('buildOrderItemPayload', () => {
       ITEM_MASTERS,
       { isSplice: true, spliceShot: true },
     )
-    expect(buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1, '')).toMatchObject({
+    expect(buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1)).toMatchObject({
       special_product_type_id: 'sp-splice',
       cutting_type: 'アイトレ',
       cutting_unit_price: null,
@@ -105,7 +105,7 @@ describe('buildOrderItemPayload', () => {
       ITEM_MASTERS,
       { isSplice: true, spliceShot: true },
     )
-    expect(buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1, '')).toMatchObject({
+    expect(buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1)).toMatchObject({
       cutting_type: '寸法切',
       square_weight: 7.536,
       actual_weight: 7.536,
@@ -118,7 +118,7 @@ describe('buildOrderItemPayload', () => {
       ITEM_MASTERS,
       { isSplice: true, spliceShot: null },
     )
-    expect(buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1, '')).toBeNull()
+    expect(buildOrderItemPayload(resolved, calculateItem(resolved, MASTERS, AS_OF), 1)).toBeNull()
   })
 
   it('入力がそろっていない行は保存用のデータを作らない', () => {
@@ -143,19 +143,21 @@ describe('buildProcessPayload', () => {
   // parentQuantity は母材の枚数（穴・曲げの数量の計算に使う）
   function processPayloadOf(
     values: Partial<ReturnType<typeof createProcessRow>>,
-    remarks = '',
     parentQuantity: number | null = null,
   ) {
     const row = { ...createProcessRow(), ...values }
-    return buildProcessPayload(resolveProcessRow(row, ITEM_MASTERS, parentQuantity), 2, remarks)
+    return buildProcessPayload(resolveProcessRow(row, ITEM_MASTERS, parentQuantity), 2)
   }
 
-  it('自由入力の形: 加工方法・加工内容・数量・単位・仕入単価・摘要を保存する', () => {
+  it('自由入力の形: 加工方法・加工内容・数量・単位・仕入単価を保存する（摘要は使わないため NULL）', () => {
     expect(
-      processPayloadOf(
-        { processType: '22', spec: ' 1S/ 2孔 30X12φ ', quantity: '12', priceUnit: '1', unitPrice: '150' },
-        ' 面取り ',
-      ),
+      processPayloadOf({
+        processType: '22',
+        spec: ' 1S/ 2孔 30X12φ ',
+        quantity: '12',
+        priceUnit: '1',
+        unitPrice: '150',
+      }),
     ).toEqual({
       line_no: 2,
       process_type_id: 'proc-shot',
@@ -164,7 +166,7 @@ describe('buildProcessPayload', () => {
       quantity: 12,
       unit_price: 150,
       price_unit: '個',
-      remarks: '面取り',
+      remarks: null,
     })
   })
 
@@ -183,7 +185,6 @@ describe('buildProcessPayload', () => {
       processPayloadOf(
         // 画面の数量の欄に何か残っていても使わない
         { processType: '20', holesPerPiece: '12', holeDiameter: '38', quantity: '999', priceUnit: '1' },
-        '',
         4,
       ),
     ).toMatchObject({
@@ -198,7 +199,6 @@ describe('buildProcessPayload', () => {
     expect(
       processPayloadOf(
         { processType: '24', bendCount: '9', bendCountFree: '5', bendStyle: '9', bendStyleFree: ' R ' },
-        '',
         7,
       ),
     ).toMatchObject({
@@ -210,7 +210,7 @@ describe('buildProcessPayload', () => {
   })
 
   it('穴・曲げで母材の枚数が決まっていなければ作らない', () => {
-    expect(processPayloadOf({ processType: '24' }, '', null)).toBeNull()
+    expect(processPayloadOf({ processType: '24' }, null)).toBeNull()
   })
 
   it('加工方法がなければ作らない', () => {

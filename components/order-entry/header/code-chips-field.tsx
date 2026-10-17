@@ -16,6 +16,8 @@ type CodeChipsFieldProps<T> = NavigationFieldProps & {
   code: string
   onCodeChange: (code: string) => void
   error?: string
+  // 上限の桁数（lib/code-lengths.ts）
+  maxLength?: number
 }
 
 export function CodeChipsField<T>({ options, code, onCodeChange, ...props }: CodeChipsFieldProps<T>) {

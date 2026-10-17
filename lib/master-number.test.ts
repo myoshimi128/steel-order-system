@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDigitsOnly, isNumberUniqueViolation, readMasterNumber } from './master-number'
+import { isDigitsOnly, isFixedDigits, isNumberUniqueViolation, readMasterNumber } from './master-number'
 
 // FormData に number 欄だけを入れて作るヘルパー
 function formWithNumber(value: string | null): FormData {
@@ -39,6 +39,28 @@ describe('readMasterNumber', () => {
     expect(readMasterNumber(formWithNumber('1.5')).ok).toBe(false)
     expect(readMasterNumber(formWithNumber('-1')).ok).toBe(false)
     expect(readMasterNumber(formWithNumber('a')).ok).toBe(false)
+  })
+
+  it('範囲を渡すと、範囲の外の番号はエラー（加工種別は 10〜99）', () => {
+    const range = { min: 10, max: 99 }
+    expect(readMasterNumber(formWithNumber('10'), range)).toEqual({ ok: true, value: 10 })
+    expect(readMasterNumber(formWithNumber('9'), range)).toEqual({ ok: false, error: '番号は 10〜99 で入力してください' })
+    expect(readMasterNumber(formWithNumber('100'), range).ok).toBe(false)
+  })
+})
+
+describe('isFixedDigits', () => {
+  it('決まった桁数の数字だけなら true', () => {
+    expect(isFixedDigits('1001', 4)).toBe(true)
+    expect(isFixedDigits('0123', 4)).toBe(true)
+    expect(isFixedDigits('3', 1)).toBe(true)
+  })
+
+  it('桁数が違う・数字以外を含むと false', () => {
+    expect(isFixedDigits('101', 4)).toBe(false)
+    expect(isFixedDigits('10010', 4)).toBe(false)
+    expect(isFixedDigits('220', 1)).toBe(false)
+    expect(isFixedDigits('C001', 4)).toBe(false)
   })
 })
 

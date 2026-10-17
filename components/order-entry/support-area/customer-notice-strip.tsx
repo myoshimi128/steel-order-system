@@ -3,7 +3,7 @@
 // ② 注文内容の画面で、受注情報の要約の下に固定表示する「得意先の注意事項」の帯。
 // 明細を打ちながら見えるようにするため、表の上に置く（docs/screen-design.md「得意先の注意事項」）。
 // 件数が多いときは 2 件まで出し、残りは「ほか○件」で開けるようにする。
-// ③ 伝票の指示の画面では、スタンプ・フリーコメントと並べて全件を出す（customer-notice-panel.tsx）。
+// 当てはまる注意事項がなければ、帯ごと出さない。③ 伝票の指示の画面には出さない。
 
 import { useState } from 'react'
 import type { DisplayedNotice } from '@/lib/order-entry/notices'

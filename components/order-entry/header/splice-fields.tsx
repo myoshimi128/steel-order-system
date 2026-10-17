@@ -5,6 +5,7 @@
 
 import { CodeField } from '@/components/code-input/code-field'
 import { TextField } from '@/components/code-input/text-field'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { JOINT_NO_MAX_LENGTH, SHOT_OPTIONS } from '@/lib/order-entry/constants'
 import type { OrderHeaderState } from '@/lib/order-entry/use-order-header'
@@ -31,6 +32,7 @@ export function SpliceFields({ header, navigation }: SpliceFieldsProps) {
         {...navigation.fieldProps('spliceShot')}
         label="ショット"
         options={SHOT_OPTIONS}
+        maxLength={CODE_LENGTHS.spliceShot}
         code={header.values.spliceShot}
         onCodeChange={(code) => header.setValue('spliceShot', code)}
         error={header.errors.spliceShot}

@@ -643,7 +643,7 @@ export type Database = {
           order_no?: string
           project_name?: string | null
           remarks?: string | null
-          site_id?: string
+          site_id: string
           splice_shot?: boolean | null
           status?: string
           updated_at?: string
@@ -699,6 +699,13 @@ export type Database = {
             columns: ["delivery_method_id"]
             isOneToOne: false
             referencedRelation: "delivery_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
             referencedColumns: ["id"]
           },
         ]

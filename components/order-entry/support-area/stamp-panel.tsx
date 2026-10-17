@@ -1,6 +1,6 @@
 'use client'
 
-// 補助エリアの「スタンプ」の枠。チェックしたスタンプが現場用伝票に印字される。
+// ② 注文内容の下の帯の「スタンプ」の枠。チェックしたスタンプが現場用伝票に印字される。
 //
 //   ・番号の欄に番号を打って Enter で付け外しする（欄は空に戻り、カーソルはそのまま）。
 //     欄が空のまま Enter を押すと、フリーコメントへ進む。クリックでも付け外しできる
@@ -11,6 +11,7 @@
 
 import { NumericField } from '@/components/code-input/numeric-field'
 import type { NavigationFieldProps } from '@/components/order-entry/items/dimension-props'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { OrderAuxState } from '@/lib/order-entry/use-order-aux'
 import { AuxPanel } from './aux-panel'
 
@@ -46,22 +47,30 @@ export function StampPanel({ aux, showShotStamp, fieldProps }: StampPanelProps) 
   }
 
   return (
-    <AuxPanel title="スタンプ" note="番号 → Enter で付け外し">
-      <div className="mb-2">
+    <AuxPanel
+      title="スタンプ"
+      note="番号 → Enter で付け外し"
+      headerContent={
+        // 帯の高さを抑えるため、番号の欄は見出しの行に置く。
+        // 番号は 2 桁まで（lib/code-lengths.ts）。Enter で付け外しする欄のため、桁がそろっても自動では進まない
         <NumericField
           {...fieldProps}
-          label="番号"
           value={aux.stampCode}
-          onValueChange={aux.setStampCode}
+          onValueChange={(value) => aux.setStampCode(value.slice(0, CODE_LENGTHS.stamp))}
           onNext={handleNext}
           error={aux.stampCodeError}
+          placeholder="番号"
           widthClass="w-14"
+          dense
+          showErrorText={false}
         />
-      </div>
-
-      <ul className="flex flex-col gap-1">
+      }
+    >
+      {aux.stampCodeError && <p className="mb-1 text-xs text-red-600">{aux.stampCodeError}</p>}
+      {/* 帯の高さに多く収まるよう、3 列に並べる */}
+      <ul className="grid grid-cols-3 gap-x-3 gap-y-0.5">
         {showShotStamp && (
-          <li className="flex items-center gap-2 text-sm">
+          <li className="flex items-center gap-2 text-[13px]">
             <span className="w-5" />
             {/* 手では外せないため、チェック済みで変更不可にする */}
             <input type="checkbox" checked disabled readOnly aria-label="ショット加工" />
@@ -71,7 +80,7 @@ export function StampPanel({ aux, showShotStamp, fieldProps }: StampPanelProps) 
         )}
         {aux.states.map(({ stamp, checked, designated }) => (
           <li key={stamp.id}>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <label className="flex min-w-0 cursor-pointer items-center gap-1.5 text-[13px]">
               <span className="w-5 text-right text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
                 {stamp.number}
               </span>
@@ -82,13 +91,16 @@ export function StampPanel({ aux, showShotStamp, fieldProps }: StampPanelProps) 
                 checked={checked}
                 onChange={() => aux.toggle(stamp.id)}
               />
-              <span>{stamp.body}</span>
+              {/* 列の幅に収まらない文言は省略し、マウスを乗せると全体を出す */}
+              <span title={stamp.body} className="truncate">
+                {stamp.body}
+              </span>
               {designated && <Badge text="客先指定" />}
             </label>
           </li>
         ))}
         {aux.states.length === 0 && !showShotStamp && (
-          <li className="text-xs text-neutral-400 dark:text-neutral-500">
+          <li className="col-span-3 text-xs text-neutral-400 dark:text-neutral-500">
             スタンプが登録されていません
           </li>
         )}

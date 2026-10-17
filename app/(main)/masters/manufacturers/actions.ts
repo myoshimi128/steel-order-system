@@ -6,7 +6,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { isDigitsOnly } from '@/lib/master-number'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
+import { isFixedDigits } from '@/lib/master-number'
 import { NO_MANUFACTURER_CODE } from '@/lib/order-entry/constants'
 import { createClient } from '@/lib/supabase-server'
 
@@ -23,10 +24,10 @@ function readManufacturerForm(formData: FormData): ParsedManufacturerForm {
   if (typeof code !== 'string' || !code.trim()) {
     return { ok: false, error: 'メーカーコードを入力してください' }
   }
-  // 受注登録画面でテンキーだけで入力できるよう、コードは数字のみとする
+  // 受注登録画面でテンキーだけで入力でき、1 桁打てば自動で次の欄へ進むよう、コードは数字 1 桁とする
   // （DB 側でも manufacturers_code_digits_check で同じ制限をかけている）
-  if (!isDigitsOnly(code.trim())) {
-    return { ok: false, error: 'メーカーコードは数字のみで入力してください' }
+  if (!isFixedDigits(code.trim(), CODE_LENGTHS.manufacturer)) {
+    return { ok: false, error: `メーカーコードは数字 ${CODE_LENGTHS.manufacturer} 桁で入力してください` }
   }
   // 「0」は受注登録画面の「0 指定なし」に使うため、メーカーのコードにはできない
   // （DB 側でも manufacturers_code_not_zero_check で同じ制限をかけている）

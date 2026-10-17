@@ -7,12 +7,13 @@
 // 切断・区分で「9」を打つと加工の行になり、同じ位置が加工方法の番号の欄に変わる。
 // 加工の項目の入力欄は、加工種別の入力の形（自由入力 / 穴 / 曲げ）で切り替える（process-shapes/）。
 // 穴・曲げの数量は母材の枚数から自動で求め、グレーで表示する。
-// 単位・仕入単価は受注登録の画面では入力しない（仕入入力で扱う）。摘要は ③ 伝票の指示で入力する。
+// 単位・仕入単価は受注登録の画面では入力しない（仕入入力で扱う）。明細ごとの摘要は使わない（フリーコメントに書く）。
 // 入力順: 加工方法 → 加工の項目 → 数量（自由入力のみ）。行の最後の欄の後は次の行へ
 
 import { CodeField } from '@/components/code-input/code-field'
 import { NumericField } from '@/components/code-input/numeric-field'
 import type { CodeOption } from '@/lib/code-input/code-option'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { firstItemFieldId, itemFieldId } from '@/lib/order-entry/item-row'
 import type { ItemErrors, ItemFieldName } from '@/lib/order-entry/item-types'
@@ -101,6 +102,7 @@ export function ProcessRow({
             onPrevious={handleProcessTypePrevious}
             listTitle="加工方法"
             options={processTypeOptions}
+            maxLength={CODE_LENGTHS.processType}
             code={row.processType}
             onCodeChange={(code) => setField('processType', code)}
             error={errors.processType}

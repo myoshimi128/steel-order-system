@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { isThicknessWithinDigits, THICKNESS_MAX_DIGITS } from '@/lib/code-lengths'
 import { createClient } from '@/lib/supabase-server'
 
 export type ProductFormState = { error: string } | undefined
@@ -42,6 +43,14 @@ function readProductForm(formData: FormData): ParsedProductForm {
     typeof thicknessRaw === 'string' ? Number(thicknessRaw) : NaN
   if (!Number.isFinite(thickness) || thickness <= 0) {
     return { ok: false, error: '板厚を正しく入力してください' }
+  }
+  // 受注登録画面の板厚の欄は数字 2 桁で自動で次へ進むため、商品マスタの板厚も数字 2 桁までにする
+  // （0.1〜9.9 と 1〜99 の整数。DB 側でも products_thickness_digits_check で同じ制限をかけている）
+  if (!isThicknessWithinDigits(thickness)) {
+    return {
+      ok: false,
+      error: `板厚は数字 ${THICKNESS_MAX_DIGITS} 桁まで（0.1〜9.9 または 1〜99 の整数）で入力してください`,
+    }
   }
 
   if (typeof shape !== 'string' || !SHAPE_VALUES.includes(shape as Shape)) {

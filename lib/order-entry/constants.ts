@@ -117,6 +117,10 @@ export const STANDARD_CUT_REGION_CODE = '71'
 // 9 加工（この番号の行は加工の行になる。同じ欄で続けて加工方法の番号を打つ）
 export const PROCESS_REGION_CODE = '9'
 
+// 行番号を指定して複写するキー。切断・区分の欄で「-」→ 行番号 → Enter で、その番号の材料の行を写す
+// （「-」は明細ごとの摘要へ移るキーだったが、摘要を使わなくなって空いたため使う）
+export const COPY_ROW_COMMAND_KEY = '-'
+
 // --- 加工の行の単位（order_item_processes.price_unit の値域と一致させる） ---
 //   個: 仕入金額 = 仕入単価 × 数量
 //   kg: 仕入金額 = 仕入単価 × 母材の合計重量

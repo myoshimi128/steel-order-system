@@ -5,13 +5,14 @@
 //   ・番号を打つと、右側に名称が表示される
 //   ・「/」で選択肢の一覧（CodeList）を開く。searchable にすると検索の欄が付いた一覧になる
 //   ・存在しない番号はエラーを表示し、次の欄へ進ませない
+//   ・上限の桁（maxLength）まで打つと、Enter を押さなくても次の欄へ進む
 //   ・Enter で次の欄、Shift+Enter で前の欄へ移る
 //
 // 状態とキー操作は use-code-field.ts に分け、この部品は表示だけを担当する。
 
 import { useRef, type Ref } from 'react'
 import type { CodeOption } from '@/lib/code-input/code-option'
-import { useCodeField } from '@/lib/hooks/use-code-field'
+import { useCodeField, type CodeFieldCommand } from '@/lib/hooks/use-code-field'
 import { CodeList } from './code-list'
 import { FieldError } from './field-error'
 
@@ -27,8 +28,13 @@ type CodeFieldProps<T> = {
   // 保存時の確認などで親から渡すエラー（存在しない番号のエラーより優先して表示する）
   error?: string
   inputRef?: Ref<HTMLInputElement>
-  onNext: () => void
+  // 次の欄へ進むときに呼ぶ。確定した番号を渡す（上限の桁で自動で進むときは、親の状態の更新前に呼ばれるため）
+  onNext: (code: string) => void
   onPrevious: () => void
+  // 上限の桁数（lib/code-lengths.ts）。上限まで打つと Enter なしで次の欄へ進む
+  maxLength?: number
+  // 番号の代わりに打つ操作（明細の切断・区分の「-」→ 行番号 → Enter の複写）
+  command?: CodeFieldCommand
   // 一覧に検索の欄を付けるか（売り先・入れ先など件数の多い欄）
   searchable?: boolean
   // 入力できない状態にする（切断方法が定尺のときの区分など、値が固定される欄）
@@ -69,6 +75,8 @@ export function CodeField<T>({
   inputRef,
   onNext,
   onPrevious,
+  maxLength,
+  command,
   searchable = false,
   disabled = false,
   showErrorText = true,
@@ -89,6 +97,8 @@ export function CodeField<T>({
     onPrevious,
     searchable,
     onReturnFocus: () => codeInputRef.current?.focus(),
+    maxLength,
+    command,
   })
   const message = error ?? field.invalidError
   const hasError = message !== undefined

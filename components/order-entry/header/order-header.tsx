@@ -18,6 +18,7 @@
 import { CodeField } from '@/components/code-input/code-field'
 import { DateField } from '@/components/code-input/date-field'
 import { TextField } from '@/components/code-input/text-field'
+import { CODE_LENGTHS } from '@/lib/code-lengths'
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { MEMBER_CLASS_OPTIONS, PROCESSING_TYPE_OPTIONS } from '@/lib/order-entry/constants'
 import type { HeaderMasterOptions, OrderHeaderState } from '@/lib/order-entry/use-order-header'
@@ -59,6 +60,7 @@ export function OrderHeader({ header, navigation, masters, today }: OrderHeaderP
             {...navigation.fieldProps('processingType')}
             listTitle="処理区分"
             options={PROCESSING_TYPE_OPTIONS}
+            maxLength={CODE_LENGTHS.processingType}
             code={values.processingType}
             onCodeChange={(code) => setValue('processingType', code)}
             error={errors.processingType}
@@ -81,6 +83,7 @@ export function OrderHeader({ header, navigation, masters, today }: OrderHeaderP
             {...navigation.fieldProps('customerId')}
             listTitle="売り先"
             options={masters.customers}
+            maxLength={CODE_LENGTHS.customer}
             // 件数が多いため、一覧にふりがな・名前の検索の欄を付ける
             searchable
             code={values.customerId}
@@ -122,6 +125,7 @@ export function OrderHeader({ header, navigation, masters, today }: OrderHeaderP
             {...navigation.fieldProps('deliveryDestinationId')}
             listTitle="入れ先"
             options={masters.destinations}
+            maxLength={CODE_LENGTHS.destination}
             searchable
             code={values.deliveryDestinationId}
             onCodeChange={(code) => setValue('deliveryDestinationId', code)}
@@ -141,6 +145,7 @@ export function OrderHeader({ header, navigation, masters, today }: OrderHeaderP
             {...navigation.fieldProps('siteId')}
             listTitle="加工場所"
             options={masters.sites}
+            maxLength={CODE_LENGTHS.site}
             code={values.siteId}
             onCodeChange={(code) => setValue('siteId', code)}
             error={errors.siteId}
@@ -158,6 +163,7 @@ export function OrderHeader({ header, navigation, masters, today }: OrderHeaderP
               {...navigation.fieldProps('memberClass')}
               listTitle="部材区分"
               options={MEMBER_CLASS_OPTIONS}
+              maxLength={CODE_LENGTHS.memberClass}
               code={values.memberClass}
               onCodeChange={(code) => setValue('memberClass', code)}
               error={errors.memberClass}

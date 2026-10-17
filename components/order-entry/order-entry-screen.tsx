@@ -1,8 +1,9 @@
 'use client'
 
 // 受注登録画面の全体（docs/screen-design.md「受注登録画面」）。
-// ① 受注情報 → ② 注文内容 → ③ 伝票の指示 の 3 つの画面を、このページの中で切り替える。
-// 画面を移っても入力した内容は消えない（入力値は 3 つの画面で共通のフックが持つ）。
+// ① 受注情報 → ② 注文内容 の 2 つの画面を、このページの中で切り替える。
+// ② は明細の表の下にスタンプ・フリーコメントの帯を置き、② で登録する。
+// 画面を移っても入力した内容は消えない（入力値は 2 つの画面で共通のフックが持つ）。
 //
 //   入力値  : useOrderHeader（受注情報）・useOrderItems（明細）・useOrderAux（スタンプ・フリーコメント）
 //   計算    : useItemCalculations（重量。仕入単価も裏で計算するが画面には出さない）
@@ -16,17 +17,11 @@ import { createOrder } from '@/app/(main)/orders/new/actions'
 import { findCodeOption } from '@/lib/code-input/code-option'
 import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { DUE_DATE_TYPE_OPTIONS, MEMBER_CLASS_OPTIONS } from '@/lib/order-entry/constants'
-import { fieldNoteRows } from '@/lib/order-entry/field-note-rows'
 import { firstItemFieldId, itemFieldId, itemFieldOrder } from '@/lib/order-entry/item-row'
 import type { ItemFieldName } from '@/lib/order-entry/item-types'
 import type { OrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
 import { customerNoticesFor, orderNoticeConditions } from '@/lib/order-entry/notices'
-import {
-  SUBMIT_BUTTON_ID,
-  TO_INSTRUCTIONS_BUTTON_ID,
-  TO_ITEMS_BUTTON_ID,
-  type OrderEntryStep,
-} from '@/lib/order-entry/order-entry-steps'
+import { SUBMIT_BUTTON_ID, TO_ITEMS_BUTTON_ID, type OrderEntryStep } from '@/lib/order-entry/order-entry-steps'
 import { useDocumentPanel } from '@/lib/order-entry/use-document-panel'
 import { useItemCalculations } from '@/lib/order-entry/use-item-calculations'
 import { FREE_COMMENT_FIELD_ID, STAMP_CODE_FIELD_ID, useOrderAux } from '@/lib/order-entry/use-order-aux'
@@ -42,7 +37,6 @@ import { OrderSummary } from './order-summary'
 import { StepIndicator } from './step-indicator'
 import { AuxArea } from './support-area/aux-area'
 import { CustomerNoticeStrip } from './support-area/customer-notice-strip'
-import { FieldNoteList } from './support-area/field-note-list'
 
 type OrderEntryScreenProps = {
   masters: OrderEntryMasters
@@ -73,7 +67,8 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
 
   // スタンプ・フリーコメント。得意先を選ぶと、その得意先の指定スタンプにチェックが入る
   const aux = useOrderAux(masters.aux, header.customerId)
-  // 得意先の注意事項。得意先・切断方法・加工種別の条件がすべて受注に当てはまるものだけ
+  // 得意先の注意事項。得意先・切断方法・加工種別の条件がすべて受注に当てはまるものだけ。
+  // ② 注文内容の明細の上に出す
   const notices = customerNoticesFor(
     masters.aux.customerNotices,
     orderNoticeConditions(header.customerId, items.checks),
@@ -86,10 +81,8 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
   const [panelContainer, setPanelContainer] = useState<HTMLDivElement | null>(null)
   const panel = useDocumentPanel(panelContainer, initialPanelWidth, initialPanelOpen)
 
-  // ③ 伝票の指示の摘要の一覧（何も入力していない行は除く）
-  const noteRows = fieldNoteRows(items.rows, items.checks, masters.items, context)
-
-  // 画面ごとの入力順。今の画面の欄だけを並べ、最後は画面を進めるボタン
+  // 画面ごとの入力順。今の画面の欄だけを並べ、最後は画面を進めるボタン・登録ボタン。
+  // ② は 明細 →（最後の空の行で Enter）→ スタンプの番号 → フリーコメント → 登録
   const infoOrder = [...header.fieldOrder.filter((id) => id !== 'submit'), TO_ITEMS_BUTTON_ID]
   const itemsOrder = [
     ...items.rows.flatMap((row, index) => {
@@ -99,15 +92,11 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
         check.kind === 'material' ? check.resolved : { needsMaterial: false, steelMakingApplicable: false }
       return itemFieldOrder(row, flags, masters.items, context)
     }),
-    TO_INSTRUCTIONS_BUTTON_ID,
-  ]
-  const instructionsOrder = [
-    ...noteRows.map((row) => itemFieldId(row.key, 'fieldNote')),
     STAMP_CODE_FIELD_ID,
     FREE_COMMENT_FIELD_ID,
     SUBMIT_BUTTON_ID,
   ]
-  const fieldOrder = step === 'info' ? infoOrder : step === 'items' ? itemsOrder : instructionsOrder
+  const fieldOrder = step === 'info' ? infoOrder : itemsOrder
   const navigation = useFieldNavigation(fieldOrder)
 
   // 画面を開いたら、最初の欄（処理区分）にカーソルを置く
@@ -141,12 +130,6 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
     goTo('items', firstItemFieldId(items.rows[0]))
   }
 
-  // ② → ③。最初の摘要の欄（明細がなければスタンプの番号）へ移る
-  function goToInstructions() {
-    setStatus(null)
-    goTo('instructions', noteRows.length > 0 ? itemFieldId(noteRows[0].key, 'fieldNote') : STAMP_CODE_FIELD_ID)
-  }
-
   // 明細のエラーのある最初の欄の ID（② の入力順で探す）
   function firstItemErrorId(itemErrors: Record<string, Partial<Record<ItemFieldName, string>>>) {
     const errorIds = new Set<string>()
@@ -158,7 +141,7 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
     return itemsOrder.find((id) => errorIds.has(id)) ?? firstItemFieldId(items.rows[0])
   }
 
-  // 登録。①〜③ の入力をまとめて確認し、エラーがあればその画面に戻ってエラーの欄にカーソルを置く
+  // 登録。① ② の入力をまとめて確認し、エラーがあればその画面に戻ってエラーの欄にカーソルを置く
   function handleSubmit() {
     setStatus(null)
 
@@ -212,7 +195,7 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
     }
   }
 
-  // ②・③ の上部に出す受注情報の要約
+  // ② の上部に出す受注情報の要約
   const summary = [
     { label: '受注No.', value: '（登録時に採番）' },
     { label: '部材', value: findCodeOption(MEMBER_CLASS_OPTIONS, header.values.memberClass)?.label ?? '' },
@@ -272,24 +255,13 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
                 masters={masters.items}
                 processNotices={masters.aux.processNotices}
                 context={context}
-                finishFieldId={TO_INSTRUCTIONS_BUTTON_ID}
+                // 明細の最後の空の行で Enter を押したら、スタンプの番号の欄へ移る
+                finishFieldId={STAMP_CODE_FIELD_ID}
                 navigation={navigation}
                 onNotice={(text) => setStatus({ kind: 'info', text })}
               />
-            </>
-          )}
-
-          {step === 'instructions' && (
-            <>
-              <OrderSummary items={summary} onBackToInfo={backToInfo} />
-              <FieldNoteList rows={noteRows} items={items} navigation={navigation} />
-              <AuxArea
-                aux={aux}
-                notices={notices}
-                hasCustomer={header.customerId !== null}
-                showShotStamp={showShotStamp}
-                navigation={navigation}
-              />
+              {/* 明細の表の下に、スタンプとフリーコメントを横に並べた帯（高さを抑えて明細の行数を確保する） */}
+              <AuxArea aux={aux} showShotStamp={showShotStamp} navigation={navigation} />
             </>
           )}
         </div>
@@ -343,28 +315,6 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
             <>
               <button type="button" tabIndex={-1} onClick={backToInfo} className={secondaryButton}>
                 ← 受注情報に戻る
-              </button>
-              <button
-                ref={navigation.register(TO_INSTRUCTIONS_BUTTON_ID)}
-                type="button"
-                onClick={goToInstructions}
-                onKeyDown={(event) => handleButtonKeyDown(event, TO_INSTRUCTIONS_BUTTON_ID)}
-                className={primaryButton}
-              >
-                次へ →
-              </button>
-            </>
-          )}
-
-          {step === 'instructions' && (
-            <>
-              <button
-                type="button"
-                tabIndex={-1}
-                onClick={() => goTo('items', firstItemFieldId(items.rows[0]))}
-                className={secondaryButton}
-              >
-                ← 注文内容に戻る
               </button>
               <button
                 ref={navigation.register(SUBMIT_BUTTON_ID)}

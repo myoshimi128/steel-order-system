@@ -56,7 +56,6 @@ export function buildOrderItemPayload(
   item: ResolvedItem,
   calculation: ItemCalculation,
   lineNo: number,
-  fieldNote: string,
 ) {
   const { weight, price } = calculation
   if (
@@ -97,7 +96,8 @@ export function buildOrderItemPayload(
     cutting_unit_price: price.status === 'priced' ? price.unitPrice : null,
     price_unit: price.status === 'priced' ? price.priceUnit : null,
     manufacturer_specified_id: item.manufacturerId,
-    field_note: nullIfEmpty(fieldNote),
+    // 明細ごとの摘要は使わない（伝えたいことは受注のフリーコメントに書く）。列は残し、NULL を入れる
+    field_note: null,
   }
 }
 
@@ -105,7 +105,7 @@ export function buildOrderItemPayload(
 // 材料の行の payload の processes に入れ、create_order で母材の id を付けて登録する。
 // 入力がそろっていない行（加工方法・項目・数量・単位がない）は null を返す。
 // 穴・曲げの数量は、呼び出し側で母材の枚数を渡して解釈し直した値（resolveProcessRow）を使う
-export function buildProcessPayload(process: ResolvedProcess, lineNo: number, remarks: string) {
+export function buildProcessPayload(process: ResolvedProcess, lineNo: number) {
   if (!process.processTypeId || !process.spec || process.quantity === null || !process.priceUnit) {
     return null
   }
@@ -121,7 +121,8 @@ export function buildProcessPayload(process: ResolvedProcess, lineNo: number, re
     // 仕入単価が空欄なら単価未定（NULL）のまま登録する
     unit_price: process.unitPrice,
     price_unit: process.priceUnit,
-    remarks: nullIfEmpty(remarks),
+    // 加工の行の摘要も使わない（材料の行の field_note と同じ）。列は残し、NULL を入れる
+    remarks: null,
   }
 }
 
