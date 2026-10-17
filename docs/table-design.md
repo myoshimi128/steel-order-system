@@ -27,8 +27,9 @@
 | `process_notices` | 加工の注意事項。加工種別（必須）と、板厚・穴径の範囲（任意）の条件で、加工の行の下に表示する |
 | `stamps` | 現場用伝票に印字するスタンプ文言 |
 | `customer_stamps` | 得意先ごとに既定でチェックするスタンプ |
-| `users` | ユーザー。ロールを含む |
+| `users` | ユーザー。ロール・部署・営業所を含む |
 | `delivery_methods` | 配達方法（宵積み / 2便 / 置場引取 など） |
+| `sites` | 営業所（本社 / A営業所 / B営業所）。加工場所とユーザーの所属。docs/intake/table-design.md |
 
 ### トランザクション系
 
@@ -39,12 +40,28 @@
 | `order_item_processes` | 加工明細（材料に紐づく加工） |
 | `shipments` | 出荷実績 |
 | `shipment_items` | 出荷明細 |
-| `attachments` | 添付ファイル（注文書 PDF・DXF） |
+| `attachments` | 添付ファイル。**廃止**（`intake_files` に一本化。後述） |
 | `order_stamps` | 受注に付けたスタンプ |
+
+### 受付〜受注登録待ち
+
+受付・振り分け・CAD・受注登録待ち・通知・目安納期のテーブルは、docs/intake/table-design.md に定義する。
+
+| テーブル | 内容 |
+| --- | --- |
+| `intakes` | 受付（メール・FAX・口頭の 1 件）。受注情報の初期値を持つ |
+| `intake_destinations` | 受付の入れ先（複数） |
+| `intake_site_changes` | 加工場所の変更履歴 |
+| `work_units` | 加工区分（先寸 / アイトレ）。受注登録待ち・CAD の 1 行 |
+| `intake_files` | ファイル（注文書 PDF・DXF・CSV）。受注に関わるファイルはすべてここに持つ |
+| `notifications` / `notification_reads` | 通知と既読 |
+| `lead_time_items` / `lead_time_messages` / `lead_time_history` | 目安納期 |
 
 ### Phase2 で追加予定
 
-`packages`（梱包）、`mill_sheets`（ミルシート）、`trading_companies`（商社）、`carriers`（運送会社）、`work_locations`（加工場所）、`order_comments`（納期変更・注文変更のやり取り）
+`packages`（梱包）、`mill_sheets`（ミルシート）、`trading_companies`（商社）、`carriers`（運送会社）、`order_comments`（納期変更・注文変更のやり取り）
+
+加工場所は `sites`（営業所）として MVP で追加した。
 
 ## マスタテーブル定義
 
@@ -323,12 +340,16 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK。Supabase Auth の user id |
-| `employee_no` | text | 社員番号 |
+| `employee_no` | text | 社員番号（社員No.）。一意。ログインに使う |
 | `name` | text | 氏名 |
 | `role` | text | ロール。`office` / `factory` / `admin` |
+| `department` | text | 部署。`sales` 営業部 / `processing` 加工部 / `shearing` シャーリング部 / `delivery` 配送部 / `general` 経理・総務。通知の宛先に使う |
+| `site_id` | uuid | FK → `sites`。所属する営業所。受付登録の加工場所の初期値と、ヘッダーの表示（「本社シャーリング部」）に使う |
 | `is_active` | boolean | 有効フラグ |
 
-`factory`（現場）は MVP では運用しないが、ロールの枠組みとして定義しておく。
+`factory`（現場）は MVP では運用しないが、ロールの枠組みとして定義しておく。権限はロールで決め、部署・営業所では決めない。
+
+ログインは社員No. で行う。Supabase Auth のユーザーは `{社員No. を小文字にしたもの}@staff.invalid` のメールアドレスで作成し、ログイン画面は打たれた社員No. からこのメールアドレスを作って認証する（basic-design.md「ログイン」）。`auth.users` の作成時に `public.users` の行を作るトリガー（`handle_new_auth_user`）で、メールアドレスの `@` より前を大文字にして `employee_no` に入れる。
 
 ### notices（得意先の注意事項）
 
@@ -426,7 +447,13 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `order_no` | text | 受注番号。年 2 桁 + 年内の連番 5 桁（例: 2600001）で自動採番。一意 |
+| `order_no` | text | 受注番号。受付No.＋枝番（例: `26-1003-1`）。`create_order` の中で採番する。一意 |
+| `intake_id` | uuid | FK → `intakes`。受付。NOT NULL（受注はすべて受付を通す） |
+| `work_unit_id` | uuid | FK → `work_units`。どの加工区分から起票したか。NOT NULL。受付と同じ受付の加工区分に限る（`(work_unit_id, intake_id)` の複合外部キー） |
+| `branch_no` | integer | 枝番。`intake_id` + `branch_no` で一意 |
+| `member_class` | text | 部材区分。`NONE`（無分類）/ `DF` / `GPL` / `BH` / `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注** |
+| `site_id` | uuid | FK → `sites`。加工場所。出荷待ちを加工場所ごとに分けるのに使う。NOT NULL |
+| `staff_id` | uuid | FK → `users`。担当者（自社）。画面の初期値はログイン中のユーザーで、変更できる。加工指示書に印字する |
 | `order_date` | date | 受注日。登録日を初期値とし、必要な場合のみ変更する |
 | `customer_id` | uuid | FK → `customers`。売り先（得意先） |
 | `customer_contact` | text | 担当者（客先担当）。得意先側の窓口担当者 |
@@ -435,11 +462,10 @@
 | `due_date_type` | text | 納期種別。`確定` / `仮納期` / `後報` / `最短出荷` |
 | `due_date` | date | 納期。`後報` `最短出荷` では NULL |
 | `status` | text | `加工待ち` / `出荷待ち` / `配送依頼済み` / `完了` |
-| `created_by` | uuid | FK → `users`。起案者 |
+| `created_by` | uuid | FK → `users`。登録の操作をした人（記録用。担当者 `staff_id` とは別に、変更できない値として残す） |
 | `remarks` | text | 摘要 |
 | `field_note` | text | 現場用伝票に印字するフリーコメント |
 | `created_at` / `updated_at` | timestamptz |  |
-| `is_splice` | boolean | スプライス専用の受注か。既定 false。画面では番号の欄（0 通常 / 1 スプライス）で入力する |
 | `deleted_at` | timestamptz | 論理削除した日時。NULL は有効な受注 |
 | `joint_no` | text | 継手番号（任意。10 文字以内）。スプライス専用の受注のみ |
 | `splice_shot` | boolean | ショット加工の有無。スプライス専用の受注のみ。明細の仕入単価（`special_product_prices.has_shot`）の引き当てと、「ショット加工」の印字に使う |
@@ -448,11 +474,11 @@
 
 **スプライス専用の受注**
 
-スプライスは通常の明細と混ざることがないため、受注単位（`is_splice`）で切り替える。スプライス専用の受注では、明細はすべて `special_product_types.is_splice_order_type` が true の種別になり、ショットの有無も受注単位（`splice_shot`）で持つ。
+スプライスは通常の明細と混ざることがないため、受注単位で切り替える。部材区分が `SPL` の受注がスプライス専用の受注である。以前はスプライスの印（`is_splice`）を部材区分とは別に持っていたが、両者が食い違わないよう部材区分にまとめ、`is_splice` は廃止する。スプライス専用の受注では、明細はすべて `special_product_types.is_splice_order_type` が true の種別になり、ショットの有無も受注単位（`splice_shot`）で持つ。
 
 `splice_shot` が true の受注は、現場用伝票に「ショット加工」を目立つ位置に印字する。これは `order_stamps` には保存せず `splice_shot` から印字する。ショットの有無とスタンプを別々に持つと、両者が食い違うおそれがあるためである。
 
-チェック制約として、`is_splice` が false のときは `joint_no` と `splice_shot` を NULL とし、true のときは `splice_shot` を必須とする。`joint_no` は任意で、入力する場合は 1〜10 文字とする（空欄は NULL で保存する）。当初は 4〜6 文字の必須としていたが、長い継手番号があり、継手番号のない受注もあるため変更した（`supabase/migrations/20261001100100_optional_joint_no_and_same_as_customer_destination.sql`）。
+チェック制約として、`member_class` が `SPL` 以外のときは `joint_no` と `splice_shot` を NULL とし、`SPL` のときは `splice_shot` を必須とする。`joint_no` は任意で、入力する場合は 1〜10 文字とする（空欄は NULL で保存する）。当初は 4〜6 文字の必須としていたが、長い継手番号があり、継手番号のない受注もあるため変更した（`supabase/migrations/20261001100100_optional_joint_no_and_same_as_customer_destination.sql`）。
 
 **論理削除**
 
@@ -466,15 +492,14 @@
 
 **受注番号の採番**
 
-受注番号は「年 2 桁 + 年内の連番 5 桁」（例: 2026 年の 1 件目は `2600001`）とし、現行の受注番号と同じ形式にする。受注登録画面で受注を呼び出すときにテンキーで入力するため、数字だけにしている。
+受注番号は「受付No.＋枝番」（例: 受付 `26-1003` の 1 件目の受注は `26-1003-1`）とする。受注はすべて受付を通すため、どの受注も受付No. を持つ。受注番号の欄ではハイフンを入力できるようにする（screen-design.md「キー操作」）。
 
-- 年ごとの「最後に使った連番」を採番テーブル `private.order_no_counters` に持ち、採番関数 `private.next_order_no()` で連番を 1 進めて番号を返す
-- `order_no` の初期値（default）をこの関数にしているため、アプリは `order_no` を指定せずに登録すれば番号が入る
-- 年は登録した日（日本時間）の年とする。列の初期値の関数からは同じ行の受注日を参照できないためである
-- 同時に登録されても番号が重複しないよう、採番テーブルの行をロックして連番を進める。登録が失敗して取り消された場合は連番も取り消されるため、番号は飛ばない
-- 採番テーブルと採番関数は、Data API で公開していない `private` スキーマに置く。ブラウザから直接呼ばれて番号が飛ぶことを防ぐためである
+- 枝番は受付ごとの連番。受付の `intakes.last_branch` を 1 進めて番号を返す採番関数 `private.issue_order_branch()` を、`create_order` の中から呼ぶ
+- 同時に登録されても枝番が重複しないよう、受付の行をロックして連番を進める。受注の登録と同じ transaction で行うため、登録が失敗すると枝番も取り消される
+- 採番関数は、Data API で公開していない `private` スキーマに置く。ブラウザから直接呼ばれて番号が飛ぶことを防ぐためである
+- 受付No. の採番は docs/intake/table-design.md「番号」を参照
 
-実装は `supabase/migrations/20260930100000_add_order_no_numbering.sql` を参照。
+以前は「年 2 桁 + 年内の連番 5 桁」（例: `2600001`）を、`orders.order_no` の初期値の採番関数 `private.next_order_no()` で採番していた（`supabase/migrations/20260930100000_add_order_no_numbering.sql`）。受付No.＋枝番に切り替えるマイグレーションで、この初期値・採番関数・採番テーブル（`private.order_no_counters`）を削除する。切り替えの前に登録したテストデータの受注は削除する。
 
 **受注の登録（create_order）**
 
@@ -483,8 +508,9 @@
 - 引数はそれぞれ `orders`・`order_items` の列名をキーにした JSON（明細は配列で 1 件以上）
 - 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）。加工の項目（`spec_fields`）も JSON のまま受け取って登録する
 - ヘッダーの JSON に、フリーコメント（`field_note`）と、チェックしたスタンプの id の配列（`stamp_ids`）を持つ。明細の後に `order_stamps` に登録する（スプライス専用の受注の「ショット加工」は含めない）
+- ヘッダーの JSON に、受付（`intake_id`）・加工区分（`work_unit_id`）・部材区分（`member_class`）・加工場所（`site_id`）・担当者（`staff_id`）を持つ。受注の insert の前に `private.issue_order_branch()` で枝番を採番し、受注番号を決める。加工場所が受付と違えば、受付の加工場所も更新する（docs/intake/table-design.md「関数」）。この変更は受付のテーブルを作るマイグレーションと合わせて行う
 - `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
-- 起案者（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
+- 登録の操作をした人（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
 - 実行権限は `authenticated` にだけ付与する
 
@@ -525,7 +551,7 @@
 
 重量は角重量と実重量を分けて保持する。請求は角重量で行い（材料としては四角で消費するため）、配送依頼には実重量を用いる。寸法切は両者が一致し、ベタ丸・ドーナツは外径・内径から両方を算出する。アイトレの実重量は受注入力では扱わず、送り状発行の画面で必要な行だけ手入力する。
 
-画面の「区分」（寸法切 / アイトレ / 定尺 / 加工 / ササラ / ベタ丸 / ドーナツ）は 1 つの番号の欄だが、保存時は `cutting_method`・`cutting_type`・`special_product_type_id`・`plate_size` に振り分ける（加工は `order_item_processes` の行になる）。スプライスは区分ではなく受注単位（`orders.is_splice`）で扱う。振り分けの対応は screen-design.md「受注登録画面」を参照。
+画面の「区分」（寸法切 / アイトレ / 定尺 / 加工 / ササラ / ベタ丸 / ドーナツ）は 1 つの番号の欄だが、保存時は `cutting_method`・`cutting_type`・`special_product_type_id`・`plate_size` に振り分ける（加工は `order_item_processes` の行になる）。スプライスは区分ではなく受注単位（部材区分 `orders.member_class = 'SPL'`）で扱う。振り分けの対応は screen-design.md「受注登録画面」を参照。
 
 `product_id` は必須のため、商品マスタに該当がない板厚（取り扱いのない板厚）の明細は登録できない。受注登録画面では警告を出して登録させない。
 
@@ -597,7 +623,9 @@
 
 分割出荷は出荷実績を積み上げることで表現する。残数量はカラムを持たず「受注数量 − 出荷実績の合計」として算出する。
 
-### attachments（添付ファイル）
+### attachments（添付ファイル）【廃止】
+
+**このテーブルは使わない。** 注文書・図面・CSV は受付の時点で `intake_files` に保存し、受注からは受付（`orders.intake_id`）・加工区分（`orders.work_unit_id`）を通してたどる（docs/intake/table-design.md「intake_files」）。ファイルの置き場所を 1 つにし、受付と受注で同じファイルを別々に持たないためである。参照しているコードを外したあとのマイグレーションでテーブルを削除する。以下は廃止前の定義の記録である。
 
 | カラム | 型 | 説明 |
 | --- | --- | --- |
@@ -628,6 +656,9 @@ FAX で届いた注文書も、CAD データから出力した CSV を印刷し�
 ## リレーション
 
 ```
+intakes（受付）──< work_units（加工区分）──< orders     ← docs/intake/table-design.md
+   └─< intake_files（注文書・図面・CSV）
+
 customers ──┐
             ├─< orders ──< order_items ──< order_item_processes
 delivery_   ┘      │            │                    │
@@ -637,10 +668,10 @@ destinations       │            │                    └── process_types
                    │            └── special_product_types
                    │
                    ├─< shipments ──< shipment_items ──> order_items
-                   ├─< attachments
                    ├─< order_stamps ──> stamps
                    ├── delivery_methods （配達）
-                   └── users （created_by）
+                   ├── sites （加工場所）
+                   └── users （staff_id 担当者 / created_by 登録した人）
 
 customers ──< customer_stamps >── stamps
 notices   ──> customers（必須）/ process_types（任意）
@@ -664,7 +695,9 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `orders` | `shipments` | 1 : N | 分割出荷のため複数回 |
 | `shipments` | `shipment_items` | 1 : N | 1 回の出荷で複数明細 |
 | `order_items` | `shipment_items` | 1 : N | 1 明細が複数回に分けて出荷される |
-| `orders` | `attachments` | 1 : N | 注文書 PDF・DXF |
+| `intakes` | `orders` | 1 : N | 1 受付から複数の受注（枝番） |
+| `work_units` | `orders` | 1 : N | 1 加工区分から複数の受注 |
+| `intakes` | `intake_files` | 1 : N | 注文書 PDF・DXF・CSV |
 
 ### 参照の考え方
 
@@ -683,7 +716,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `plate_types` / `materials` / `special_product_types` / `process_types` | 番号の列 `number`（integer、一意）を追加 |
 | `special_product_types` | `is_splice_order_type`（スプライス専用の受注で使う種別か）を追加 |
 | `delivery_methods` | 配達方法マスタを新規作成 |
-| `orders` | `is_splice` / `joint_no` / `splice_shot` / `delivery_method_id` / `delivery_method_note` / `deleted_at` を追加 |
+| `orders` | `is_splice` / `joint_no` / `splice_shot` / `delivery_method_id` / `delivery_method_note` / `deleted_at` を追加（`is_splice` は受付の統合で部材区分 `member_class` にまとめて廃止） |
 | `order_item_processes` | `price_unit`（個 / kg）を追加 |
 | `customers` / `delivery_destinations` | `code` を数字のみに制限するチェック制約を追加（既存データが数字のみであることを確認してから）。`delivery_destinations` はさらに `0` を禁止（「0 売り先と同じ」に使うため） |
 | `orders` | `delivery_destination_id` を NULL 可に変更（NULL は売り先と同じ） |
@@ -694,7 +727,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 番号の持ち方は、選択肢の性質で分ける。
 
 - 今後増える可能性がある選択肢（種類・材質・特殊製品種別・加工種別・配達方法）は、マスタの `number` 列で持つ
-- 固定の選択肢（処理区分・切断方法・区分・製鋼法・納期種別・定尺サイズ）の番号は、アプリ側の定数で持つ。DB に保存するのは番号ではなく値（例: `cutting_method` は `ガス`）とし、番号は画面の入力にだけ使う
+- 固定の選択肢（処理区分・切断方法・区分・製鋼法・納期種別・定尺サイズ・部材区分）の番号は、アプリ側の定数で持つ。DB に保存するのは番号ではなく値（例: `cutting_method` は `ガス`）とし、番号は画面の入力にだけ使う
 
 メーカーは既存の `manufacturers.code`（メーカーコード）を番号として使う。「0 指定なし」はマスタの行ではなく、`manufacturer_specified_id` を NULL にすることを表す。
 
@@ -729,7 +762,10 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `process_types.input_shape` は入力の形の値の一覧に限る。`order_item_processes.spec_fields` は NULL か JSON オブジェクト
 - `customers` `delivery_destinations` `manufacturers` の `code` は数字のみ（`delivery_destinations` はさらに `0` を禁止。`manufacturers` はさらに `0` を禁止し、一意制約）
 - `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス）
-- `orders` のスプライス関連の列（`is_splice` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
+- `orders` のスプライス関連の列（`member_class` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
+- `orders.member_class` は部材区分の値（`NONE` `DF` `GPL` `BH` `SPL`）に限る
+- `orders` の `intake_id` + `branch_no` に一意制約。`work_unit_id` は同じ受付の加工区分に限る
+- `users.employee_no` に一意制約
 - `shipment_items.quantity` に正数チェック
 - 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
 - `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須
@@ -744,7 +780,11 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `order_items` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
 | `order_item_processes` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
 | `shipments` / `shipment_items` | 参照・登録・更新 | 参照不可 | すべて |
-| `attachments` | 参照・登録・更新 | 参照不可 | すべて |
+| `attachments`（廃止） | 参照・登録・更新 | 参照不可 | すべて |
+| 受付のテーブル（`intakes` `intake_destinations` `work_units` `intake_files` など） | 参照・登録・更新 | 参照不可 | すべて |
+| `sites` | 参照 | 参照 | すべて |
+| 目安納期（`lead_time_items` など） | 参照・登録・更新 | 参照 | すべて |
+| `notifications` | 自分の部署の行を参照 | 自分の部署の行を参照 | 自分の部署の行を参照 |
 | `order_stamps` | 参照・登録・更新 | 参照 | すべて |
 | `users` | 参照 | 参照 | すべて |
 | 価格系マスタ（`cutting_prices` `material_extras` `thickness_extras` `large_plate_extras` `standard_plate_prices` `special_product_prices`） | 参照不可（価格マスタの行を取り出す関数で、明細の計算に必要な行だけ取得可） | 参照不可 | すべて |
@@ -755,7 +795,8 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `order_item_processes` の `unit_price`（加工単価）は `order_items` の単価列と同じ性質の情報のため、同様に現場からは隠す。
 - `shipments` / `shipment_items`（送り状）と `attachments`（注文書ファイル）は、送り状発行・ファイル管理のいずれも事務の業務であり現場の業務範囲に含まれないため、現場は参照不可とする。
 - `order_stamps` は現場用伝票にそのまま印字される内容であり、単価情報のような機密性もないため、現場にも参照を許可する。
-- `users` は起案者・出荷担当者などの氏名表示にどのロールからも参照できる必要があるため参照は全ロールに許可し、登録・更新は管理者のみとする。
+- 受付のテーブルの詳細（削除の扱い、トリガーだけが書くテーブルなど）は docs/intake/table-design.md「RLS・権限・Realtime・Storage」を参照。受付の作業は事務所の業務であり、現場の業務範囲に含まれないため、現場は参照不可とする。
+- `users` は担当者・出荷担当者などの氏名表示にどのロールからも参照できる必要があるため参照は全ロールに許可し、登録・更新は管理者のみとする。
 - 価格体系の再設計（切断単価・各種エキストラ・定尺単価・特殊製品単価）により `prices` は廃止されたが、単価情報を現場に見せないという方針自体は変わらないため、価格系の新テーブルすべてに同じ制限を引き継ぐ。`plate_types`（種類）・`special_product_types`（特殊製品種別）・`unit_weights`（単位質量）は単価そのものではなく分類・物理量の参照データのため、他のマスタ同様に全ロール参照可とする。
 
 ### 価格マスタの権限と単価計算
@@ -844,4 +885,4 @@ DB の関数は `security definer`（関数所有者の権限で実行）とし�
 
 **拠点間の横持ち**
 
-複数拠点を持つ事業所では、拠点間で材料を移動する「横持ち」が発生する。MVP は単一拠点の鋼板切断部門に閉じているため扱わないが、拠点間連携を実装する際は出荷実績に発地・着地の情報が必要になる。
+複数拠点を持つ事業所では、拠点間で材料を移動する「横持ち」が発生する。MVP では加工場所（営業所）を受付・受注に持つが、拠点間の材料の移動は扱わない。拠点間連携を実装する際は出荷実績に発地・着地の情報が必要になる。
