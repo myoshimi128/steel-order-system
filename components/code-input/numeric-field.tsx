@@ -25,9 +25,6 @@ type NumericFieldProps = {
   allowDecimal?: boolean
   // 入力欄の幅（Tailwind のクラス）
   widthClass?: string
-  // 欄全体（見出し＋入力欄）に付けるクラス。
-  // 並んだ欄の幅を、置き場所の広さに合わせて伸び縮みさせるとき（flex-1 と最小・最大の幅）に使う
-  className?: string
   // エラーの文章を欄の下に出すか（明細の行では false にし、行の下にまとめて出す）
   showErrorText?: boolean
 }
@@ -43,7 +40,6 @@ export function NumericField({
   onPrevious,
   allowDecimal = false,
   widthClass = 'w-20',
-  className = '',
   showErrorText = true,
 }: NumericFieldProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -66,7 +62,7 @@ export function NumericField({
   }
 
   return (
-    <div className={`flex items-center gap-1 ${className}`}>
+    <div className="flex items-center gap-1">
       {label && (
         <label htmlFor={id} className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400">
           {label}

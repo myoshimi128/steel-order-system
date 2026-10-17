@@ -24,9 +24,7 @@ export function CircleDimensions({ withInnerDiameter, ...props }: CircleDimensio
         onValueChange={(value) => onChange('outerDiameter', value)}
         error={errors.outerDiameter}
         allowDecimal
-        // 品名の欄の幅に合わせて伸び縮みする（見出し「外径」などを含めて最小 92px〜最大 160px）
-        className="min-w-[5.75rem] max-w-40 flex-1"
-        widthClass="min-w-0 flex-1"
+        widthClass="w-[4.25rem]"
         showErrorText={false}
       />
       {withInnerDiameter && (
@@ -39,9 +37,7 @@ export function CircleDimensions({ withInnerDiameter, ...props }: CircleDimensio
             onValueChange={(value) => onChange('innerDiameter', value)}
             error={errors.innerDiameter}
             allowDecimal
-            // 品名の欄の幅に合わせて伸び縮みする（見出し「外径」などを含めて最小 92px〜最大 160px）
-        className="min-w-[5.75rem] max-w-40 flex-1"
-        widthClass="min-w-0 flex-1"
+            widthClass="w-[4.25rem]"
             showErrorText={false}
           />
         </>

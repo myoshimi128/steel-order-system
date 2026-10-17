@@ -18,9 +18,7 @@ export function RectangleDimensions(props: DimensionInputProps) {
         onValueChange={(value) => onChange('width', value)}
         error={errors.width}
         allowDecimal
-        // 品名の欄の幅に合わせて伸び縮みする（最小 72px〜最大 128px）
-        className="min-w-[4.5rem] max-w-32 flex-1"
-        widthClass="min-w-0 flex-1"
+        widthClass="w-[5.5rem]"
         showErrorText={false}
       />
       <span className="text-neutral-400">×</span>
@@ -30,9 +28,7 @@ export function RectangleDimensions(props: DimensionInputProps) {
         onValueChange={(value) => onChange('length', value)}
         error={errors.length}
         allowDecimal
-        // 品名の欄の幅に合わせて伸び縮みする（最小 72px〜最大 128px）
-        className="min-w-[4.5rem] max-w-32 flex-1"
-        widthClass="min-w-0 flex-1"
+        widthClass="w-[5.5rem]"
         showErrorText={false}
       />
     </>
