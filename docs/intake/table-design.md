@@ -31,7 +31,7 @@ lead_time_items / lead_time_messages / lead_time_history（目安納期）
 | `intake_files` | 新規 | ファイルの情報（実体は Storage）。受注に関わるファイルはすべてここに持つ |
 | `notifications` / `notification_reads` | 新規 | 新着の通知と既読 |
 | `lead_time_items` / `lead_time_messages` / `lead_time_history` | 新規 | 目安納期・部署メッセージ・更新履歴 |
-| `orders` | **既存を変更** | 受付との紐付け・部材区分・加工場所・担当者を追加。受注No. の形式を変更。`is_splice` を部材区分にまとめる |
+| `orders` | **既存を変更** | 受付との紐付け・加工場所・担当者を追加。受注No. の形式を変更（部材区分の追加と `is_splice` の廃止は、受注登録画面の作り直しの PR で先に行う） |
 | `users` | **既存を変更** | 部署・営業所を追加。社員No. を一意に |
 | `attachments` | **既存を廃止** | `intake_files` に一本化する |
 | `work_unit_queue_view` | 新規ビュー | 受注登録待ち・CAD の一覧用 |
@@ -249,7 +249,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | intake_id | uuid | 受付。NOT NULL（受注はすべて受付を通す） |
 | work_unit_id | uuid | どの加工区分から起票したか。NOT NULL。`(work_unit_id, intake_id)` → `work_units(id, intake_id)` |
 | branch_no | integer | 枝番。`(intake_id, branch_no)` で一意 |
-| member_class | text | 部材区分。`NONE` `DF` `GPL` `BH` `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注**（`is_splice` は廃止） |
+| member_class | text | 部材区分。`NONE` `DF` `GPL` `BH` `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注**（`is_splice` は廃止）。受注登録画面の作り直しの PR で追加済み（このマイグレーションでは扱わない） |
 | site_id | uuid | 加工場所（出荷待ちの振り分けに使う）。NOT NULL |
 | staff_id | uuid | 担当者（自社）。FK → `users`。画面の初期値はログイン中のユーザー。NOT NULL |
 | order_no | text | 既存の列。`{受付No.}-{枝番}` を `create_order` の中で入れる。`private.next_order_no()` の初期値は外す |
@@ -274,7 +274,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | `add_work_unit(intake_id, kind, origin, note) → uuid` | 受注登録待ちに追加（見落とし・口頭など）。振り分け完了後のみ。`closed` なら `dispatched` に戻す |
 | `private.issue_order_branch(intake_id) → (branch_no, order_no)` | 受注No. の枝番を採番する。`create_order` の中からだけ呼ぶ。`security definer` |
 | `complete_work_unit(work_unit_id)` | 起票完了（`ready` → `done`） |
-| `create_order(p_order, p_items)`（本体・変更） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`member_class`・`site_id`・`staff_id` を受け取る。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
+| `create_order(p_order, p_items)`（本体・変更） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
 
 `private` の関数以外は `security invoker`（呼び出したユーザーの権限で実行）とし、RLS をそのまま効かせる。
 
