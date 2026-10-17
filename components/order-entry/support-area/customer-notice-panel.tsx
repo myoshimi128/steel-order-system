@@ -1,4 +1,4 @@
-// 補助エリアの「得意先の注意事項」の枠（表示のみ。受注には保存しない）。
+// ③ 伝票の指示の「得意先の注意事項」の枠（表示のみ。受注には保存しない）。
 // 得意先・切断方法・加工種別のうち、指定した条件がすべて受注に当てはまった注意事項だけを出す
 // （絞り込みは lib/order-entry/notices.ts）。各注意事項には、どの条件で表示されたかの印を付ける。
 
@@ -22,7 +22,7 @@ export function CustomerNoticePanel({ notices, hasCustomer }: CustomerNoticePane
         <ul className="flex flex-col gap-1.5">
           {notices.map((notice) => (
             <li key={notice.id} className="flex items-start gap-2 text-sm">
-              <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+              <span className="shrink-0 rounded bg-attention-soft px-1.5 py-0.5 text-[11px] font-semibold text-attention">
                 {notice.label}
               </span>
               <span className="whitespace-pre-wrap">{notice.body}</span>

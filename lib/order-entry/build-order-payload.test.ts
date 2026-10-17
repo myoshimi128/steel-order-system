@@ -19,8 +19,7 @@ describe('buildOrderItemPayload', () => {
   it('寸法切は切断方法・切断区分・縦横を保存し、実重量は角重量と同じ', () => {
     expect(
       payloadOf({
-        cuttingMethod: '3',
-        region: '1',
+        cutRegion: '41',
         material: '0',
         thickness: '9',
         width: '100',
@@ -47,7 +46,7 @@ describe('buildOrderItemPayload', () => {
 
   it('定尺売りは切断方法 NULL・定尺サイズを保存する', () => {
     expect(
-      payloadOf({ cuttingMethod: '9', region: '3', material: '0', thickness: '6', plateSize: '3', quantity: '1' }),
+      payloadOf({ cutRegion: '71', material: '0', thickness: '6', plateSize: '3', quantity: '1' }),
     ).toMatchObject({
       cutting_method: null,
       cutting_type: null,
@@ -61,7 +60,7 @@ describe('buildOrderItemPayload', () => {
 
   it('ベタ丸は特殊製品種別と外径を保存し、切断区分は NULL', () => {
     expect(
-      payloadOf({ cuttingMethod: '3', region: '7', material: '0', thickness: '9', outerDiameter: '300', quantity: '10' }),
+      payloadOf({ cutRegion: '47', material: '0', thickness: '9', outerDiameter: '300', quantity: '10' }),
     ).toMatchObject({
       cutting_type: null,
       special_product_type_id: 'sp-betamaru',
@@ -73,19 +72,19 @@ describe('buildOrderItemPayload', () => {
 
   it('別途見積もりは仕入単価を NULL で保存する', () => {
     expect(
-      payloadOf({ cuttingMethod: '2', region: '1', material: '0', thickness: '28', width: '80', length: '80', quantity: '5' }),
+      payloadOf({ cutRegion: '21', material: '0', thickness: '28', width: '80', length: '80', quantity: '5' }),
     ).toMatchObject({ cutting_unit_price: null, price_unit: null, product_id: 'p-ss400-28-large' })
   })
 
   it('切断単価が登録されていない別途見積もりの行も、重量を保存する', () => {
     expect(
-      payloadOf({ cuttingMethod: '2', region: '1', material: '0', thickness: '9', width: '100', length: '200', quantity: '10' }),
+      payloadOf({ cutRegion: '21', material: '0', thickness: '9', width: '100', length: '200', quantity: '10' }),
     ).toMatchObject({ cutting_unit_price: null, square_weight: 1.413, actual_weight: 1.413 })
   })
 
   it('スプライスのアイトレは別途見積もりで、切断区分と角重量を保存する', () => {
     const resolved = resolveItemRow(
-      itemRow({ cuttingMethod: '2', region: '2', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }),
+      itemRow({ cutRegion: '22', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }),
       ITEM_MASTERS,
       { isSplice: true, spliceShot: true },
     )
@@ -102,7 +101,7 @@ describe('buildOrderItemPayload', () => {
 
   it('スプライスの寸法切は、実重量に角重量と同じ値を保存する', () => {
     const resolved = resolveItemRow(
-      itemRow({ cuttingMethod: '2', region: '1', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }),
+      itemRow({ cutRegion: '21', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }),
       ITEM_MASTERS,
       { isSplice: true, spliceShot: true },
     )
@@ -115,7 +114,7 @@ describe('buildOrderItemPayload', () => {
 
   it('ショットが未入力（単価が未確定）の行は保存用のデータを作らない', () => {
     const resolved = resolveItemRow(
-      itemRow({ cuttingMethod: '2', region: '1', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }),
+      itemRow({ cutRegion: '21', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }),
       ITEM_MASTERS,
       { isSplice: true, spliceShot: null },
     )
@@ -123,7 +122,7 @@ describe('buildOrderItemPayload', () => {
   })
 
   it('入力がそろっていない行は保存用のデータを作らない', () => {
-    expect(payloadOf({ cuttingMethod: '3', region: '1' })).toBeNull()
+    expect(payloadOf({ cutRegion: '41' })).toBeNull()
   })
 })
 

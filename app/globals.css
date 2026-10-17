@@ -35,6 +35,9 @@
   --color-navy-soft: #e8edf4;
   /* 至急・要相談・重要・必須の印と、入力のエラーにだけ使う赤 */
   --color-urgent: #c0392b;
+  /* 初期値と違う値の強調（高炉の指定・メーカー指定・縞板など）。赤（至急・エラー）と区別できるオレンジ系 */
+  --color-attention: #b45309;
+  --color-attention-soft: #fff4e5;
   /* 画面の地の色（白いカードの外側の薄いグレー） */
   --color-canvas: #f5f6f8;
   /* 区切り線 */

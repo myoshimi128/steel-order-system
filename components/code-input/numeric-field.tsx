@@ -25,6 +25,10 @@ type NumericFieldProps = {
   allowDecimal?: boolean
   // 入力欄の幅（Tailwind のクラス）
   widthClass?: string
+  // 空欄のときに薄く出す文字（欄の見出しを付けられない狭い場所で、何を入れる欄かを示す。例: 外径）
+  placeholder?: string
+  // 詰めた表示（内側の余白を小さくする）。受注登録の明細の表で使う
+  dense?: boolean
   // エラーの文章を欄の下に出すか（明細の行では false にし、行の下にまとめて出す）
   showErrorText?: boolean
 }
@@ -40,6 +44,8 @@ export function NumericField({
   onPrevious,
   allowDecimal = false,
   widthClass = 'w-20',
+  placeholder,
+  dense = false,
   showErrorText = true,
 }: NumericFieldProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -79,7 +85,8 @@ export function NumericField({
           onChange={(event) => handleChange(event.target.value)}
           onKeyDown={handleKeyDown}
           aria-invalid={error !== undefined}
-          className={`w-full rounded border px-2 py-1.5 text-right tabular-nums outline-none focus:bg-blue-50 dark:bg-neutral-900 dark:focus:bg-blue-950 ${
+          placeholder={placeholder}
+          className={`w-full rounded border ${dense ? 'px-1 py-1' : 'px-2 py-1.5'} text-right placeholder:text-left placeholder:text-xs placeholder:text-neutral-400 tabular-nums outline-none focus:bg-blue-50 dark:bg-neutral-900 dark:focus:bg-blue-950 ${
             error ? 'border-red-500' : 'border-neutral-300 dark:border-neutral-700'
           }`}
         />

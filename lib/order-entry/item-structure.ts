@@ -1,6 +1,6 @@
 // 明細の行の並び（材料の行と、それにぶら下がる加工の行）を扱う処理。
 //
-// 明細は 1 つの配列で持ち、区分が「9 加工」の行を加工の行として扱う。
+// 明細は 1 つの配列で持ち、切断・区分が「9 加工」の行を加工の行として扱う。
 // 加工の行は、それより上にあるいちばん近い材料の行（母材）にぶら下がる。
 //   1  材料の行 ─┐
 //   └  加工の行 ─┤ 1 行目の材料にぶら下がる
@@ -12,9 +12,9 @@
 import { PROCESS_REGION_CODE } from './constants'
 import type { ItemRowValues } from './item-types'
 
-// 加工の行か（区分が 9 加工）
+// 加工の行か（切断・区分が 9 加工）
 export function isProcessRow(row: ItemRowValues): boolean {
-  return row.region.trim() === PROCESS_REGION_CODE
+  return row.cutRegion.trim() === PROCESS_REGION_CODE
 }
 
 // 加工の行がぶら下がる材料の行（母材）の位置。なければ -1。

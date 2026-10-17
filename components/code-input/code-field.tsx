@@ -40,6 +40,10 @@ type CodeFieldProps<T> = {
   codeWidthClass?: string
   // 名称の表示部分の幅（Tailwind のクラス）
   nameWidthClass?: string
+  // 詰めた表示（内側の余白を小さくする）。受注登録の明細の表のように、列の幅が狭い場所で使う
+  dense?: boolean
+  // 初期値と違う値として強調する（太字・オレンジ系の色。docs/screen-design.md「初期値と違う値の強調」）
+  emphasized?: boolean
 }
 
 // 親から受け取った ref（入力順の管理に使う）に要素を渡す。
@@ -68,6 +72,8 @@ export function CodeField<T>({
   showErrorText = true,
   codeWidthClass = 'w-12',
   nameWidthClass = 'w-28',
+  dense = false,
+  emphasized = false,
 }: CodeFieldProps<T>) {
   // 検索ありの一覧を Esc で閉じたとき、番号の欄へフォーカスを戻すために使う
   const codeInputRef = useRef<HTMLInputElement | null>(null)
@@ -83,6 +89,9 @@ export function CodeField<T>({
   })
   const message = error ?? field.invalidError
   const hasError = message !== undefined
+  // 詰めた表示では内側の余白を小さくする
+  const padding = dense ? 'px-1 py-1' : 'px-2 py-1.5'
+  const name = field.selected?.label ?? ''
 
   return (
     <div className="flex items-start gap-2">
@@ -93,9 +102,9 @@ export function CodeField<T>({
       )}
       <div className="relative">
         <div
-          className={`flex items-stretch rounded border bg-white dark:bg-neutral-900 ${
-            hasError ? 'border-red-500' : 'border-neutral-300 dark:border-neutral-700'
-          }`}
+          className={`flex items-stretch rounded border ${
+            emphasized ? 'bg-attention-soft' : 'bg-white dark:bg-neutral-900'
+          } ${hasError ? 'border-red-500' : emphasized ? 'border-attention' : 'border-neutral-300 dark:border-neutral-700'}`}
         >
           <input
             id={id}
@@ -113,13 +122,16 @@ export function CodeField<T>({
             onBlur={field.handleBlur}
             aria-invalid={hasError}
             disabled={disabled}
-            className={`${codeWidthClass} rounded-l border-r border-neutral-200 bg-neutral-50 px-2 py-1.5 text-center font-semibold tabular-nums outline-none focus:bg-blue-50 disabled:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:bg-blue-950`}
+            className={`${codeWidthClass} ${padding} rounded-l border-r border-neutral-200 bg-neutral-50 text-center font-semibold tabular-nums outline-none focus:bg-blue-50 disabled:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:bg-blue-950`}
           />
-          {/* 番号から引いた名称（表示のみ） */}
+          {/* 番号から引いた名称（表示のみ）。欄が狭くて切れる場合に備え、マウスを乗せると全体を出す */}
           <span
-            className={`${nameWidthClass} truncate px-2 py-1.5 ${disabled ? 'text-neutral-400' : ''}`}
+            title={name || undefined}
+            className={`${nameWidthClass} ${padding} truncate ${
+              disabled ? 'text-neutral-400' : emphasized ? 'font-bold text-attention' : ''
+            }`}
           >
-            {field.selected?.label ?? ''}
+            {name}
           </span>
         </div>
         {field.isListOpen && (

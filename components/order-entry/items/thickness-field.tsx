@@ -13,8 +13,10 @@ export function ThicknessField({ row, errors, fieldProps, onChange }: DimensionI
       onValueChange={(value) => onChange('thickness', value)}
       error={errors.thickness}
       allowDecimal
-      // 幅は固定（56px）。1280px の画面で、一番長いドーナツの寸法が品名の欄に収まる幅にしている（item-grid.ts）
-      widthClass="w-14"
+      // 幅は固定（44px）。広い画面でも引き伸ばさない（docs/screen-design.md「明細の表」）
+      widthClass="w-11"
+      placeholder="板厚"
+      dense
       showErrorText={false}
     />
   )

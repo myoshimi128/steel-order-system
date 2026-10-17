@@ -73,13 +73,14 @@ export type ProcessTypeMaster = {
 // --- 明細の行の入力値 ---
 
 // 各欄の入力値（番号の欄は打った番号、数値の欄は打った文字をそのまま持つ）。
-// 材料の行と加工の行を同じ形で持ち、区分が「9 加工」の行を加工の行として扱う。
+// 材料の行と加工の行を同じ形で持ち、切断・区分が「9 加工」の行を加工の行として扱う。
 // 加工の行は、それより上にあるいちばん近い材料の行にぶら下がる（item-structure.ts）。
 export type ItemRowValues = {
   // 行を見分けるための ID（画面の中だけで使う。保存はしない）
   key: string
-  cuttingMethod: string
-  region: string
+  // 切断・区分の番号（切断方法と区分をまとめた 2 桁の番号。例: 41 レーザー寸法切、71 定尺、9 加工）。
+  // 解釈は item-options.ts の resolveCutRegion で行う
+  cutRegion: string
   plateType: string
   material: string
   steelMaking: string
@@ -95,7 +96,8 @@ export type ItemRowValues = {
   plateSize: string
   // 数量（材料の行は枚数、加工の行は加工数量）
   quantity: string
-  // 摘要（材料の行は order_items.field_note、加工の行は order_item_processes.remarks）
+  // 摘要（材料の行は order_items.field_note、加工の行は order_item_processes.remarks）。
+  // ③ 伝票の指示の画面で入力する
   fieldNote: string
   // --- 加工の行だけで使う欄 ---
   // 加工方法（加工種別マスタの番号）
@@ -115,9 +117,9 @@ export type ItemRowValues = {
   // （「曲げ」を除いた部分。R、85° など）
   bendStyle: string
   bendStyleFree: string
-  // 単位の番号（1 個 / 2 kg）
+  // 単位の番号（1 個 / 2 kg）と加工の仕入単価（空欄は単価未定）。
+  // 単価に関わるため受注登録の画面では入力せず（仕入入力で扱う）、初期値（1 個・空欄）のまま保存する
   priceUnit: string
-  // 加工の仕入単価（手入力。空欄は単価未定）
   unitPrice: string
 }
 
@@ -136,7 +138,8 @@ export type Region =
   // 加工の行
   | { kind: 'process' }
   // 特殊製品（ササラ・ベタ丸・ドーナツ、スプライス専用の受注ではスプライス）。
-  // cuttingType はスプライス専用の受注の切断区分（寸法切 / アイトレ）。それ以外の特殊製品は null
+  // cuttingType はスプライス専用の受注の切断区分（寸法切 / アイトレ）。それ以外の特殊製品は null。
+  // 切断方法は切断・区分の番号の十の位から別に求める（ResolvedItem.cuttingMethod）
   | { kind: 'special'; type: SpecialProductTypeMaster; cuttingType: CuttingType | null }
 
 // 受注全体の設定のうち、明細の解釈・計算に使うもの（ヘッダーの値）

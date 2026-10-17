@@ -613,8 +613,8 @@ export type Database = {
           due_date_type: string
           field_note: string | null
           id: string
-          is_splice: boolean
           joint_no: string | null
+          member_class: string
           order_date: string
           order_no: string
           project_name: string | null
@@ -636,8 +636,8 @@ export type Database = {
           due_date_type: string
           field_note?: string | null
           id?: string
-          is_splice?: boolean
           joint_no?: string | null
+          member_class?: string
           order_date: string
           order_no?: string
           project_name?: string | null
@@ -659,8 +659,8 @@ export type Database = {
           due_date_type?: string
           field_note?: string | null
           id?: string
-          is_splice?: boolean
           joint_no?: string | null
+          member_class?: string
           order_date?: string
           order_no?: string
           project_name?: string | null
@@ -924,6 +924,7 @@ export type Database = {
       }
       special_product_prices: {
         Row: {
+          cutting_method: string | null
           has_shot: boolean
           id: string
           plate_type_id: string
@@ -934,6 +935,7 @@ export type Database = {
           valid_from: string
         }
         Insert: {
+          cutting_method?: string | null
           has_shot?: boolean
           id?: string
           plate_type_id: string
@@ -944,6 +946,7 @@ export type Database = {
           valid_from: string
         }
         Update: {
+          cutting_method?: string | null
           has_shot?: boolean
           id?: string
           plate_type_id?: string

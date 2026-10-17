@@ -117,13 +117,13 @@ export function checkProcessRow(
 
   // 加工の行は材料の行にぶら下がるため、材料の行より前（明細の先頭）には置けない
   if (!hasParent) {
-    liveErrors.region = '加工の行は材料の行の下に置いてください'
+    liveErrors.processType = '加工の行は材料の行の下に置いてください'
   }
 
   if (!row.processType.trim()) {
-    errors.processType = '加工方法を選択してください'
+    errors.processType ??= '加工方法を選択してください'
   } else if (!resolved.processTypeId) {
-    liveErrors.processType = '存在しない番号です'
+    liveErrors.processType ??= '存在しない番号です'
   }
 
   // 数量は自由入力の形のときだけ確認する。
@@ -136,6 +136,8 @@ export function checkProcessRow(
     }
   }
 
+  // 単位・仕入単価は受注登録の画面では入力しない（初期値の 1 個・空欄のまま）。
+  // 画面を経由しない呼び出しに備えて、値が入っている場合だけ確認する
   if (!row.priceUnit.trim()) {
     errors.priceUnit = '単位を選択してください'
   } else if (!resolved.priceUnit) {

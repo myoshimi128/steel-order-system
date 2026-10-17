@@ -183,10 +183,17 @@ export function pricingConditionsOf(item: ResolvedItem, asOf: string): PricingRo
       // 切断区分（寸法切 / アイトレ）は条件に含めない（特殊製品単価は切断区分で分かれておらず、
       // アイトレの別途見積もりは取得した後に lib/pricing で判定する）。
       // そのため、スプライスの寸法切とアイトレは同じ条件になり、取得結果も同じになる
-      if (item.hasShot === null) {
+      // 切断方法も条件に含める。特殊製品単価には切断方法の条件（cutting_method）があり、
+      // 当てはまる行だけが返る（例: ベタ丸・ドーナツはレーザーの行だけ。ガス・プラズマは行がなく別途見積もり）
+      if (item.hasShot === null || !item.cuttingMethod || item.cuttingMethod === '定尺') {
         return null
       }
-      return { ...base, specialProductTypeId: region.type.id, hasShot: item.hasShot }
+      return {
+        ...base,
+        cuttingMethod: item.cuttingMethod,
+        specialProductTypeId: region.type.id,
+        hasShot: item.hasShot,
+      }
     case 'standard':
       return item.plateSize ? { ...base, plateSize: item.plateSize } : null
     case 'process':

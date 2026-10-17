@@ -10,7 +10,7 @@ import {
 
 // 加工の行（区分 9）を作る
 function processRow(values: Parameters<typeof itemRow>[0]) {
-  return itemRow({ region: '9', ...values })
+  return itemRow({ cutRegion: '9', ...values })
 }
 
 describe('processInputShapeOf（入力の形）', () => {

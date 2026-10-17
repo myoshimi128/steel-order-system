@@ -21,7 +21,7 @@ export default async function SpecialProductPricesPage() {
   const { data: specialProductPrices, error } = await supabase
     .from('special_product_prices')
     .select(
-      'id, has_shot, thickness_min, thickness_max, unit_price, valid_from, special_product_types(name), plate_types(name)'
+      'id, has_shot, cutting_method, thickness_min, thickness_max, unit_price, valid_from, special_product_types(name), plate_types(name)'
     )
     .order('valid_from', { ascending: false })
 
@@ -48,7 +48,8 @@ export default async function SpecialProductPricesPage() {
           <tr className="border-b border-neutral-300 text-left dark:border-neutral-700">
             <th className="py-2 pr-4">特殊製品種別</th>
             <th className="py-2 pr-4">種類</th>
-            <th className="py-2 pr-4">ショット</th>
+            <th className="py-2 pr-4">切断方法</th>
+              <th className="py-2 pr-4">ショット</th>
             <th className="py-2 pr-4">板厚範囲（mm）</th>
             <th className="py-2 pr-4">単価</th>
             <th className="py-2 pr-4">適用開始日</th>
@@ -65,7 +66,9 @@ export default async function SpecialProductPricesPage() {
                 {price.special_product_types?.name ?? ''}
               </td>
               <td className="py-2 pr-4">{price.plate_types?.name ?? ''}</td>
-              <td className="py-2 pr-4">{price.has_shot ? 'あり' : 'なし'}</td>
+              {/* 切断方法の条件。空欄は切断方法を問わない */}
+                <td className="py-2 pr-4">{price.cutting_method ?? '問わない'}</td>
+                <td className="py-2 pr-4">{price.has_shot ? 'あり' : 'なし'}</td>
               <td className="py-2 pr-4">
                 {price.thickness_min}〜{price.thickness_max}
               </td>

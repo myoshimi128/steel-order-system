@@ -1,23 +1,24 @@
 'use client'
 
-// 受注明細の表（見出し＋材料の行・加工の行＋合計）。
-// 明細が 100 行を超えることもあるため、この部分だけをスクロールさせる（ヘッダーは固定表示）。
-// 行の種類（材料の行 / 加工の行）に応じて、MaterialRow（2 段）と ProcessRow（1 段）を出し分ける。
+// 受注明細の表（見出し＋材料の行・加工の行＋合計）。② 注文内容の画面の中心。
+// 明細が 100 行を超えることもあるため、この部分だけをスクロールさせる。
+// 行の種類（材料の行 / 加工の行）に応じて、MaterialRow と ProcessRow を出し分ける（どちらも 1 行）。
 
 import type { FieldNavigation } from '@/lib/hooks/use-field-navigation'
+import { rowEmphasis } from '@/lib/order-entry/emphasis'
 import {
+  cutRegionOptions,
   plateTypeOptions,
   processTypeOptions,
-  regionOptions,
 } from '@/lib/order-entry/item-options'
+import { itemFieldOrder } from '@/lib/order-entry/item-row'
 import { materialNumbers } from '@/lib/order-entry/item-structure'
 import {
   processNoticeTargetOf,
   processNoticesFor,
   type ProcessNoticeMaster,
 } from '@/lib/order-entry/notices'
-import type { ItemTotals } from '@/lib/order-entry/item-totals'
-import type { ItemMasters } from '@/lib/order-entry/item-types'
+import type { ItemContext, ItemMasters } from '@/lib/order-entry/item-types'
 import type { ItemRowCalculation } from '@/lib/order-entry/use-item-calculations'
 import type { OrderItemsState } from '@/lib/order-entry/use-order-items'
 import { HeaderCell } from './header-cell'
@@ -29,12 +30,14 @@ import { ProcessRow } from './process-row'
 type OrderItemsTableProps = {
   items: OrderItemsState
   calculations: readonly ItemRowCalculation[]
-  totals: ItemTotals
+  totalWeight: number
   masters: ItemMasters
   // 加工の注意事項（当てはまる加工の行のすぐ下に出す）
   processNotices: readonly ProcessNoticeMaster[]
-  // スプライス専用の受注か（区分の欄が切断区分になる）
-  isSplice: boolean
+  // スプライス専用の受注か・ショットの有無（切断・区分の番号の解釈が変わる）
+  context: ItemContext
+  // 明細の入力を終えたときに移るボタンの ID（「次へ」）
+  finishFieldId: string
   navigation: FieldNavigation
   onNotice: (message: string) => void
 }
@@ -42,53 +45,52 @@ type OrderItemsTableProps = {
 export function OrderItemsTable({
   items,
   calculations,
-  totals,
+  totalWeight,
   masters,
   processNotices,
-  isSplice,
+  context,
+  finishFieldId,
   navigation,
   onNotice,
 }: OrderItemsTableProps) {
   // 選択肢はマスタから作る（行ごとに作り直さないよう、表で 1 回だけ作る）
-  const regions = regionOptions(masters, isSplice)
+  const cutRegions = cutRegionOptions(masters, context.isSplice)
   const plateTypes = plateTypeOptions(masters)
   const processTypes = processTypeOptions(masters)
   // No 欄の番号（材料の行だけに 1 から振る）
   const numbers = materialNumbers(items.rows)
+  // 数量の合計（材料の行だけ。加工の行の数量は孔数などで単位が違うため含めない）
+  const totalQuantity = items.checks.reduce(
+    (sum, check) => (check.kind === 'material' && check.resolved.quantity ? sum + check.resolved.quantity : sum),
+    0,
+  )
 
   return (
     // 見出し・明細の行・合計を 1 つのスクロールの枠に入れ、見出しは上端、合計は下端に固定する（sticky）。
     // 見出しや合計を枠の外に置くと、明細の行の側にだけスクロールバーの幅が入り、列の位置がずれるため。
-    // scroll-pt / scroll-pb は、キー操作で欄を移ったときに、その欄が固定した見出し・合計の下に隠れないようにする余白。
-    //
-    // 左右の余白は、受注のヘッダー部分・下の 3 つの枠と端を揃えるためのもの（左 24px、右 16px＋スクロールバー 8px＝24px）。
-    // scrollbar-gutter: stable で、明細が少なくスクロールバーが出ないときもその幅を空けておき、右端の位置を変えない。
-    // スクロールバーの幅は globals.css の scroll-thin で 8px に決めている
-    <div className="scroll-thin min-h-0 flex-1 scroll-pt-14 scroll-pb-12 overflow-y-auto pl-6 pr-4 [scrollbar-gutter:stable]">
+    // scroll-pt / scroll-pb は、キー操作で欄を移ったときに、その欄が固定した見出し・合計の下に隠れないようにする余白
+    <div className="scroll-thin min-h-0 flex-1 scroll-pt-12 scroll-pb-10 overflow-y-auto [scrollbar-gutter:stable]">
       {/* 見出し */}
-      <div
-        className={`${ITEM_GRID_CLASS} sticky top-0 z-10 bg-slate-900 py-2 text-xs font-semibold text-white dark:bg-slate-800`}
-      >
-        {/* No の列は見出しの文字を出さない（帯の左端が詰まって見えるため）。
-            列の位置は残し、読み上げ用にだけ「No」を入れておく */}
+      <div className={`${ITEM_GRID_CLASS} sticky top-0 z-10 border-b border-line bg-canvas py-2 text-xs font-semibold text-neutral-600`}>
+        {/* No の列は見出しの文字を出さない。読み上げ用にだけ「No」を入れておく */}
         <div>
           <span className="sr-only">No</span>
         </div>
-        <HeaderCell top="切断方法" bottom={isSplice ? '切断区分' : '区分'} />
-        <HeaderCell top="種類" bottom="製鋼法" />
-        <HeaderCell top="材質" bottom="メーカー" />
-        <HeaderCell top="品名" bottom="寸法（板厚 × 縦 × 横）" />
-        <HeaderCell top="数量" bottom="重量(kg)" />
-        <HeaderCell top="仕入単価" bottom="仕入金額" />
-        <HeaderCell top="摘要" />
+        <HeaderCell top="切断・区分" />
+        <HeaderCell top="種類" />
+        <HeaderCell top="材質" />
+        <HeaderCell top="製鋼法" />
+        <HeaderCell top="メーカー" />
+        <HeaderCell top="品名・寸法" />
+        <HeaderCell top="数量" />
+        <HeaderCell top="重量(kg)" />
       </div>
 
       {/* スプライス専用の受注の案内 */}
-      {isSplice && (
-        <p className="border-b border-blue-100 bg-blue-50 px-3 py-1.5 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+      {context.isSplice && (
+        <p className="border-b border-line bg-navy-soft px-3 py-1.5 text-xs text-navy">
           <span className="font-semibold">スプライス専用の受注</span>
-          　明細はすべてスプライス。ショットの有無は受注単位。切断区分は 1 寸法切 ／ 2
-          アイトレ（アイトレは別途見積もり）／ 9 加工
+          　明細はすべてスプライス。使える番号は 寸法切 11・21・31・41 ／ アイトレ 12・22・32・42（別途見積もり）／ 9 加工
         </p>
       )}
 
@@ -100,6 +102,7 @@ export function OrderItemsTable({
           const errors = items.errorsOf(row.key, index)
 
           if (check.kind === 'process' && result.kind === 'process') {
+            const order = itemFieldOrder(row, { needsMaterial: false, steelMakingApplicable: false }, masters, context)
             return (
               <ProcessRow
                 key={row.key}
@@ -111,11 +114,9 @@ export function OrderItemsTable({
                   processNotices,
                   processNoticeTargetOf(items.rows, items.checks, index),
                 )}
-                calculation={result.calculation}
                 errors={errors}
-                isSplice={isSplice}
-                regionOptions={regions}
                 processTypeOptions={processTypes}
+                lastFieldId={order[order.length - 1]}
                 navigation={navigation}
                 onNotice={onNotice}
               />
@@ -133,9 +134,10 @@ export function OrderItemsTable({
                 pricingError={result.pricingError}
                 errors={errors}
                 masters={masters}
-                isSplice={isSplice}
-                regionOptions={regions}
+                emphasis={rowEmphasis(check.resolved, masters)}
+                cutRegionOptions={cutRegions}
                 plateTypeOptions={plateTypes}
+                finishFieldId={finishFieldId}
                 navigation={navigation}
                 onNotice={onNotice}
               />
@@ -143,14 +145,12 @@ export function OrderItemsTable({
           }
           return null
         })}
-        {items.itemsError && (
-          <p className="px-3 py-2 text-sm text-red-600 dark:text-red-400">{items.itemsError}</p>
-        )}
+        {items.itemsError && <p className="px-3 py-2 text-sm text-urgent">{items.itemsError}</p>}
       </div>
 
       {/* 合計は枠の下端に固定する（明細が少なければ最後の行のすぐ下に出る） */}
       <div className="sticky bottom-0 z-10">
-        <OrderItemsTotals totals={totals} />
+        <OrderItemsTotals totalQuantity={totalQuantity} totalWeight={totalWeight} />
       </div>
     </div>
   )

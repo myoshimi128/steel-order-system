@@ -21,6 +21,7 @@ type SpecialProductPrice = {
   id: string
   special_product_type_id: string
   plate_type_id: string
+  cutting_method: string | null
   has_shot: boolean
   thickness_min: number
   thickness_max: number
@@ -112,6 +113,27 @@ export function SpecialProductPriceForm(props: SpecialProductPriceFormProps) {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="cutting_method" className="text-sm">
+          切断方法の条件
+        </label>
+        {/* 空欄は「切断方法を問わない」。ベタ丸・ドーナツはレーザーだけ（ガス・プラズマは別途見積もりになる） */}
+        <select
+          id="cutting_method"
+          name="cutting_method"
+          defaultValue={specialProductPrice?.cutting_method ?? ''}
+          className="rounded border border-neutral-300 px-3 py-2"
+        >
+          <option value="">問わない</option>
+          <option value="ガス">ガス</option>
+          <option value="プラズマ">プラズマ</option>
+          <option value="レーザー">レーザー</option>
+        </select>
+        <p className="text-xs text-neutral-500">
+          指定すると、その切断方法の明細だけにこの単価を使う。当てはまる単価がない切断方法は別途見積もりになる
+        </p>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

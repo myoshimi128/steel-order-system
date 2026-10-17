@@ -5,12 +5,20 @@
 // 最終的な制約は DB（NOT NULL・チェック制約・外部キー）でも強制されるが、
 // ここで先に確認することで、どの欄が問題かを画面に示せるようにする。
 
-import { dueDateTypeNeedsDate, JOINT_NO_MAX_LENGTH, type DueDateType } from './constants'
+import {
+  dueDateTypeNeedsDate,
+  JOINT_NO_MAX_LENGTH,
+  type DueDateType,
+  type MemberClass,
+} from './constants'
 
 // 保存に使うヘッダーの値。番号ではなく、保存する値（id など）に変換した後のもの
 export type OrderHeaderInput = {
   // 受注日 'YYYY-MM-DD'
   orderDate: string
+  // 部材区分。SPL がスプライス専用の受注
+  memberClass: MemberClass
+  // スプライス専用の受注か（部材区分が SPL）。memberClass から求めた値
   isSplice: boolean
   // 継手番号（スプライス専用の受注のみ。任意）
   jointNo: string

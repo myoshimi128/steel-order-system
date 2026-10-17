@@ -6,15 +6,17 @@ import type { ItemErrors } from '@/lib/order-entry/item-types'
 
 type RowMessagesProps = {
   errors: ItemErrors
+  // 欄に結びつかない文章（価格マスタの取得に失敗した など）
+  extra?: readonly string[]
 }
 
-export function RowMessages({ errors }: RowMessagesProps) {
-  const messages = [...new Set(Object.values(errors).filter((message) => message))]
+export function RowMessages({ errors, extra = [] }: RowMessagesProps) {
+  const messages = [...new Set([...Object.values(errors), ...extra].filter((message) => message))]
   if (messages.length === 0) {
     return null
   }
   return (
-    <ul className="col-span-full px-12 pt-1 text-xs text-red-600 dark:text-red-400">
+    <ul className="col-span-full pl-8 pt-1 text-xs text-urgent">
       {messages.map((message) => (
         <li key={message}>{message}</li>
       ))}

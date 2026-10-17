@@ -1,7 +1,7 @@
 'use client'
 
 // スプライス専用の受注のときだけ表示する「継手番号」と「ショット」の欄。
-// ヘッダーの「スプライス」を 1 にすると表示される（docs/screen-design.md「スプライス専用の受注」）。
+// ① 受注情報の「部材区分」を 4 SPL にすると表示される（docs/screen-design.md「スプライス専用の受注」）。
 
 import { CodeField } from '@/components/code-input/code-field'
 import { TextField } from '@/components/code-input/text-field'

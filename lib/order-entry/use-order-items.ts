@@ -16,6 +16,7 @@ import {
   createEmptyItemRow,
   createInitialItemRow,
   createProcessRow,
+  firstItemFieldId,
   INITIAL_ITEM_ROW,
   itemFieldId,
   newItemRowKey,
@@ -94,7 +95,7 @@ export function useOrderItems(masters: ItemMasters, context: ItemContext) {
     return row.key
   }
 
-  // 指定した行の前に空の行を挿入し、その行の key を返す（Ctrl+Insert）
+  // 指定した行の前に空の行を挿入し、その行の key を返す（F3 / Ctrl+Insert）
   function insertRowBefore(rowKey: string): string {
     const row = createEmptyItemRow()
     setRows((current) => {
@@ -117,7 +118,7 @@ export function useOrderItems(masters: ItemMasters, context: ItemContext) {
     return row.key
   }
 
-  // 行を削除し、次にフォーカスを当てる欄の ID を返す（Ctrl+Delete）。
+  // 行を削除し、次にフォーカスを当てる欄の ID を返す（F4 / Ctrl+Delete）。
   // 材料の行を削除するときは、ぶら下がっている加工の行も一緒に削除する。
   // すべての行がなくなる場合は、空の行に置き換える（明細の入力欄が 0 行にならないように）
   function deleteRow(rowKey: string): string {
@@ -127,7 +128,7 @@ export function useOrderItems(masters: ItemMasters, context: ItemContext) {
       const row = createEmptyItemRow()
       setRows([row])
       setSubmitErrors({})
-      return itemFieldId(row.key, 'cuttingMethod')
+      return itemFieldId(row.key, 'cutRegion')
     }
     setRows(remaining)
     // 削除した行（と加工の行）のエラーを消す
@@ -143,14 +144,14 @@ export function useOrderItems(masters: ItemMasters, context: ItemContext) {
       return next
     })
     // 削除した位置にある行（なければ最後の行）の先頭の欄へ移る。
-    // 材料の行の先頭は切断方法、加工の行の先頭は区分
+    // 材料の行の先頭は切断・区分、加工の行の先頭は加工方法
     const next = remaining[index] ?? remaining[remaining.length - 1]
-    return itemFieldId(next.key, isProcessRow(next) ? 'region' : 'cuttingMethod')
+    return firstItemFieldId(next)
   }
 
   // 「*」の複写。
   //   材料の行: 直前の材料の行を、加工の行ごと今の行に写す。
-  //             sourceNumber（空の行の切断方法の欄で打った行番号）があれば、その番号の材料の行を写す。
+  //             sourceNumber（空の行の切断・区分の欄で打った行番号）があれば、その番号の材料の行を写す。
   //             写した加工の行は、今の行のすぐ下に入る
   //   加工の行: 何もしない（同じ材料に同じ加工を 2 行入れることはなく、
   //             「18φ 4つ」のように 1 行にまとめて入力するため、加工の行を写す必要がない）

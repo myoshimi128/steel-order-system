@@ -22,8 +22,7 @@ function calculateSplice(values: Parameters<typeof itemRow>[0], spliceShot: bool
 
 describe('calculateItem（スプライス専用の受注）', () => {
   const SPLICE_ROW = {
-    cuttingMethod: '2',
-    region: '1',
+    cutRegion: '21',
     material: '0',
     thickness: '16',
     width: '150',
@@ -42,7 +41,7 @@ describe('calculateItem（スプライス専用の受注）', () => {
     expect(calculateSplice(SPLICE_ROW, false).price).toMatchObject({ status: 'priced', unitPrice: 180 })
   })
 
-  it('切断区分 1 寸法切は、実重量に角重量と同じ値を入れる', () => {
+  it('切断区分が寸法切（21）なら、実重量に角重量と同じ値を入れる', () => {
     expect(calculateSplice(SPLICE_ROW, true).weight?.weights).toEqual({
       squareWeight: 7.536,
       actualWeight: 7.536,
@@ -51,8 +50,8 @@ describe('calculateItem（スプライス専用の受注）', () => {
     })
   })
 
-  it('切断区分 2 アイトレは別途見積もり。重量（角重量）は寸法から計算する', () => {
-    expect(calculateSplice({ ...SPLICE_ROW, region: '2' }, true)).toEqual({
+  it('切断区分がアイトレ（22）なら別途見積もり。重量（角重量）は寸法から計算する', () => {
+    expect(calculateSplice({ ...SPLICE_ROW, cutRegion: '22' }, true)).toEqual({
       // アイトレの実重量は送り状発行の画面で入力するため null
       weight: {
         weights: { squareWeight: 7.536, actualWeight: null, materialWeight: null, displayWeight: 7.536 },
@@ -80,8 +79,7 @@ describe('calculateItem（スプライス専用の受注）', () => {
 describe('calculateItem', () => {
   it('SN400B・レーザー寸法切・9mm・100×200・10枚: 1 枚 1.413kg → 1.5kg の段で 190 × 1.5 = 285/枚', () => {
     const result = calculate({
-      cuttingMethod: '3',
-      region: '1',
+      cutRegion: '41',
       material: '4',
       steelMaking: '2',
       thickness: '9',
@@ -97,8 +95,7 @@ describe('calculateItem', () => {
 
   it('定尺に収まる部品には大板加算をかけない（SS400・レーザー・9mm: 170）', () => {
     const result = calculate({
-      cuttingMethod: '3',
-      region: '1',
+      cutRegion: '41',
       material: '0',
       thickness: '9',
       width: '1000',
@@ -110,8 +107,7 @@ describe('calculateItem', () => {
 
   it('定尺を超える部品には大板加算をかける（SS400・レーザー・9mm・2000×2000: 170 + 15 = 185）', () => {
     const result = calculate({
-      cuttingMethod: '3',
-      region: '1',
+      cutRegion: '41',
       material: '0',
       thickness: '9',
       width: '2000',
@@ -123,8 +119,7 @@ describe('calculateItem', () => {
 
   it('SS400・ガス寸法切・28mm・80×80 は 1 枚 2kg 未満のため別途見積もり', () => {
     const result = calculate({
-      cuttingMethod: '2',
-      region: '1',
+      cutRegion: '21',
       material: '0',
       thickness: '28',
       width: '80',
@@ -138,8 +133,7 @@ describe('calculateItem', () => {
     // 角重量 9 × 300 × 300 × 7.85 ÷ 1,000,000 = 6.3585 → 6.4 × 190 = 1216/枚
     // 実重量 9 × 300² × 6.161 ÷ 1,000,000 = 4.99041 → 10 枚で 49.90
     const result = calculate({
-      cuttingMethod: '3',
-      region: '7',
+      cutRegion: '47',
       material: '0',
       thickness: '9',
       outerDiameter: '300',
@@ -153,8 +147,7 @@ describe('calculateItem', () => {
 
   it('定尺売りは定尺単価 × 合計重量（SS400・6mm・5x10・10 枚）', () => {
     const result = calculate({
-      cuttingMethod: '9',
-      region: '3',
+      cutRegion: '71',
       material: '0',
       thickness: '6',
       plateSize: '3',
@@ -165,7 +158,7 @@ describe('calculateItem', () => {
 
   it('価格マスタの行が未取得（取得中・取得失敗）なら、重量だけ先に計算する', () => {
     const resolved = resolveItemRow(
-      itemRow({ cuttingMethod: '3', region: '1', material: '0', thickness: '9', width: '100', length: '200', quantity: '3' }),
+      itemRow({ cutRegion: '41', material: '0', thickness: '9', width: '100', length: '200', quantity: '3' }),
       ITEM_MASTERS,
     )
     expect(calculateItem(resolved, undefined, AS_OF)).toMatchObject({
@@ -176,7 +169,7 @@ describe('calculateItem', () => {
 
   it('受注日が未入力なら単価は未確定。重量は計算する', () => {
     const resolved = resolveItemRow(
-      itemRow({ cuttingMethod: '3', region: '1', material: '0', thickness: '9', width: '100', length: '200', quantity: '3' }),
+      itemRow({ cutRegion: '41', material: '0', thickness: '9', width: '100', length: '200', quantity: '3' }),
       ITEM_MASTERS,
     )
     expect(calculateItem(resolved, MASTERS, '')).toMatchObject({
@@ -185,19 +178,10 @@ describe('calculateItem', () => {
     })
   })
 
-  it('切断方法が未入力なら単価は未確定。重量は計算する', () => {
-    expect(
-      calculate({ region: '1', material: '0', thickness: '9', width: '100', length: '200', quantity: '3' }),
-    ).toMatchObject({
-      weight: { totalWeight: 4.24 },
-      price: { status: 'undetermined', reason: '切断方法が未入力のため単価を計算できません' },
-    })
-  })
-
   it('取り扱いのない板厚（商品がない）なら単価は未確定。重量は計算する', () => {
     // 12 × 100 × 200 × 7.85 ÷ 1,000,000 = 1.884kg
     expect(
-      calculate({ cuttingMethod: '3', region: '1', material: '0', thickness: '12', width: '100', length: '200', quantity: '1' }),
+      calculate({ cutRegion: '41', material: '0', thickness: '12', width: '100', length: '200', quantity: '1' }),
     ).toMatchObject({
       weight: { totalWeight: 1.88 },
       price: { status: 'undetermined', reason: '取り扱いのない板厚のため単価を計算できません' },
@@ -205,12 +189,12 @@ describe('calculateItem', () => {
   })
 
   it('寸法・数量がそろっていなければ、重量も単価も計算しない', () => {
-    expect(calculate({ cuttingMethod: '3', region: '1', material: '0', thickness: '9' })).toEqual({
+    expect(calculate({ cutRegion: '41', material: '0', thickness: '9' })).toEqual({
       weight: null,
       price: { status: 'incomplete' },
     })
     expect(
-      calculate({ cuttingMethod: '3', region: '1', material: '0', thickness: '9', width: '100', length: '200' }),
+      calculate({ cutRegion: '41', material: '0', thickness: '9', width: '100', length: '200' }),
     ).toEqual({ weight: null, price: { status: 'incomplete' } })
   })
 })
@@ -218,11 +202,11 @@ describe('calculateItem', () => {
 describe('pricingConditionsOf', () => {
   it('寸法・数量は条件に含めない（同じ材質・板厚の行は同じキーになる）', () => {
     const a = resolveItemRow(
-      itemRow({ cuttingMethod: '3', region: '1', material: '0', thickness: '9', width: '100', length: '200' }),
+      itemRow({ cutRegion: '41', material: '0', thickness: '9', width: '100', length: '200' }),
       ITEM_MASTERS,
     )
     const b = resolveItemRow(
-      itemRow({ cuttingMethod: '3', region: '1', material: '0', thickness: '9', width: '900', length: '50' }),
+      itemRow({ cutRegion: '41', material: '0', thickness: '9', width: '900', length: '50' }),
       ITEM_MASTERS,
     )
     expect(pricingConditionsKey(pricingConditionsOf(a, AS_OF)!)).toBe(
@@ -231,14 +215,14 @@ describe('pricingConditionsOf', () => {
   })
 
   it('スプライスの寸法切とアイトレは同じ条件になる（切断区分を含めないため、取得結果も同じ）', () => {
-    const row = { cuttingMethod: '2', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }
+    const row = { material: '0', thickness: '16', width: '150', length: '400', quantity: '20' }
     const context = { isSplice: true, spliceShot: true }
     const dimensionCut = pricingConditionsOf(
-      resolveItemRow(itemRow({ ...row, region: '1' }), ITEM_MASTERS, context),
+      resolveItemRow(itemRow({ ...row, cutRegion: '21' }), ITEM_MASTERS, context),
       AS_OF,
     )
     const irregularCut = pricingConditionsOf(
-      resolveItemRow(itemRow({ ...row, region: '2' }), ITEM_MASTERS, context),
+      resolveItemRow(itemRow({ ...row, cutRegion: '22' }), ITEM_MASTERS, context),
       AS_OF,
     )
     expect(irregularCut).toEqual({
@@ -246,6 +230,8 @@ describe('pricingConditionsOf', () => {
       materialId: 'mat-ss400',
       thickness: 16,
       asOf: AS_OF,
+      // 特殊製品単価は切断方法の条件で絞り込むため、切断方法も含める
+      cuttingMethod: 'ガス',
       specialProductTypeId: 'sp-splice',
       hasShot: true,
     })
@@ -253,7 +239,7 @@ describe('pricingConditionsOf', () => {
   })
 
   it('加工の行は価格マスタの行を取得しない', () => {
-    const resolved = resolveItemRow(itemRow({ cuttingMethod: '3', region: '9', thickness: '9' }), ITEM_MASTERS)
+    const resolved = resolveItemRow(itemRow({ cutRegion: '9', thickness: '9' }), ITEM_MASTERS)
     expect(pricingConditionsOf(resolved, AS_OF)).toBeNull()
   })
 })
@@ -316,8 +302,7 @@ describe('sumRows（明細の合計）', () => {
 describe('calculateItem（別途見積もりの行の重量）', () => {
   // 同じ寸法の、単価が決まる行の重量と比べる
   const pricedWeight = calculate({
-    cuttingMethod: '3',
-    region: '1',
+    cutRegion: '41',
     material: '0',
     thickness: '9',
     width: '100',
@@ -331,8 +316,7 @@ describe('calculateItem（別途見積もりの行の重量）', () => {
 
   it('切断単価が登録されていない（ガス・9mm）: 別途見積もりでも重量は同じ', () => {
     const result = calculate({
-      cuttingMethod: '2',
-      region: '1',
+      cutRegion: '21',
       material: '0',
       thickness: '9',
       width: '100',
@@ -349,8 +333,7 @@ describe('calculateItem（別途見積もりの行の重量）', () => {
   it('28mm 以上で 1 枚 2kg 未満（ガス・28mm・80×80）: 別途見積もりでも重量を計算する', () => {
     expect(
       calculate({
-        cuttingMethod: '2',
-        region: '1',
+        cutRegion: '21',
         material: '0',
         thickness: '28',
         width: '80',
@@ -366,15 +349,14 @@ describe('calculateItem（別途見積もりの行の重量）', () => {
 
   it('スプライスのアイトレは、寸法切と同じ角重量になる（切断区分は単価だけに影響する）', () => {
     const row = {
-      cuttingMethod: '2',
       material: '0',
       thickness: '16',
       width: '150',
       length: '400',
       quantity: '20',
     }
-    const dimensionCut = calculateSplice({ ...row, region: '1' }, true)
-    const irregularCut = calculateSplice({ ...row, region: '2' }, true)
+    const dimensionCut = calculateSplice({ ...row, cutRegion: '21' }, true)
+    const irregularCut = calculateSplice({ ...row, cutRegion: '22' }, true)
     expect(dimensionCut.price.status).toBe('priced')
     expect(irregularCut.price.status).toBe('quote')
     expect(irregularCut.weight?.totalWeight).toBe(dimensionCut.weight?.totalWeight)
@@ -382,7 +364,7 @@ describe('calculateItem（別途見積もりの行の重量）', () => {
 
   it('別途見積もりの行の重量も、明細の重量の合計に含める', () => {
     const quoteRow = calculateSplice(
-      { cuttingMethod: '2', region: '2', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' },
+      { cutRegion: '22', material: '0', thickness: '16', width: '150', length: '400', quantity: '20' },
       true,
     )
     const totals = sumRows([

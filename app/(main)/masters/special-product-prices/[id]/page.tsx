@@ -32,7 +32,7 @@ export default async function EditSpecialProductPricePage(
     supabase
       .from('special_product_prices')
       .select(
-        'id, special_product_type_id, plate_type_id, has_shot, thickness_min, thickness_max, unit_price, valid_from'
+        'id, special_product_type_id, plate_type_id, cutting_method, has_shot, thickness_min, thickness_max, unit_price, valid_from'
       )
       .eq('id', id)
       .single(),

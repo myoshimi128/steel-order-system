@@ -8,7 +8,7 @@ import { ITEM_MASTERS, itemRow } from './test-fixtures'
 const AS_OF = '2026-06-01'
 
 function process(values: Parameters<typeof itemRow>[0]) {
-  return resolveProcessRow(itemRow({ region: '9', ...values }), ITEM_MASTERS)
+  return resolveProcessRow(itemRow({ cutRegion: '9', ...values }), ITEM_MASTERS)
 }
 
 describe('resolveProcessRow', () => {
@@ -58,14 +58,14 @@ describe('parentBillingTotalWeight（母材の単価の根拠にした重量の�
   it('角重量 × 母材の数量（ベタ丸でも表示用の実重量ではなく角重量）', () => {
     // ベタ丸 9mm 直径 300: 角重量 6.3585kg × 10 枚 = 63.585 → 63.59（実重量の 49.90 ではない）
     const parent = resolveItemRow(
-      itemRow({ cuttingMethod: '3', region: '7', material: '0', thickness: '9', outerDiameter: '300', quantity: '10' }),
+      itemRow({ cutRegion: '47', material: '0', thickness: '9', outerDiameter: '300', quantity: '10' }),
       ITEM_MASTERS,
     )
     expect(parentBillingTotalWeight(calculateItem(parent, MASTERS, AS_OF), parent.quantity)).toBe(63.59)
   })
 
   it('母材の重量が求まっていなければ null', () => {
-    const parent = resolveItemRow(itemRow({ cuttingMethod: '3', region: '1' }), ITEM_MASTERS)
+    const parent = resolveItemRow(itemRow({ cutRegion: '41' }), ITEM_MASTERS)
     expect(parentBillingTotalWeight(calculateItem(parent, MASTERS, AS_OF), parent.quantity)).toBeNull()
   })
 })
