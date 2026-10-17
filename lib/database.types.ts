@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -340,7 +340,8 @@ export type Database = {
       notices: {
         Row: {
           body: string
-          customer_id: string | null
+          customer_id: string
+          cutting_method: string | null
           id: string
           is_active: boolean
           priority: number
@@ -348,7 +349,8 @@ export type Database = {
         }
         Insert: {
           body: string
-          customer_id?: string | null
+          customer_id: string
+          cutting_method?: string | null
           id?: string
           is_active?: boolean
           priority?: number
@@ -356,7 +358,8 @@ export type Database = {
         }
         Update: {
           body?: string
-          customer_id?: string | null
+          customer_id?: string
+          cutting_method?: string | null
           id?: string
           is_active?: boolean
           priority?: number
@@ -721,6 +724,47 @@ export type Database = {
         }
         Relationships: []
       }
+      process_notices: {
+        Row: {
+          body: string
+          hole_diameter_max: number | null
+          hole_diameter_min: number | null
+          id: string
+          is_active: boolean
+          process_type_id: string
+          thickness_max: number | null
+          thickness_min: number | null
+        }
+        Insert: {
+          body: string
+          hole_diameter_max?: number | null
+          hole_diameter_min?: number | null
+          id?: string
+          is_active?: boolean
+          process_type_id: string
+          thickness_max?: number | null
+          thickness_min?: number | null
+        }
+        Update: {
+          body?: string
+          hole_diameter_max?: number | null
+          hole_diameter_min?: number | null
+          id?: string
+          is_active?: boolean
+          process_type_id?: string
+          thickness_max?: number | null
+          thickness_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_notices_process_type_id_fkey"
+            columns: ["process_type_id"]
+            isOneToOne: false
+            referencedRelation: "process_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_types: {
         Row: {
           category: string | null
@@ -977,21 +1021,21 @@ export type Database = {
       stamps: {
         Row: {
           body: string
-          display_order: number
           id: string
           is_active: boolean
+          number: number
         }
         Insert: {
           body: string
-          display_order?: number
           id?: string
           is_active?: boolean
+          number: number
         }
         Update: {
           body?: string
-          display_order?: number
           id?: string
           is_active?: boolean
+          number?: number
         }
         Relationships: []
       }

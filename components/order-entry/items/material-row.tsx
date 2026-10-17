@@ -22,6 +22,7 @@ import type { ItemErrors, ItemFieldName, ItemMasters } from '@/lib/order-entry/i
 import { buildProductName } from '@/lib/order-entry/product-name'
 import { useItemRowKeyboard } from '@/lib/order-entry/use-item-row-keyboard'
 import type { OrderItemsState } from '@/lib/order-entry/use-order-items'
+import { STAMP_CODE_FIELD_ID } from '@/lib/order-entry/use-order-aux'
 import type { ItemRowCheck } from '@/lib/order-entry/validate-order-items'
 import { DimensionFields } from './dimension-fields'
 import { ITEM_GRID_CLASS } from './item-grid'
@@ -81,11 +82,11 @@ export function MaterialRow({
     navigation.focusFieldLater(firstItemFieldId(items.rows[index + 1]))
   }
 
-  // 切断方法の欄の Enter: 何も入力していない最後の行なら、明細の入力を終えたとして登録ボタンへ移る
+  // 切断方法の欄の Enter: 何も入力していない最後の行なら、明細の入力を終えたとして補助エリア（スタンプの番号）へ移る
   function handleCuttingMethodNext() {
     const isBlankLastRow = isLastRow && index > 0 && !row.cuttingMethod.trim()
     if (isBlankLastRow) {
-      navigation.focusField('submit')
+      navigation.focusField(STAMP_CODE_FIELD_ID)
       return
     }
     navigation.focusNext(itemFieldId(row.key, 'cuttingMethod'))

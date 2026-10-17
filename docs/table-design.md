@@ -23,7 +23,8 @@
 | `unit_weights` | 単位質量（縞板。メーカー × 板厚） |
 | `process_types` | 加工種別 |
 | `manufacturers` | メーカー |
-| `notices` | 注意事項。得意先・加工種別・その組み合わせに紐づく |
+| `notices` | 得意先の注意事項。得意先（必須）と、切断方法・加工種別（任意）の条件で表示する |
+| `process_notices` | 加工の注意事項。加工種別（必須）と、板厚・穴径の範囲（任意）の条件で、加工の行の下に表示する |
 | `stamps` | 現場用伝票に印字するスタンプ文言 |
 | `customer_stamps` | 得意先ごとに既定でチェックするスタンプ |
 | `users` | ユーザー。ロールを含む |
@@ -63,7 +64,7 @@
 
 `name_kana`（ふりがな）は、漢字の名前を読み方で探せるようにするための列である。既存の行には値がないため NULL 可とし、マスタ画面から順次入力する。検索時にひらがな・カタカナの違いを区別しないため、どちらで登録してもよい（納入先も同じ）。追加は `supabase/migrations/20260930100100_add_name_kana_to_customers_and_destinations.sql`。
 
-注意事項は `notices` テーブルに切り出す。得意先マスタ内のテキスト欄として持つと、その受注に関係のない注意事項まですべて表示され、件数が増えるにつれ読み飛ばされるためである。
+注意事項は `notices`（得意先の注意事項）テーブルに切り出す。得意先マスタ内のテキスト欄として持つと、その受注に関係のない注意事項まですべて表示され、件数が増えるにつれ読み飛ばされるためである。
 
 ### delivery\_destinations（納入先）
 
@@ -279,7 +280,7 @@
 | `input_shape` | text | 入力の形。`自由入力` / `穴` / `曲げ`。既定 `自由入力`。受注登録画面の加工の項目の入力欄を切り替える |
 | `is_active` | boolean | 有効フラグ |
 
-注意事項は `notices` テーブルに切り出す。
+加工の注意事項は `process_notices` テーブルに切り出す。
 
 `input_shape`（入力の形）は、加工の行の項目（`order_item_processes.spec_fields`）の入力欄と、数量の求め方を決める（basic-design.md「加工の入力項目」）。加工種別の名前で分岐せずに済むよう、データとして持つ（`special_product_types.dimension_shape` と同じ考え方）。初期データは、レーザー・プラズマ孔・ガス孔・キリ孔を `穴`、曲げを `曲げ`、それ以外を `自由入力` とする（列の追加は `supabase/migrations/20261002100000_add_process_input_shapes.sql`、値の設定は seed 005）。形を追加するたびに、チェック制約の値の一覧を新しいマイグレーションで広げる（予定: ピアス孔・長孔・中抜き・タップ孔・開先・マーキング・切り込み・入力項目なし（ショット））。
 
@@ -329,28 +330,53 @@
 
 `factory`（現場）は MVP では運用しないが、ロールの枠組みとして定義しておく。
 
-### notices（注意事項）
+### notices（得意先の注意事項）
 
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
-| `customer_id` | uuid | FK → `customers`。NULL 可 |
-| `process_type_id` | uuid | FK → `process_types`。NULL 可 |
+| `customer_id` | uuid | FK → `customers`。NOT NULL |
+| `cutting_method` | text | 切断方法の条件（任意）。`シャーリング` / `ガス` / `レーザー` / `プラズマ`（`cutting_prices.cutting_method` と同じ値域） |
+| `process_type_id` | uuid | FK → `process_types`。加工種別の条件（任意） |
 | `body` | text | 注意事項の本文 |
-| `priority` | integer | 表示順 |
+| `priority` | integer | 表示順（小さいほど上） |
 | `is_active` | boolean | 有効フラグ |
 
-得意先・加工種別のどちらを埋めるかで表示条件が決まる。
+得意先・切断方法・加工種別のうち、指定した条件がすべて受注に当てはまったら、受注登録画面の補助エリアに表示する。切断方法と加工種別は、受注のどこかの行にあれば当てはまるとする。
 
-| `customer_id` | `process_type_id` | 表示条件 |
+| 指定した条件 | 表示する受注 |
+| --- | --- |
+| 得意先だけ | その得意先の受注すべて |
+| 得意先 × 切断方法 | その得意先で、その切断方法の行がある受注（例: レーザーのときはケガキマーキング不可でインクジェットマーキング指定） |
+| 得意先 × 加工種別 | その得意先で、その加工の行がある受注 |
+| 得意先 × 切断方法 × 加工種別 | その得意先で、両方の行がある受注 |
+
+「A 社は常に精度に厳しい」と「A 社はレーザーのときだけ注意」を同一の仕組みで扱える。表示のみで、受注には保存しない。
+
+注意事項を独立したテーブルとするのは、受注に関係のないものまで表示すると件数が増えるにつれ読み飛ばされ、注意喚起として機能しなくなるためである。範囲で表せない条件付きの内容は自動判定せずテキストとして表示する。
+
+当初は「得意先だけ」「加工種別だけ」「その組み合わせ」の 3 通りを 1 つのテーブルで持っていた。加工種別だけの注意事項は板厚・穴径で判定したいものが多いため `process_notices` に分け、`notices` は得意先を必須にした。既存の加工種別だけの行は `process_notices` に移した（`supabase/migrations/20261003100000_split_customer_and_process_notices.sql`）。
+
+### process_notices（加工の注意事項）
+
+| カラム | 型 | 説明 |
 | --- | --- | --- |
-| あり | NULL | その得意先の受注すべてで表示 |
-| NULL | あり | その加工を選択したときすべてで表示 |
-| あり | あり | その得意先かつその加工のときのみ表示 |
+| `id` | uuid | PK |
+| `process_type_id` | uuid | FK → `process_types`。NOT NULL |
+| `thickness_min` / `thickness_max` | numeric | 板厚の範囲（mm。任意）。加工の行の母材（材料の行）の板厚で判定する |
+| `hole_diameter_min` / `hole_diameter_max` | numeric | 穴径の範囲（mm。任意）。入力の形が「穴」の加工の行で、入力した穴径で判定する |
+| `body` | text | 文言 |
+| `is_active` | boolean | 有効フラグ |
 
-「A 社はレーザー加工のときだけ注意」と「A 社は常に精度に厳しい」を同一の仕組みで扱える。両方が NULL の行は作らない（チェック制約で禁止する）。
+加工種別が一致し、範囲を指定した項目がすべて範囲に入る加工の行のすぐ下に、文言を小さく表示する。表示のみで、受注には保存せず、登録も止めない。
 
-注意事項を独立したテーブルとするのは、受注に関係のないものまで表示すると件数が増えるにつれ読み飛ばされ、注意喚起として機能しなくなるためである。条件付きの内容（板厚 9mm 以下なら可、など）は自動判定せずテキストとして表示する。
+- 範囲はどちらも「以上・以下」（境界の値を含む）。片方だけの指定もできる（例: 板厚 13 以上）
+- 範囲を指定しない場合は、その加工種別の行すべてに表示する
+- 範囲を指定しているのに値がまだ入力されていない（母材の板厚・穴径が未入力）場合は表示しない
+- 穴径の範囲は、入力の形が「穴」の加工種別のときだけ指定できる（マスタ画面で確認する。ほかの形では穴径を入力しないため、一度も表示されなくなる）
+- 下限 ≤ 上限、値は正の数（チェック制約）
+
+例: キリ孔・穴径 30 以上 →「精度注意」、曲げ・板厚 13 以上 →「12mm を超える曲げは要確認」
 
 ### stamps（スタンプ文言）
 
@@ -358,12 +384,14 @@
 | --- | --- | --- |
 | `id` | uuid | PK |
 | `body` | text | 文言（雨濡れ厳禁 など） |
-| `display_order` | integer | 表示順 |
+| `number` | integer | 番号（一意、NOT NULL、1 以上）。受注登録画面で番号を打って付け外しする。並び順にも使う |
 | `is_active` | boolean | 有効フラグ |
 
 現場用伝票に印字する文言を登録しておき、受注入力時にチェックしたものを伝票に反映する。
 
 同じ文言を複数の得意先が指定するため、得意先との関連は `customer_stamps` で保持する。
+
+受注登録画面はテンキーで操作するため、スタンプにも番号の列 `number` を持たせる（ほかのマスタの番号と同じ考え方。0 は「いつもの値」に取っておくため 1 から）。並び順も番号で決めるため、当初の表示順の列 `display_order` は削除した。並び順の列が 2 つあると食い違うためである。既存の行には、それまでの表示順で 1 から番号を振った（`supabase/migrations/20261003100100_add_stamp_numbers_and_save_order_aux.sql`）。
 
 ### customer\_stamps（得意先の既定スタンプ）
 
@@ -454,12 +482,13 @@
 
 - 引数はそれぞれ `orders`・`order_items` の列名をキーにした JSON（明細は配列で 1 件以上）
 - 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）。加工の項目（`spec_fields`）も JSON のまま受け取って登録する
+- ヘッダーの JSON に、フリーコメント（`field_note`）と、チェックしたスタンプの id の配列（`stamp_ids`）を持つ。明細の後に `order_stamps` に登録する（スプライス専用の受注の「ショット加工」は含めない）
 - `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
 - 起案者（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
 - 実行権限は `authenticated` にだけ付与する
 
-実装は `supabase/migrations/20260930100300_create_create_order_function.sql`（加工の登録を加えたものは `20261001100000_create_order_with_processes.sql`）を参照。
+実装は `supabase/migrations/20260930100300_create_create_order_function.sql`（加工の登録を加えたものは `20261001100000_create_order_with_processes.sql`、フリーコメントとスタンプを加えたものは `20261003100100_add_stamp_numbers_and_save_order_aux.sql`）を参照。
 
 ### order\_items（受注明細）
 
@@ -614,7 +643,8 @@ destinations       │            │                    └── process_types
                    └── users （created_by）
 
 customers ──< customer_stamps >── stamps
-notices   ──> customers / process_types （どちらか、または両方）
+notices   ──> customers（必須）/ process_types（任意）
+process_notices ──> process_types
 
 ── 価格系（値で照合。products への外部キーは持たない）──
 cutting_prices        ──> plate_types / materials（NULL = SS400ベース）
@@ -693,6 +723,9 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `material_extras.material_id` に一意制約（材質ごとに1行）
 - `plate_types` `materials` `special_product_types` は `name` に一意制約
 - `plate_types` `materials` `special_product_types` `process_types` `delivery_methods` は `number` に一意制約
+- `stamps.number` に一意制約（1 以上）
+- `notices.customer_id` は NOT NULL。`notices.cutting_method` は切断方法の値に限る
+- `process_notices` の範囲は正の数で、下限 ≤ 上限
 - `process_types.input_shape` は入力の形の値の一覧に限る。`order_item_processes.spec_fields` は NULL か JSON オブジェクト
 - `customers` `delivery_destinations` `manufacturers` の `code` は数字のみ（`delivery_destinations` はさらに `0` を禁止。`manufacturers` はさらに `0` を禁止し、一意制約）
 - `special_product_types.is_splice_order_type` が true の行は 1 行だけ（部分一意インデックス）
@@ -715,7 +748,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `order_stamps` | 参照・登録・更新 | 参照 | すべて |
 | `users` | 参照 | 参照 | すべて |
 | 価格系マスタ（`cutting_prices` `material_extras` `thickness_extras` `large_plate_extras` `standard_plate_prices` `special_product_prices`） | 参照不可（価格マスタの行を取り出す関数で、明細の計算に必要な行だけ取得可） | 参照不可 | すべて |
-| マスタ各種（`plate_types` `special_product_types` `unit_weights` `delivery_methods` を含む） | 参照 | 参照 | すべて |
+| マスタ各種（`plate_types` `special_product_types` `unit_weights` `delivery_methods` `notices` `process_notices` `stamps` `customer_stamps` を含む） | 参照 | 参照 | すべて |
 
 `order_item_processes` / `shipments` / `shipment_items` / `attachments` / `order_stamps` / `users` は元の設計時点では個別に定めていなかったテーブルである。`orders` `order_items` `マスタ各種` に適用した考え方（現場の業務範囲は「加工指示の閲覧」に限られる、単価情報は現場に見せない）を、各テーブルの性質に当てはめて追加した。
 

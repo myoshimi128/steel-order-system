@@ -11,6 +11,9 @@ const MASTER_LINKS = [
   { href: '/masters/special-product-types', label: '特殊製品種別' },
   { href: '/masters/unit-weights', label: '単位質量' },
   { href: '/masters/process-types', label: '加工種別' },
+  { href: '/masters/notices', label: '得意先の注意事項' },
+  { href: '/masters/process-notices', label: '加工の注意事項' },
+  { href: '/masters/stamps', label: 'スタンプ' },
   { href: '/masters/manufacturers', label: 'メーカー' },
   { href: '/masters/delivery-methods', label: '配達方法' },
 ] as const

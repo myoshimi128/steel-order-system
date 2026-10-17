@@ -9,11 +9,18 @@ import { sortByCode, type CodeOption } from '@/lib/code-input/code-option'
 import type { Database } from '@/lib/database.types'
 import { SAME_AS_CUSTOMER_OPTION } from './constants'
 import type { ItemMasters, ProcessTypeMaster, SpecialProductTypeMaster } from './item-types'
+import type { CustomerNoticeMaster, ProcessNoticeMaster } from './notices'
+import type { OrderAuxMasters } from './use-order-aux'
 import type { HeaderMasterOptions } from './use-order-header'
 
 export type OrderEntryMasters = {
   header: HeaderMasterOptions
   items: ItemMasters
+  // 補助エリア（注意事項・スタンプ）と、加工の行の下に出す加工の注意事項
+  aux: OrderAuxMasters & {
+    customerNotices: CustomerNoticeMaster[]
+    processNotices: ProcessNoticeMaster[]
+  }
 }
 
 // 得意先・納入先の行を、番号入力の選択肢（番号＝コード、名称、保存する値＝id）に変換する。
@@ -49,6 +56,10 @@ export async function loadOrderEntryMasters(
     unitWeights,
     specialProductTypes,
     processTypes,
+    customerNotices,
+    processNotices,
+    stamps,
+    customerStamps,
   ] = await Promise.all([
     supabase.from('customers').select('id, code, name, name_kana').eq('is_active', true),
     supabase.from('delivery_destinations').select('id, code, name, name_kana').eq('is_active', true),
@@ -76,6 +87,18 @@ export async function loadOrderEntryMasters(
     // 加工方法（加工の行）。番号が未設定の行は画面の選択肢から外す（item-options.ts）
     // 入力の形（input_shape）で、加工の項目の入力欄と数量の求め方を切り替える
     supabase.from('process_types').select('id, number, name, input_shape').eq('is_active', true),
+    // 注意事項は件数が少ないため、画面を開くときにまとめて取得し、画面側で受注に関係するものに絞り込む
+    supabase
+      .from('notices')
+      .select('id, customer_id, cutting_method, process_type_id, body, priority')
+      .eq('is_active', true),
+    supabase
+      .from('process_notices')
+      .select('id, process_type_id, thickness_min, thickness_max, hole_diameter_min, hole_diameter_max, body')
+      .eq('is_active', true),
+    // スタンプは番号順に並べる（番号を打って付け外しする）
+    supabase.from('stamps').select('id, number, body').eq('is_active', true).order('number'),
+    supabase.from('customer_stamps').select('customer_id, stamp_id'),
   ])
 
   const deliveryMethodRows = rowsOf(deliveryMethods, '配達方法')
@@ -125,6 +148,18 @@ export async function loadOrderEntryMasters(
           input_shape: row.input_shape as ProcessTypeMaster['input_shape'],
         }),
       ),
+    },
+    aux: {
+      // cutting_method も CHECK 制約で切断方法の値に限定されている
+      customerNotices: rowsOf(customerNotices, '得意先の注意事項').map(
+        (row): CustomerNoticeMaster => ({
+          ...row,
+          cutting_method: row.cutting_method as CustomerNoticeMaster['cutting_method'],
+        }),
+      ),
+      processNotices: rowsOf(processNotices, '加工の注意事項'),
+      stamps: rowsOf(stamps, 'スタンプ'),
+      customerStamps: rowsOf(customerStamps, '得意先の指定スタンプ'),
     },
   }
 }
