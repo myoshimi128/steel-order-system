@@ -57,10 +57,13 @@ export function OrderItemsTable({
   const numbers = materialNumbers(items.rows)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // 見出し・明細の行・合計を 1 つのスクロールの枠に入れ、見出しは上端、合計は下端に固定する（sticky）。
+    // 見出しや合計を枠の外に置くと、明細の行の側にだけスクロールバーの幅が入り、列の位置がずれるため。
+    // scroll-pt / scroll-pb は、キー操作で欄を移ったときに、その欄が固定した見出し・合計の下に隠れないようにする余白
+    <div className="min-h-0 flex-1 scroll-pt-14 scroll-pb-12 overflow-y-auto">
       {/* 見出し */}
       <div
-        className={`${ITEM_GRID_CLASS} bg-slate-900 py-2 text-xs font-semibold text-white dark:bg-slate-800`}
+        className={`${ITEM_GRID_CLASS} sticky top-0 z-10 bg-slate-900 py-2 text-xs font-semibold text-white dark:bg-slate-800`}
       >
         <HeaderCell top="No" />
         <HeaderCell top="切断方法" bottom={isSplice ? '切断区分' : '区分'} />
@@ -81,8 +84,8 @@ export function OrderItemsTable({
         </p>
       )}
 
-      {/* 明細の行（この部分だけスクロールする） */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* 明細の行 */}
+      <div>
         {items.rows.map((row, index) => {
           const check = items.checks[index]
           const result = calculations[index]
@@ -137,7 +140,10 @@ export function OrderItemsTable({
         )}
       </div>
 
-      <OrderItemsTotals totals={totals} />
+      {/* 合計は枠の下端に固定する（明細が少なければ最後の行のすぐ下に出る） */}
+      <div className="sticky bottom-0 z-10">
+        <OrderItemsTotals totals={totals} />
+      </div>
     </div>
   )
 }
