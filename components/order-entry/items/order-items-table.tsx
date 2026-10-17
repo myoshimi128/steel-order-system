@@ -65,7 +65,11 @@ export function OrderItemsTable({
       <div
         className={`${ITEM_GRID_CLASS} sticky top-0 z-10 bg-slate-900 py-2 text-xs font-semibold text-white dark:bg-slate-800`}
       >
-        <HeaderCell top="No" />
+        {/* No の列は見出しの文字を出さない（帯の左端が詰まって見えるため）。
+            列の位置は残し、読み上げ用にだけ「No」を入れておく */}
+        <div>
+          <span className="sr-only">No</span>
+        </div>
         <HeaderCell top="切断方法" bottom={isSplice ? '切断区分' : '区分'} />
         <HeaderCell top="種類" bottom="製鋼法" />
         <HeaderCell top="材質" bottom="メーカー" />
