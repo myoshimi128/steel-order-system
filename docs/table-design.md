@@ -349,7 +349,7 @@
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK。Supabase Auth の user id |
-| `employee_no` | text | 社員番号（社員No.）。一意。ログインに使う |
+| `employee_no` | text | 社員番号（社員No.）。英大文字と数字で 1〜10 文字。一意・必須。ログインに使う |
 | `name` | text | 氏名 |
 | `role` | text | ロール。`office` / `factory` / `admin` |
 | `department` | text | 部署。`sales` 営業部 / `processing` 加工部 / `shearing` シャーリング部 / `delivery` 配送部 / `general` 経理・総務。通知の宛先に使う |
@@ -358,7 +358,7 @@
 
 `factory`（現場）は MVP では運用しないが、ロールの枠組みとして定義しておく。権限はロールで決め、部署・営業所では決めない。
 
-ログインは社員No. で行う。Supabase Auth のユーザーは `{社員No. を小文字にしたもの}@staff.invalid` のメールアドレスで作成し、ログイン画面は打たれた社員No. からこのメールアドレスを作って認証する（basic-design.md「ログイン」）。`auth.users` の作成時に `public.users` の行を作るトリガー（`handle_new_auth_user`）で、メールアドレスの `@` より前を大文字にして `employee_no` に入れる。
+ログインは社員No. で行う。Supabase Auth のユーザーは `{社員No. を小文字にしたもの}@staff.invalid` のメールアドレスで作成し、ログイン画面は打たれた社員No. からこのメールアドレスを作って認証する（basic-design.md「ログイン」）。`auth.users` の作成時に `public.users` の行を作るトリガー（`handle_new_auth_user`）で、メールアドレスの `@` より前を大文字にして `employee_no` に入れる。形の違うメールアドレスではユーザーを作らせない。名前・ロール・部署・営業所は、ユーザーを作るときの追加の情報（`raw_user_meta_data` の `name`・`role`・`department`・`site`）があれば使い、なければ名前は社員No.、ロールは `office`、部署・営業所は空で作る（管理画面の「Create new user」では追加の情報を入れられないため、あとで SQL で入れる。basic-design.md「ユーザーの作り方」）。
 
 ### notices（得意先の注意事項）
 
@@ -781,7 +781,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `orders` のスプライス関連の列（`member_class` / `joint_no` / `splice_shot`）の整合性チェック（`orders` の説明を参照）
 - `orders.member_class` は部材区分の値（`NONE` `DF` `GPL` `BH` `SPL`）に限る
 - `orders` の `intake_id` + `branch_no` に一意制約。`work_unit_id` は同じ受付の加工区分に限る
-- `users.employee_no` に一意制約
+- `users.employee_no` に一意制約・形の check 制約（英大文字と数字で 1〜10 文字）・NOT NULL
 - `shipment_items.quantity` に正数チェック
 - 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
 - `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須

@@ -1,6 +1,6 @@
 # 受付〜受注登録 テーブル設計書
 
-前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。まだマイグレーションにしていない分（社員No. の一意制約、`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
+前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。社員No. の一意制約とユーザー作成時のトリガーは `20261019100000_employee_no_login.sql`（PR 4）。まだマイグレーションにしていない分（`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
 
 本体のテーブル（`orders` `users` など）の変更は、本体の `docs/table-design.md` にも反映している。
 
@@ -32,7 +32,7 @@ lead_time_items / lead_time_messages / lead_time_history（目安納期）
 | `notifications` / `notification_reads` | 新規 | 新着の通知と既読 |
 | `lead_time_items` / `lead_time_messages` / `lead_time_history` | 新規 | 目安納期・部署メッセージ・更新履歴 |
 | `orders` | **既存を変更（PR 9）** | 受付との紐付け・担当者を追加。受注No. の形式を変更（部材区分・加工場所は受注登録画面の作り直しの PR で先に追加済み）。受付のない今の受注登録画面から登録できなくならないよう、受付をつなぐ PR 9 で行う |
-| `users` | **既存を変更** | 部署・営業所を追加（PR 3）。社員No. を一意に（ログインを切り替える PR 4） |
+| `users` | **既存を変更** | 部署・営業所を追加（PR 3）。社員No. を一意・必須に（ログインを切り替える PR 4） |
 | `attachments` | **既存を廃止（PR 9 以降）** | `intake_files` に一本化する。参照しているコードを外したあとで drop する |
 | `work_unit_queue_view` | 新規ビュー | 受注登録待ち・CAD の一覧用 |
 
@@ -264,7 +264,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | --- | --- | --- |
 | department | text | 部署。`sales` `processing` `shearing` `delivery` `general`。通知の宛先に使う |
 | site_id | uuid | 所属する営業所。FK → `sites`。受付登録の加工場所の初期値・ヘッダーの表示（「本社シャーリング部」）に使う |
-| employee_no | text | 既存の列。一意にする。ログインに使う（一意制約とユーザー作成時のトリガーの作り直しは PR 4） |
+| employee_no | text | 既存の列。英大文字と数字で 1〜10 文字。一意・必須。ログインに使う（PR 4。ユーザー作成時のトリガーがメールアドレスから入れる） |
 
 `department`・`site_id` はどちらも空を許す（既存のユーザーは空のまま入るため）。部署が空のユーザーには通知が届かない。ログイン中のユーザーの部署は `current_user_department()`（`security definer`。`current_user_role()` と同じ作り）で読み、通知の RLS に使う。
 

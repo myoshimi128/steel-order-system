@@ -1,55 +1,46 @@
-import { LoginForm } from './login-form'
+import { LoginBrand } from '@/components/login/login-brand'
+import { LoginFooter } from '@/components/login/login-footer'
+import { LoginForm } from '@/components/login/login-form'
 
-// ユーザー登録画面は作らない方針のため、ここにはログインフォームのみを置く
-// （アカウントの作成は管理者が Supabase の管理画面で行う運用。
-//  supabase/migrations の handle_new_auth_user トリガーが public.users 側の行を自動作成する）
+// ログイン画面（docs/intake/screen-design.md「S-00 ログイン」）。見た目は画面イメージ「00 ログイン」に合わせる。
+//   ・上にネイビーの帯、地は薄い格子柄
+//   ・中央にロゴとシステム名、その下にログインのカード（上の縁がネイビー）
+//   ・カードの下に注意書き、画面の下端に著作権の表示と問い合わせ先
 //
-// 見た目は Figma Make で作成したデザイン案を反映している。
-// 対象解像度は 1280×1024 固定・レスポンシブ対応なし（docs/screen-design.md 共通方針）のため、
-// 画面幅が変わる前提のスタイルは入れていない。
+// ユーザー登録の画面は作らない。ユーザーは管理者が Supabase の管理画面で
+// {社員No.}@staff.invalid のメールアドレスで作る（docs/basic-design.md「ユーザーの作り方」）。
+// 対象解像度は 1280×1024 固定・レスポンシブ対応なし（docs/screen-design.md 共通方針）。
 export default function LoginPage() {
   return (
-    <main
-      className="flex min-h-screen flex-col items-center justify-center px-4"
+    <div
+      className="flex min-h-screen flex-col bg-canvas"
       style={{
-        backgroundColor: '#f4f6f8',
-        // 薄いブループリント風の格子柄。業務システムらしさを出すための装飾で、
-        // 機能には関係しない
+        // 薄い格子柄（装飾）。28px ごとに縦横の細い線を引く
         backgroundImage:
-          'linear-gradient(rgba(100,130,160,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(100,130,160,0.07) 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
+          'linear-gradient(rgba(27,54,93,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(27,54,93,0.05) 1px, transparent 1px)',
+        backgroundSize: '28px 28px',
       }}
     >
-      <div className="w-full max-w-[360px]">
-        {/* ロゴ・タイトル */}
-        <div className="mb-10 text-center">
-          <div className="mb-4 flex items-center justify-center gap-2.5">
-            <div className="flex h-[34px] w-[34px] items-center justify-center rounded border border-amber-500/25 bg-amber-500/[0.12]">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="1" y="1" width="6" height="6" rx="0.5" fill="#f59e0b" opacity="0.9" />
-                <rect x="9" y="1" width="6" height="6" rx="0.5" fill="#f59e0b" opacity="0.5" />
-                <rect x="1" y="9" width="6" height="6" rx="0.5" fill="#f59e0b" opacity="0.5" />
-                <rect x="9" y="9" width="6" height="6" rx="0.5" fill="#f59e0b" opacity="0.25" />
-              </svg>
-            </div>
-            <h1 className="text-[26px] font-bold tracking-[0.06em] text-[#1a2e42]">
-              鋼材受注システム
-            </h1>
-          </div>
-          <p className="text-xs tracking-[0.15em] text-[#7a9ab4]">
-            Steel Order Management
-          </p>
-        </div>
+      {/* 上のネイビーの帯（共通レイアウトのヘッダーと同じ色） */}
+      <div className="h-7 shrink-0 bg-navy" />
 
-        {/* フォームカード */}
-        <div className="rounded-md border border-[rgba(100,130,160,0.15)] bg-white px-7 py-8 shadow-[0_4px_24px_rgba(20,50,80,0.08)]">
+      <main className="flex flex-1 flex-col items-center justify-center px-4 py-10">
+        <LoginBrand />
+
+        {/* ログインのカード。上の縁だけネイビーの太い線にする */}
+        <section className="w-[420px] rounded-md border border-line border-t-[3px] border-t-navy bg-white px-9 pt-8 pb-9 shadow-[0_2px_12px_rgba(20,40,70,0.06)]">
+          <h2 className="mb-6 text-base font-bold text-neutral-900">ログイン</h2>
           <LoginForm />
-        </div>
+        </section>
 
-        <p className="mt-7 text-center text-[10px] tracking-[0.05em] text-[#aabccc]">
-          Steel Order Management System
+        <p className="mt-6 text-center text-xs leading-6 text-neutral-400">
+          このシステムへのアクセスは許可された従業員のみに限定されています。
+          <br />
+          不正アクセスは社内規定および法令により処罰されます。
         </p>
-      </div>
-    </main>
+      </main>
+
+      <LoginFooter />
+    </div>
   )
 }
