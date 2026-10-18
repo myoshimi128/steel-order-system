@@ -74,6 +74,10 @@ describe('buildBreadcrumbs', () => {
       { label: 'シャーリング部', href: '/shearing' },
       { label: 'マスタ管理', href: null },
     ])
+    expect(buildBreadcrumbs('/shearing/lead-time')).toEqual([
+      { label: 'シャーリング部', href: '/shearing' },
+      { label: '納期連絡', href: null },
+    ])
   })
 
   it('メニューにない画面はシャーリング部だけ', () => {

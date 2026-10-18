@@ -2092,6 +2092,17 @@ export type Database = {
         }
         Returns: Json
       }
+      publish_lead_times: {
+        Args: {
+          p_dept: string
+          p_expected_history_id?: string
+          p_expires_on?: string
+          p_items: Json
+          p_message?: string
+          p_summary: string
+        }
+        Returns: string
+      }
       register_intake: { Args: { p_intake_id: string }; Returns: string }
     }
     Enums: {

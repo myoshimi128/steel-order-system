@@ -82,7 +82,7 @@ export const HOME_MENU: Menu = {
   ],
 }
 
-// シャーリング部のメニュー。今ある画面（受注登録・マスタ管理）だけを押せるようにする
+// シャーリング部のメニュー。今ある画面（受注登録・納期連絡・マスタ管理）だけを押せるようにする
 export const SHEARING_MENU: Menu = {
   kind: 'shearing',
   sections: [
@@ -97,7 +97,7 @@ export const SHEARING_MENU: Menu = {
         { label: '送り状発行', icon: 'ticket', href: null },
         { label: 'ミルシート作成', icon: 'sheet', href: null },
         { label: '受注管理', icon: 'list', href: null },
-        { label: '納期連絡', icon: 'clock', href: null },
+        { label: '納期連絡', icon: 'clock', href: '/shearing/lead-time' },
         { label: '在庫・材料', icon: 'box', href: null, proposal: true },
         { label: 'マスタ管理', icon: 'gear', href: '/masters', activePrefix: '/masters' },
       ],

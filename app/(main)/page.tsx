@@ -1,43 +1,41 @@
-import Link from 'next/link'
+// ホーム（S-01。docs/intake/screen-design.md「S-01 ホーム」）。以前の簡易なメインメニューを置き換えた。
+//   ・上部: あいさつ（「おはようございます、○○さん」）と今日の日付
+//   ・左: 社内連絡（Phase 2 までは「準備中」の枠だけ）
+//   ・右: 目安納期（加工部・シャーリング部のカード。納期連絡の画面で公開した内容）
+// 画面へのリンクは、サイドメニュー（ホームのメニュー）から開く。
 
-// メインメニュー（簡易版）。
-// docs/basic-design.md の画面構成:
-//   メインメニュー
-//     └ 鋼板切断（受注登録・受注管理 / 現場加工指示 / 送り状発行 / ミルシート作成）
-//     └ マスタ管理
-// のうち、現時点で実装済みなのは受注登録（新規・ヘッダーのみ）とマスタ管理。
-// 鋼板切断配下のそれ以外の画面は未実装のため、リンクにはせずラベル表示のみとする。
-export default function Home() {
+import { LeadTimeOverview } from '@/components/home/lead-time-overview'
+import { NoticeBoardPlaceholder } from '@/components/home/notice-board-placeholder'
+import { getCurrentUser } from '@/lib/auth'
+import { formatJapaneseDate, greetingFor } from '@/lib/home/greeting'
+import { loadLeadTimeBoards } from '@/lib/lead-time/load-lead-times'
+import { HOME_LEAD_TIME_DEPTS } from '@/lib/lead-time/types'
+import { todayInJapan } from '@/lib/order-entry/date'
+
+export default async function HomePage() {
+  // ユーザーと目安納期を並行して読む
+  const [user, boards] = await Promise.all([
+    getCurrentUser(),
+    loadLeadTimeBoards(HOME_LEAD_TIME_DEPTS),
+  ])
+
+  // あいさつ・日付・メッセージの表示期限は、表示した時点の日本時間で決める
+  const now = new Date()
+
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-12">
-      <h1 className="text-xl font-semibold">メインメニュー</h1>
+    <main className="flex-1 bg-canvas px-8 py-6">
+      <div className="flex items-baseline gap-4">
+        <h1 className="text-2xl font-bold text-neutral-900">
+          {greetingFor(now)}
+          {user && `、${user.name}さん`}
+        </h1>
+        <p className="text-sm text-neutral-500">{formatJapaneseDate(now)}</p>
+      </div>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-          鋼板切断
-        </h2>
-        <Link
-          href="/orders/new"
-          className="w-fit rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-white dark:text-neutral-900"
-        >
-          受注登録
-        </Link>
-        <p className="rounded border border-dashed border-neutral-300 px-4 py-3 text-sm text-neutral-400 dark:border-neutral-700 dark:text-neutral-500">
-          受注管理／現場加工指示／送り状発行（未実装）
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-          マスタ管理
-        </h2>
-        <Link
-          href="/masters"
-          className="w-fit rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-white dark:text-neutral-900"
-        >
-          マスタ管理を開く
-        </Link>
-      </section>
+      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_440px] items-start gap-5">
+        <NoticeBoardPlaceholder />
+        <LeadTimeOverview boards={boards} today={todayInJapan(now)} />
+      </div>
     </main>
   )
 }
