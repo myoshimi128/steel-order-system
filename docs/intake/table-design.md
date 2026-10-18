@@ -1,6 +1,6 @@
 # 受付〜受注登録 テーブル設計書
 
-前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。マイグレーションの下書きは `docs/intake/schema-draft.sql`（実装の PR で本物のマイグレーションにしたら削除する）。
+前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。まだマイグレーションにしていない分（社員No. の一意制約、`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
 
 本体のテーブル（`orders` `users` など）の変更は、本体の `docs/table-design.md` にも反映している。
 
@@ -31,9 +31,9 @@ lead_time_items / lead_time_messages / lead_time_history（目安納期）
 | `intake_files` | 新規 | ファイルの情報（実体は Storage）。受注に関わるファイルはすべてここに持つ |
 | `notifications` / `notification_reads` | 新規 | 新着の通知と既読 |
 | `lead_time_items` / `lead_time_messages` / `lead_time_history` | 新規 | 目安納期・部署メッセージ・更新履歴 |
-| `orders` | **既存を変更** | 受付との紐付け・加工場所・担当者を追加。受注No. の形式を変更（部材区分の追加と `is_splice` の廃止は、受注登録画面の作り直しの PR で先に行う） |
-| `users` | **既存を変更** | 部署・営業所を追加。社員No. を一意に |
-| `attachments` | **既存を廃止** | `intake_files` に一本化する |
+| `orders` | **既存を変更（PR 9）** | 受付との紐付け・担当者を追加。受注No. の形式を変更（部材区分・加工場所は受注登録画面の作り直しの PR で先に追加済み）。受付のない今の受注登録画面から登録できなくならないよう、受付をつなぐ PR 9 で行う |
+| `users` | **既存を変更** | 部署・営業所を追加（PR 3）。社員No. を一意に（ログインを切り替える PR 4） |
+| `attachments` | **既存を廃止（PR 9 以降）** | `intake_files` に一本化する。参照しているコードを外したあとで drop する |
 | `work_unit_queue_view` | 新規ビュー | 受注登録待ち・CAD の一覧用 |
 
 コード値は enum ではなく `text`＋`check` 制約で持つ（本体と同じ）。
@@ -155,7 +155,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 - 納期：`確定` `仮納期` は日付が必須、`後報` `最短出荷` は日付が空（`orders` と同じ）
 - 受注が 1 件でもある受付には `deleted_at` を入れられない（トリガー）
 
-**トリガー**：`intakes_touch`（更新者・日時）、`intakes_log_site_change`（加工場所の変更履歴）、`intakes_notify_new`（`waiting` で追加されたらシャーリング部への通知を作る）、`intakes_prevent_deleting_ordered`（受注のある受付の削除を拒否）
+**トリガー**：`intakes_touch`（更新者・日時）、`intakes_log_site_change`（加工場所の変更履歴）、`intakes_notify_new`（`waiting` で追加されたらシャーリング部への通知を作る）、`intakes_prevent_deleting_ordered`（受注のある受付の削除を拒否。`orders.intake_id` を足す PR 9 で作る）
 
 受付の納期・入れ先などは、受注の **初期値** として使う。受注登録で値を変えても、受付の値は書き換えない（加工場所だけは例外で、受注情報で変えると受付も更新する。basic-design.md「例外の運用」）。
 
@@ -242,7 +242,9 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 
 詳しくは本体の `docs/table-design.md`（`orders` `users`）を参照。
 
-### orders
+### orders（PR 9）
+
+受注に必須の列（受付・加工区分）を先に足すと、受付のない今の受注登録画面から登録できなくなる。そのため、テストデータの受注の削除・列の追加・受注No. の切り替え（`private.issue_order_branch()`、`private.next_order_no()` とカウンターの削除、`create_order` の変更）は、受注登録画面と受付をつなぐ PR 9 でまとめて行う（下書きは `schema-draft.sql`）。
 
 | 列 | 型 | 説明 |
 | --- | --- | --- |
@@ -262,19 +264,21 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | --- | --- | --- |
 | department | text | 部署。`sales` `processing` `shearing` `delivery` `general`。通知の宛先に使う |
 | site_id | uuid | 所属する営業所。FK → `sites`。受付登録の加工場所の初期値・ヘッダーの表示（「本社シャーリング部」）に使う |
-| employee_no | text | 既存の列。一意にする。ログインに使う |
+| employee_no | text | 既存の列。一意にする。ログインに使う（一意制約とユーザー作成時のトリガーの作り直しは PR 4） |
+
+`department`・`site_id` はどちらも空を許す（既存のユーザーは空のまま入るため）。部署が空のユーザーには通知が届かない。ログイン中のユーザーの部署は `current_user_department()`（`security definer`。`current_user_role()` と同じ作り）で読み、通知の RLS に使う。
 
 ## 関数
 
 | 関数 | 内容 |
 | --- | --- |
-| `private.assign_intake_no(intake_id) → text` | 受付No. を採番する（すでにあれば同じ番号を返す）。年ごとのカウンターを 1 行ロックして +1。`security definer` |
+| `private.assign_intake_no(intake_id) → text` | 受付No. を採番する（すでにあれば同じ番号を返す）。年ごとのカウンターを 1 行ロックして +1。`security definer`（カウンターは `authenticated` の権限を外しているため、`security invoker` の `register_intake` から呼んでも所有者の権限で読み書きする。受注番号の `private.next_order_no()` と同じ作り） |
 | `register_intake(intake_id) → text` | 受付登録。売り先・加工場所をチェック → 採番 → `registered`・登録者を記録・対応中を解除 |
 | `complete_split(intake_id, no_file_kinds text[]) → text[]` | 振り分け完了。枠ごとに加工区分を作ってファイルを紐付け、図面なしの区分（`array['sakisun']` など）も作る。元データを論理削除し、**Storage から消すパスを返す**。`dispatched` にする |
 | `add_work_unit(intake_id, kind, origin, note) → uuid` | 受注登録待ちに追加（見落とし・口頭など）。振り分け完了後のみ。`closed` なら `dispatched` に戻す |
-| `private.issue_order_branch(intake_id) → (branch_no, order_no)` | 受注No. の枝番を採番する。`create_order` の中からだけ呼ぶ。`security definer` |
+| `private.issue_order_branch(intake_id) → (branch_no, order_no)` | 受注No. の枝番を採番する。`create_order` の中からだけ呼ぶ。`security definer`（PR 9） |
 | `complete_work_unit(work_unit_id)` | 起票完了（`ready` → `done`） |
-| `create_order(p_order, p_items)`（本体・変更） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
+| `create_order(p_order, p_items)`（本体・変更。PR 9） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
 
 `private` の関数以外は `security invoker`（呼び出したユーザーの権限で実行）とし、RLS をそのまま効かせる。
 
@@ -301,12 +305,30 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 - 業務データは物理削除しない。`intake_destinations` だけ、事務・管理者の削除を許可する（入れ先の入れ直しのため）
 - `intake_site_changes` はトリガーだけが書く（アプリからは参照のみ）
 - `notifications` はトリガー（`security definer`）だけが書く
-- 関数の実行権限は `authenticated` にだけ付与する
+- 関数の実行権限は `authenticated` にだけ付与する（`public`・`anon` からは外す）
+- テーブル・ビューの権限は、マイグレーションの中で `authenticated` にだけ、必要な操作の分を付ける（先に `anon`・`authenticated` の権限をすべて外してから付け直す）。Data API の設定画面から公開の操作をすると `anon` にも権限が付くことがあるため、画面では公開されているかを確認するだけにする
 - Realtime：`notifications`・`intakes`・`work_units` を `supabase_realtime` に追加する（通知と一覧の自動更新）。Realtime の配信も RLS に従う
 - Storage：非公開バケット `intake-files`（50MB、未決 Q-4）。事務・管理者は参照・追加・更新・削除（元データの削除と差し替えのため）
 - Phase 2 のメール取り込み API はサービスロールキーで書き込む
 
-新しいテーブルは、作成後に Data API の設定で公開する（CLAUDE.md の運用）。`private` スキーマのテーブル・関数は公開しない。
+新しいテーブルは、作成後に Data API の設定で公開されているかを確認する（権限はマイグレーションで付ける）。`private` スキーマのテーブル・関数は公開しない。
+
+### マイグレーションの実行の手順（PR 3）
+
+1. SQL Editor で、次の順に 1 ファイルずつ実行する
+   1. `20261018100000_add_user_department_and_site.sql`（`users` の部署・営業所、`current_user_department()`）
+   2. `20261018100100_create_intake_tables.sql`（受付・入れ先・変更履歴・受付No. のカウンター・加工区分・ファイルとトリガー）
+   3. `20261018100200_create_intake_functions.sql`（採番・受付登録・振り分け完了・追加・起票完了）
+   4. `20261018100300_create_notifications_and_lead_times.sql`（通知・目安納期と初期データ）
+   5. `20261018100400_create_work_unit_queue_view.sql`
+   6. `20261018100500_create_intake_rls_and_realtime.sql`（RLS・権限・Realtime）
+   7. `20261018100600_create_intake_files_bucket.sql`（Storage。権限のエラーになったら、ファイルの先頭の手順で管理画面から作る）
+2. 既存のユーザーに部署・営業所を入れる（1 のファイルの先頭の SQL）
+3. `npm run db:types` で型を再生成する
+4. Data API の設定画面で、次が公開されているかを **確認だけ** する（画面から公開の操作はしない。`anon` にも権限が付くことがあるため）
+   - 公開するもの：`intakes`・`intake_destinations`・`intake_site_changes`・`work_units`・`intake_files`・`notifications`・`notification_reads`・`lead_time_items`・`lead_time_messages`・`lead_time_history`・`work_unit_queue_view`
+   - 公開してはいけないもの：`private` スキーマ全体（`private.intake_no_counters`・`private.assign_intake_no`・既存の `private.order_no_counters`・`private.next_order_no`）。どのテーブルも `anon` に権限を付けない
+5. 確認・デモ用に、必要なら seed 006 を実行する（本番の DB では実行しない）
 
 ## ファイルの保存
 
