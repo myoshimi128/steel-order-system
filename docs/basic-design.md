@@ -671,7 +671,28 @@ MVP で出力するのは現場用伝票・加工図面・製品ラベル・送�
 
 画面では社員No. とパスワードでログインする。Supabase Auth はメールアドレスでログインする仕組みのため、社員No. から決まった形のメールアドレス（`{社員No. を小文字にしたもの}@staff.invalid`）を作って渡す。`.invalid` は実在しないことが保証されたドメインで、メールは送らない。社員No. からメールアドレスを調べる関数を作る方法もあるが、どの社員No. が存在するかを外から確かめられてしまうため採らない。
 
-ユーザーは管理者が Supabase の管理画面で、この形のメールアドレスで作成する。`users.employee_no` は一意とし、作成時にメールアドレスから自動で入れる。
+ユーザーは管理者が Supabase の管理画面で、この形のメールアドレスで作成する。`users.employee_no` は一意・必須とし、作成時にメールアドレスから自動で入れる（`supabase/migrations/20261019100000_employee_no_login.sql`）。
+
+- 社員No. の形は、英大文字と数字で 1〜10 文字（例: `U00001`）。ログイン画面では、前後の空白を除き、全角を半角に、小文字を大文字にそろえてから使う（`lib/employee-login.ts`）
+- ログインに失敗したときの文は「社員No. またはパスワードが正しくありません」の 1 つだけにする。社員No. の形の違い・存在しない社員No.・パスワードの間違い・無効のユーザーを区別すると、どの社員No. が存在するかを外から確かめられてしまうためである。形の違う社員No. は Supabase に問い合わせずに同じ文を返す
+- 無効のユーザー（`users.is_active = false`）は、ログインした直後にログアウトさせ、同じ文を出す
+- 何回も間違えたときの制限は、Supabase Auth の標準の回数制限に任せる
+- アプリからユーザーを作る画面は作らない。ログインのユーザーを作るにはサービスロールキー（RLS を無視できる鍵）をサーバーに置く必要があり、今のアプリはこの鍵を使っていないためである。名前・ロール・部署・営業所を直す画面（マスタ管理の「ユーザー」、管理者だけ）は、必要になったら追加する
+
+### ユーザーの作り方
+
+1. 管理画面の Authentication → Users → Add user → Create new user で、メールアドレス `{社員No. を小文字にしたもの}@staff.invalid`（例: `u00001@staff.invalid`）とパスワードを入れ、「Auto Confirm User」にチェックを入れて作る（確認のメールは届かないため、確認済みにしておく）
+2. トリガー（`handle_new_auth_user`）が `users` の行を作る。社員No. はメールアドレスから入り、名前は仮に社員No.、ロールは `office`、部署・営業所は空になる。形の違うメールアドレスではユーザーを作れない（「Database error creating new user」になる）
+3. SQL Editor で名前・ロール・部署・営業所を入れる
+
+```sql
+update public.users
+set name = '管理 太郎', role = 'admin', department = 'shearing',
+    site_id = (select id from public.sites where code = 'honsha')
+where employee_no = 'U00001';
+```
+
+ユーザーを消すときは、先に `public.users` の行を SQL で消してから（`auth.users` を参照しているため）、管理画面の Delete user で消す。そのユーザーが登録した受注などが残っていると `public.users` の行は消せないため、ふつうは消さずに `is_active` を `false` にする。
 
 ### 実装方針
 
