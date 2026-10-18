@@ -1743,7 +1743,7 @@ export type Database = {
       users: {
         Row: {
           department: string | null
-          employee_no: string | null
+          employee_no: string
           id: string
           is_active: boolean
           name: string
@@ -1752,7 +1752,7 @@ export type Database = {
         }
         Insert: {
           department?: string | null
-          employee_no?: string | null
+          employee_no: string
           id: string
           is_active?: boolean
           name: string
@@ -1761,7 +1761,7 @@ export type Database = {
         }
         Update: {
           department?: string | null
-          employee_no?: string | null
+          employee_no?: string
           id?: string
           is_active?: boolean
           name?: string
