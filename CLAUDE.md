@@ -25,7 +25,7 @@
 - `docs/intake/basic-design.md` — 受付〜受注登録待ちのスコープ、業務フロー、受注情報（受付と受注で共通の入力）
 - `docs/intake/screen-design.md` — 受付・振り分け・CAD・受注登録待ち・受注情報・納期連絡の画面
 - `docs/intake/table-design.md` — 受付のテーブル・関数・RLS、本体のテーブルの変更
-- `docs/intake/schema-draft.sql` — 受付のマイグレーションの下書き（本物のマイグレーションを作ったら削除する）
+- `docs/intake/schema-draft.sql` — 受付のマイグレーションの下書きの残り（社員No. の一意制約、`orders` の変更。PR 9 でマイグレーションにしたら削除する）
 
 ## 技術スタック
 
@@ -44,7 +44,8 @@ TypeScript / React / Next.js (App Router) / Supabase / Vercel
   Claude Code は実DBに適用できないため、SQLファイルの生成までを行う。
 - スキーマ変更後は `npm run db:types` で型定義を再生成する。
 - 新しいテーブルを作成したら、Supabase の Data API 設定で公開する必要がある
-  （自動公開をオフにしているため）。
+  （自動公開をオフにしているため）。受付のマイグレーション以降は、権限（grant）をマイグレーションで
+  `authenticated` にだけ付け、設定画面では公開されているかを確認するだけにする（画面から公開すると `anon` にも権限が付くことがあるため）。
 - 機能ごとにブランチを切り、PR を経て main にマージする。
 
 ## 設計変更
@@ -64,7 +65,8 @@ TypeScript / React / Next.js (App Router) / Supabase / Vercel
 切断・区分の 2 桁の番号、注文書のパネル、部材区分、特殊製品単価の切断方法の条件、加工場所）。
 明細ごとの摘要は使わず、伝えたいことはフリーコメントに書く運用とした（DB の列は残す）。
 番号の欄は上限の桁まで打つと自動で次の欄へ進み、マスタのコード・番号も同じ桁数に制限した（`lib/code-lengths.ts`）。
-次は `docs/intake/basic-design.md`「実装の順序」の PR 3（受付のマイグレーション）に進む。
+受付のマイグレーション（受付のテーブル・関数・トリガー・ビュー・RLS・Storage、`users` の部署・営業所）と `lib/intake/` の定数・受付No. の正規化を追加した（PR 3）。
+`orders` の変更と受注No. の切り替えは PR 9 で行う。次は「実装の順序」の PR 4（社員No. でのログイン・通知・ホーム・納期連絡）に進む。
 仕入入力は予定として設計書にだけ書いてある（`docs/basic-design.md`「仕入入力（予定）」）。
 現場用伝票の印刷と、残りの加工の入力の形（タップ孔・長孔・中抜きなど）は後回しとする。
 

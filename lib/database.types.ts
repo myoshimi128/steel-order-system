@@ -236,6 +236,373 @@ export type Database = {
         }
         Relationships: []
       }
+      intake_destinations: {
+        Row: {
+          created_at: string
+          destination_id: string | null
+          id: string
+          intake_id: string
+          seq: number
+        }
+        Insert: {
+          created_at?: string
+          destination_id?: string | null
+          id?: string
+          intake_id: string
+          seq: number
+        }
+        Update: {
+          created_at?: string
+          destination_id?: string | null
+          id?: string
+          intake_id?: string
+          seq?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_destinations_destination_id_fkey"
+            columns: ["destination_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_destinations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_destinations_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_destinations_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_unit_queue_view"
+            referencedColumns: ["intake_id"]
+          },
+        ]
+      }
+      intake_files: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          intake_id: string
+          kind: string
+          mime_type: string | null
+          original_name: string
+          size_bytes: number | null
+          slot: string | null
+          storage_path: string
+          updated_at: string
+          updated_by: string | null
+          uploaded_by: string | null
+          work_unit_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          intake_id: string
+          kind: string
+          mime_type?: string | null
+          original_name: string
+          size_bytes?: number | null
+          slot?: string | null
+          storage_path: string
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_by?: string | null
+          work_unit_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          intake_id?: string
+          kind?: string
+          mime_type?: string | null
+          original_name?: string
+          size_bytes?: number | null
+          slot?: string | null
+          storage_path?: string
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_by?: string | null
+          work_unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_files_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_files_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_unit_queue_view"
+            referencedColumns: ["intake_id"]
+          },
+          {
+            foreignKeyName: "intake_files_unit_same_intake_fkey"
+            columns: ["work_unit_id", "intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_units"
+            referencedColumns: ["id", "intake_id"]
+          },
+          {
+            foreignKeyName: "intake_files_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intake_site_changes: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          from_site_id: string | null
+          id: string
+          intake_id: string
+          reason: string | null
+          to_site_id: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          from_site_id?: string | null
+          id?: string
+          intake_id: string
+          reason?: string | null
+          to_site_id?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          from_site_id?: string | null
+          id?: string
+          intake_id?: string
+          reason?: string | null
+          to_site_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_site_changes_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_site_changes_from_site_id_fkey"
+            columns: ["from_site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_site_changes_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_site_changes_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_unit_queue_view"
+            referencedColumns: ["intake_id"]
+          },
+          {
+            foreignKeyName: "intake_site_changes_to_site_id_fkey"
+            columns: ["to_site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intakes: {
+        Row: {
+          channel: string
+          created_at: string
+          created_by: string | null
+          customer_contact: string | null
+          customer_id: string | null
+          deleted_at: string | null
+          delivery_method_id: string | null
+          delivery_method_note: string | null
+          due_date: string | null
+          due_date_type: string | null
+          email_body: string | null
+          email_from: string | null
+          email_message_id: string | null
+          email_subject: string | null
+          handling_at: string | null
+          handling_by: string | null
+          id: string
+          intake_date: string | null
+          intake_no: string | null
+          intake_seq: number | null
+          intake_year: number | null
+          is_urgent: boolean
+          last_branch: number
+          memo: string | null
+          project_name: string | null
+          received_at: string
+          registered_at: string | null
+          registered_by: string | null
+          site_change_reason_input: string | null
+          site_id: string | null
+          staff_id: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          created_by?: string | null
+          customer_contact?: string | null
+          customer_id?: string | null
+          deleted_at?: string | null
+          delivery_method_id?: string | null
+          delivery_method_note?: string | null
+          due_date?: string | null
+          due_date_type?: string | null
+          email_body?: string | null
+          email_from?: string | null
+          email_message_id?: string | null
+          email_subject?: string | null
+          handling_at?: string | null
+          handling_by?: string | null
+          id?: string
+          intake_date?: string | null
+          intake_no?: string | null
+          intake_seq?: number | null
+          intake_year?: number | null
+          is_urgent?: boolean
+          last_branch?: number
+          memo?: string | null
+          project_name?: string | null
+          received_at?: string
+          registered_at?: string | null
+          registered_by?: string | null
+          site_change_reason_input?: string | null
+          site_id?: string | null
+          staff_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          customer_contact?: string | null
+          customer_id?: string | null
+          deleted_at?: string | null
+          delivery_method_id?: string | null
+          delivery_method_note?: string | null
+          due_date?: string | null
+          due_date_type?: string | null
+          email_body?: string | null
+          email_from?: string | null
+          email_message_id?: string | null
+          email_subject?: string | null
+          handling_at?: string | null
+          handling_by?: string | null
+          id?: string
+          intake_date?: string | null
+          intake_no?: string | null
+          intake_seq?: number | null
+          intake_year?: number | null
+          is_urgent?: boolean
+          last_branch?: number
+          memo?: string | null
+          project_name?: string | null
+          received_at?: string
+          registered_at?: string | null
+          registered_by?: string | null
+          site_change_reason_input?: string | null
+          site_id?: string | null
+          staff_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intakes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_delivery_method_id_fkey"
+            columns: ["delivery_method_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_handling_by_fkey"
+            columns: ["handling_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_registered_by_fkey"
+            columns: ["registered_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       large_plate_extras: {
         Row: {
           extra_price: number
@@ -253,6 +620,114 @@ export type Database = {
           thickness?: number
         }
         Relationships: []
+      }
+      lead_time_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          dept: string
+          id: string
+          summary: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          dept: string
+          id?: string
+          summary: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          dept?: string
+          id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_time_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_time_items: {
+        Row: {
+          congestion: string
+          days: number | null
+          dept: string
+          id: string
+          name: string
+          note: string | null
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          congestion?: string
+          days?: number | null
+          dept: string
+          id?: string
+          name: string
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          congestion?: string
+          days?: number | null
+          dept?: string
+          id?: string
+          name?: string
+          note?: string | null
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_time_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_time_messages: {
+        Row: {
+          dept: string
+          expires_on: string | null
+          message: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          dept: string
+          expires_on?: string | null
+          message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          dept?: string
+          expires_on?: string | null
+          message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_time_messages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       manufacturers: {
         Row: {
@@ -379,6 +854,84 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "process_types"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_reads: {
+        Row: {
+          notification_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          notification_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          notification_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          dept: string
+          id: string
+          intake_id: string | null
+          kind: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          dept: string
+          id?: string
+          intake_id?: string | null
+          kind: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          dept?: string
+          id?: string
+          intake_id?: string | null
+          kind?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_unit_queue_view"
+            referencedColumns: ["intake_id"]
           },
         ]
       }
@@ -1189,27 +1742,128 @@ export type Database = {
       }
       users: {
         Row: {
+          department: string | null
           employee_no: string | null
           id: string
           is_active: boolean
           name: string
           role: string
+          site_id: string | null
         }
         Insert: {
+          department?: string | null
           employee_no?: string | null
           id: string
           is_active?: boolean
           name: string
           role: string
+          site_id?: string | null
         }
         Update: {
+          department?: string | null
           employee_no?: string | null
           id?: string
           is_active?: boolean
           name?: string
           role?: string
+          site_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_units: {
+        Row: {
+          cad_assignee: string | null
+          cad_started_at: string | null
+          created_at: string
+          created_by: string | null
+          done_at: string | null
+          id: string
+          intake_id: string
+          kind: string
+          note: string | null
+          origin: string
+          ready_at: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cad_assignee?: string | null
+          cad_started_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          done_at?: string | null
+          id?: string
+          intake_id: string
+          kind: string
+          note?: string | null
+          origin?: string
+          ready_at?: string | null
+          status: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cad_assignee?: string | null
+          cad_started_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          done_at?: string | null
+          id?: string
+          intake_id?: string
+          kind?: string
+          note?: string | null
+          origin?: string
+          ready_at?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_units_cad_assignee_fkey"
+            columns: ["cad_assignee"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_units_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_units_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_units_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_unit_queue_view"
+            referencedColumns: ["intake_id"]
+          },
+          {
+            foreignKeyName: "work_units_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1348,9 +2002,81 @@ export type Database = {
           },
         ]
       }
+      work_unit_queue_view: {
+        Row: {
+          cad_assignee: string | null
+          cad_started_at: string | null
+          customer_id: string | null
+          customer_name: string | null
+          due_date: string | null
+          due_date_type: string | null
+          file_count: number | null
+          intake_id: string | null
+          intake_no: string | null
+          is_urgent: boolean | null
+          kind: string | null
+          origin: string | null
+          project_name: string | null
+          ready_at: string | null
+          registered_at: string | null
+          site_id: string | null
+          staff_id: string | null
+          staff_name: string | null
+          status: string | null
+          work_unit_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intakes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intakes_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_units_cad_assignee_fkey"
+            columns: ["cad_assignee"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      add_work_unit: {
+        Args: {
+          p_intake_id: string
+          p_kind: string
+          p_note?: string
+          p_origin: string
+        }
+        Returns: string
+      }
+      complete_split: {
+        Args: { p_intake_id: string; p_no_file_kinds?: string[] }
+        Returns: string[]
+      }
+      complete_work_unit: {
+        Args: { p_work_unit_id: string }
+        Returns: undefined
+      }
       create_order: { Args: { p_items: Json; p_order: Json }; Returns: string }
+      current_user_department: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
       get_pricing_rows: {
         Args: {
@@ -1366,6 +2092,7 @@ export type Database = {
         }
         Returns: Json
       }
+      register_intake: { Args: { p_intake_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

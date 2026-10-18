@@ -520,7 +520,7 @@
 - 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）。加工の項目（`spec_fields`）も JSON のまま受け取って登録する
 - ヘッダーの JSON に、フリーコメント（`field_note`）と、チェックしたスタンプの id の配列（`stamp_ids`）を持つ。明細の後に `order_stamps` に登録する（スプライス専用の受注の「ショット加工」は含めない）
 - ヘッダーの JSON に部材区分（`member_class`）を持つ（以前の `is_splice` の代わり。受注登録画面の作り直しで変更）
-- ヘッダーの JSON に、受付（`intake_id`）・加工区分（`work_unit_id`）・加工場所（`site_id`）・担当者（`staff_id`）を持つ。受注の insert の前に `private.issue_order_branch()` で枝番を採番し、受注番号を決める。加工場所が受付と違えば、受付の加工場所も更新する（docs/intake/table-design.md「関数」）。この変更は受付のテーブルを作るマイグレーションと合わせて行う
+- ヘッダーの JSON に、受付（`intake_id`）・加工区分（`work_unit_id`）・加工場所（`site_id`）・担当者（`staff_id`）を持つ。受注の insert の前に `private.issue_order_branch()` で枝番を採番し、受注番号を決める。加工場所が受付と違えば、受付の加工場所も更新する（docs/intake/table-design.md「関数」）。この変更は、受付のテーブルを作るマイグレーション（PR 3）ではなく、受注登録画面と受付をつなぐ PR 9 で行う（受注に必須の受付の列を先に足すと、受付のない今の受注登録画面から登録できなくなるため）
 - `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
 - 登録の操作をした人（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
