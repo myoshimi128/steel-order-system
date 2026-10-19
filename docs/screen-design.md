@@ -63,6 +63,8 @@
 | --- | --- |
 | 枠（ヘッダー・サイドメニュー・中身）。ログイン画面以外の画面は `app/(main)/` の下に置く（`( )` のフォルダは URL に入らない） | `app/(main)/layout.tsx` |
 | ヘッダー・パンくず・通知ベル | `components/layout/app-header.tsx` / `breadcrumbs.tsx` / `notification-bell.tsx` |
+| 通知の状態（未読の一覧・数）・新着のお知らせ・Realtime の購読 | `components/notifications/`、`lib/notifications/` |
+| 白いカードの枠（見出しの左にネイビーの縦線） | `components/layout/panel.tsx` |
 | サイドメニュー・項目・アイコン | `components/layout/sidebar.tsx` / `sidebar-item.tsx` / `icon.tsx` |
 | メニューの定義・表示するメニューの選び方・パンくず | `lib/layout/menus.ts` |
 | 開閉の決め方（cookie の読み書き、受注登録の画面の扱い） | `lib/layout/sidebar-state.ts` / `use-sidebar.ts` |
@@ -72,7 +74,7 @@
 - 受注登録の画面では、保存した好みに関係なく閉じた状態で始める。その画面で開いても cookie の好みは書き換えない（ほかの画面の開閉の好みを崩さないため）。別の画面に移ると、また保存した好みに戻る
 - 明るい配色だけで使う。Tailwind の `dark:` は `.dark` クラスの中だけで効く設定にし、`.dark` はどこにも付けないため、既存の画面に残る `dark:` の指定は効かない
 - ヘッダーのユーザーは「本社シャーリング部 ○○」（所属する営業所の名前＋部署の名前、氏名）の形で出す。営業所・部署が未設定なら、その部分は出さない。社員No. とロールは、マウスを乗せたときの説明に出す（`lib/current-user.ts` の `formatAffiliation`）
-- 通知ベルは、通知のテーブルができるまでアイコンだけを出して押せない状態にする
+- 通知ベル・新着のお知らせの動きは docs/intake/screen-design.md「通知（画面側）」のとおり
 - シャーリング部の部署ホーム（`/shearing`）は、本来の画面（docs/intake/screen-design.md「S-02」）ができるまで、受注登録・マスタ管理への入口だけを置いた仮のページとする
 
 ## 受注登録画面

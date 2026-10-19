@@ -6,8 +6,10 @@
 import { cookies } from 'next/headers'
 import { AppHeader } from '@/components/layout/app-header'
 import { Sidebar } from '@/components/layout/sidebar'
+import { NotificationsProvider } from '@/components/notifications/notifications-provider'
 import { getCurrentUser } from '@/lib/auth'
 import { SIDEBAR_COOKIE_NAME, parseSidebarCookie } from '@/lib/layout/sidebar-state'
+import { loadUnreadNotifications } from '@/lib/notifications/load-unread'
 
 export default async function MainLayout({ children }: LayoutProps<'/'>) {
   // getCurrentUser は cache() で包んでいるため、ルートレイアウトと合わせてもデータの取得は 1 回だけ
@@ -18,14 +20,22 @@ export default async function MainLayout({ children }: LayoutProps<'/'>) {
   const cookieStore = await cookies()
   const preferCollapsed = parseSidebarCookie(cookieStore.get(SIDEBAR_COOKIE_NAME)?.value)
 
+  // ヘッダーの通知ベルに最初に出す未読の通知。新着はその後ブラウザで Realtime から受け取る
+  const unread = await loadUnreadNotifications(user)
+
   return (
-    <>
+    // 通知の状態（未読の一覧・数・新着のお知らせ）を、ヘッダーの通知ベルなどで使えるようにする
+    <NotificationsProvider
+      initialUnread={unread.items}
+      initialUnreadCount={unread.count}
+      department={user?.department ?? null}
+    >
       <AppHeader user={user} />
       <div className="flex flex-1">
         <Sidebar initialPreferCollapsed={preferCollapsed} />
         {/* min-w-0 を付けないと、中身が広いときに横にはみ出してしまう（flex の子の最小幅の既定値のため） */}
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>
-    </>
+    </NotificationsProvider>
   )
 }
