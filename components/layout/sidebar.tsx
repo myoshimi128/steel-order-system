@@ -3,15 +3,28 @@
 // サイドメニュー（docs/screen-design.md「共通レイアウト」）。
 // ・URL に応じて、ホームのメニューかシャーリング部のメニューを出す（lib/layout/menus.ts）
 // ・開閉できる。閉じるとアイコンだけの幅になる。開閉の状態は useSidebar が持ち、cookie に保存する
+// ・項目に件数のバッジを出す（受付登録の項目に受付待ちの件数。受付の変更を Realtime で受け取って更新する）
 
 import Link from 'next/link'
 import { Icon } from '@/components/layout/icon'
 import { SidebarItem } from '@/components/layout/sidebar-item'
-import { isMenuItemActive, selectMenu } from '@/lib/layout/menus'
+import { useWaitingIntakeCount } from '@/lib/intake/use-waiting-intake-count'
+import { isMenuItemActive, selectMenu, type MenuBadgeCounts } from '@/lib/layout/menus'
 import { useSidebar } from '@/lib/layout/use-sidebar'
 
-export function Sidebar({ initialPreferCollapsed }: { initialPreferCollapsed: boolean }) {
+type SidebarProps = {
+  initialPreferCollapsed: boolean
+  // 受付待ちの件数（共通レイアウトで数えたもの）。事務・管理者でなければ null（バッジを出さない）
+  initialWaitingIntakeCount: number | null
+}
+
+export function Sidebar({ initialPreferCollapsed, initialWaitingIntakeCount }: SidebarProps) {
   const { pathname, collapsed, toggle } = useSidebar(initialPreferCollapsed)
+  const waitingIntakeCount = useWaitingIntakeCount(
+    initialWaitingIntakeCount,
+    initialWaitingIntakeCount !== null
+  )
+  const badgeCounts: MenuBadgeCounts = { intakeWaiting: waitingIntakeCount ?? undefined }
   const menu = selectMenu(pathname)
 
   return (
@@ -60,6 +73,7 @@ export function Sidebar({ initialPreferCollapsed }: { initialPreferCollapsed: bo
                     item={item}
                     active={isMenuItemActive(item, pathname)}
                     collapsed={collapsed}
+                    badgeCount={item.badge ? badgeCounts[item.badge] : undefined}
                   />
                 </li>
               ))}

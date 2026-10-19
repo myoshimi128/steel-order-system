@@ -2067,6 +2067,11 @@ export type Database = {
         }
         Returns: string
       }
+      claim_intake: { Args: { p_intake_id: string }; Returns: string }
+      classify_intake: {
+        Args: { p_intake_id: string; p_status: string }
+        Returns: string
+      }
       complete_split: {
         Args: { p_intake_id: string; p_no_file_kinds?: string[] }
         Returns: string[]
@@ -2078,6 +2083,7 @@ export type Database = {
       create_order: { Args: { p_items: Json; p_order: Json }; Returns: string }
       current_user_department: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
+      delete_intake: { Args: { p_intake_id: string }; Returns: undefined }
       get_pricing_rows: {
         Args: {
           p_as_of: string
@@ -2104,6 +2110,16 @@ export type Database = {
         Returns: string
       }
       register_intake: { Args: { p_intake_id: string }; Returns: string }
+      release_intake: { Args: { p_intake_id: string }; Returns: undefined }
+      save_intake: {
+        Args: {
+          p_destinations: Json
+          p_info: Json
+          p_intake_id: string
+          p_register?: boolean
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

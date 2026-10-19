@@ -49,7 +49,10 @@ export function NotificationBell() {
         <NotificationPanel
           items={center.unread}
           unreadCount={unreadCount}
-          onMarkRead={(item) => void center.markRead(item)}
+          onOpen={(item) => {
+            setOpen(false)
+            center.open(item)
+          }}
           onMarkAllRead={() => void center.markAllRead()}
         />
       )}

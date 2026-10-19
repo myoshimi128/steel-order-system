@@ -1,6 +1,6 @@
 # 受付〜受注登録 テーブル設計書
 
-前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。社員No. の一意制約とユーザー作成時のトリガーは `20261019100000_employee_no_login.sql`（PR 4）。納期連絡の公開の関数は `20261019110000_create_publish_lead_times.sql`（PR 4b）。まだマイグレーションにしていない分（`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
+前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。社員No. の一意制約とユーザー作成時のトリガーは `20261019100000_employee_no_login.sql`（PR 4）。納期連絡の公開の関数は `20261019110000_create_publish_lead_times.sql`（PR 4b）。受付待ち一覧・受付登録の関数は `20261020100000_create_intake_registration_functions.sql`（PR 5）。まだマイグレーションにしていない分（`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
 
 本体のテーブル（`orders` `users` など）の変更は、本体の `docs/table-design.md` にも反映している。
 
@@ -59,6 +59,8 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 ```
 
 受付の「2 削除」（受付登録の処理区分）は状態ではなく、`deleted_at` に日時を入れる論理削除とする。受注が 1 件でもある受付は削除できない。
+
+状態を変える関数：受付登録・変更は `save_intake`、見積・ミルシート／対象外への区分と対象外から受付待ちへ戻すのは `classify_intake`（見積・ミルシートは受付No. を採番する）、削除は `delete_intake`（「関数」の表）。
 
 | channel | 表示 |
 | --- | --- |
@@ -280,6 +282,11 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | `add_work_unit(intake_id, kind, origin, note) → uuid` | 受注登録待ちに追加（見落とし・口頭など）。振り分け完了後のみ。`closed` なら `dispatched` に戻す |
 | `private.issue_order_branch(intake_id) → (branch_no, order_no)` | 受注No. の枝番を採番する。`create_order` の中からだけ呼ぶ。`security definer`（PR 9） |
 | `complete_work_unit(work_unit_id)` | 起票完了（`ready` → `done`） |
+| `save_intake(intake_id, info jsonb, destinations jsonb, register boolean)` → text | 受付登録（処理区分 0 新規）と変更（1 変更）（PR 5）。受注情報の列を書き、入れ先を消して入れ直し（`destinations` は納入先の id か null＝売り先と同じの配列。並び順で `seq`）、`register = true` なら続けて `register_intake` で採番する。1 つの transaction で行い、受付No. を返す。新規は受付待ちだけ（違えば `INTAKE_NOT_WAITING` のエラー＝ほかの人が先に登録した）、変更は受付登録済・振り分け完了・完了だけ。事務・管理者だけ（関数の中でもロールを確かめる） |
+| `classify_intake(intake_id, status)` → text | 受付待ち → 見積・ミルシート（受付No. を採番して返す）／対象外、対象外 → 受付待ち（PR 5）。それ以外の移り方は `INTAKE_STATUS_CHANGED` のエラー。対応中の表示も外す |
+| `delete_intake(intake_id)` | 処理区分 2 削除（PR 5）。`deleted_at` を入れる論理削除。受付登録済・振り分け完了・完了・見積の受付が対象（受付待ち・対象外は「対象外」で扱う）。受注のある受付の削除の禁止は PR 9 のトリガー |
+| `claim_intake(intake_id)` → uuid | 対応中にする（PR 5）。受付待ちで、空き・自分・開始から 30 分過ぎのときだけ自分と今の日時を入れる。条件つきの update 1 回で決めるため、同時に開いても 1 人に決まる。その後の対応中の人を返す |
+| `release_intake(intake_id)` | 対応中を外す（PR 5）。自分が対応中のときだけ |
 | `publish_lead_times(dept, items jsonb, summary, message, expires_on, expected_history_id) → uuid` | 納期連絡の「ホームに公開」（PR 4b）。工程（`items` の並び順で `sort_order`。`id` が空の行は追加）・部署メッセージを書き換え、`lead_time_history` に要約を 1 行残して、その id を返す。事務・管理者だけ。部署メッセージの行をロックしてから、最新の履歴が `expected_history_id`（画面を開いた時点の最新）と違えば `LEAD_TIME_CONFLICT` のエラー（ほかの人が先に公開した）。既存の工程がすべて渡されていなければエラー（工程は削除できないため）。要相談の工程は日数を空にする。`message`・`expires_on`・`expected_history_id` は初期値 null（型の生成で省略できる引数になる） |
 | `create_order(p_order, p_items)`（本体・変更。PR 9） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
 
@@ -333,6 +340,13 @@ waiting ──受付登録──→ registered ──振り分け完了──→
    - 公開してはいけないもの：`private` スキーマ全体（`private.intake_no_counters`・`private.assign_intake_no`・既存の `private.order_no_counters`・`private.next_order_no`）。どのテーブルも `anon` に権限を付けない
 5. 確認・デモ用に、必要なら seed 006 を実行する（本番の DB では実行しない）
 
+### マイグレーションの実行の手順（PR 5）
+
+1. SQL Editor で `20261020100000_create_intake_registration_functions.sql` を実行する
+2. `npm run db:types` で型を再生成する（5 つの関数の型は、生成と同じ形で `lib/database.types.ts` に先に入れてあるため、再生成しても差は出ない想定）
+3. テーブルは増えないため、Data API の設定画面での確認は不要
+4. 確認・デモ用に、必要なら seed 009（本文つきの受付待ち。`supabase/seed/009_intake_mail_demo.sql`）を実行する（本番の DB では実行しない）
+
 ### マイグレーションの実行の手順（PR 4b）
 
 1. SQL Editor で `20261019110000_create_publish_lead_times.sql` を実行する
@@ -343,7 +357,8 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 ## ファイルの保存
 
 - バケット `intake-files`（非公開）、パス `{intake_id}/{file_id}.{拡張子}`（日本語の名前はキーに使わない）
-- アップロードの順番：① `intake_files` の行を作る → ② Storage にアップロード → ③ 失敗したら行を削除する
+- アップロードの順番（PR 5 で決めた）：① ファイルの id を画面で決める → ② ブラウザから Storage に置く → ③ 置けたファイルの行（`intake_files`）をまとめて作る → ④ 行を作れなかったら、② で置いた実物を Storage から消す。先に行を作る順だと、置くのに失敗したときに行を消す必要があるが、`intake_files` には削除の権限を付けていない（業務データは物理削除しない）ため、この順にする（`lib/intake/upload-intake-files.ts`）
+- ファイルはブラウザから Storage に直接置く（Server Action には送れる大きさの上限があるため、通さない）。置けるのは事務・管理者だけ（Storage のポリシー）。PDF には `application/pdf` の種類を付けて置き、署名付き URL を開いたときにブラウザの中で表示されるようにする
 - 振り分けの枠の差し替え：同じ枠に同じ `original_name` があれば、既存の行の Storage を上書きし、`updated_by` / `updated_at` を更新する
 - 元データの削除：`complete_split()` が削除するパスを返す → アプリが Storage から削除する（失敗した分を後でまとめて削除する仕組みは Phase 2）
 
@@ -365,11 +380,14 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 supabase.from('intakes').select('id, channel, received_at, email_from, email_subject, handling_by, intake_files(kind, original_name)')
   .eq('status', 'waiting').is('deleted_at', null).order('received_at', { ascending: false })
 
-// 受付登録（受注情報を保存してから、受付No. を採番する）
-await supabase.from('intakes').update({ intake_date, staff_id, customer_id, customer_contact, project_name,
-  due_date_type, due_date, delivery_method_id, delivery_method_note, is_urgent, site_id }).eq('id', id)
-// 入れ先は消して入れ直す → intake_destinations
-const { data: intakeNo } = await supabase.rpc('register_intake', { p_intake_id: id })
+// 受付登録（受注情報の保存・入れ先の入れ直し・受付No. の採番を 1 つの関数で行う。PR 5）
+const { data: intakeNo } = await supabase.rpc('save_intake', {
+  p_intake_id: id,
+  p_info: { intake_date, staff_id, customer_id, customer_contact, project_name,
+    due_date_type, due_date, delivery_method_id, delivery_method_note, is_urgent, site_id },
+  p_destinations: [null, destinationId],  // null は売り先と同じ
+  p_register: true,                       // 変更（処理区分 1）は false
+})
 
 // 振り分け完了（元データの実ファイルも削除）
 const { data: paths } = await supabase.rpc('complete_split', { p_intake_id: id, p_no_file_kinds: [] })

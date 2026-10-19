@@ -42,13 +42,45 @@ function rowsOf<T>(result: { data: T[] | null; error: { message: string } | null
   return result.data ?? []
 }
 
+// 受注情報（受付登録と受注登録で共通の入力欄）で使うマスタ: 売り先・入れ先・配達・加工場所。
+// 受付登録の画面（app/(main)/intake/）でも使うため、明細のマスタとは分けて読めるようにしている
+export async function loadHeaderMasters(supabase: SupabaseClient<Database>): Promise<HeaderMasterOptions> {
+  const [customers, destinations, deliveryMethods, sites] = await Promise.all([
+    supabase.from('customers').select('id, code, name, name_kana').eq('is_active', true),
+    supabase.from('delivery_destinations').select('id, code, name, name_kana').eq('is_active', true),
+    supabase.from('delivery_methods').select('id, number, name, requires_note').eq('is_active', true),
+    // 加工場所（営業所）。番号順に並べる
+    supabase.from('sites').select('id, number, name').eq('is_active', true).order('number'),
+  ])
+
+  const deliveryMethodRows = rowsOf(deliveryMethods, '配達方法')
+
+  return {
+    customers: sortByCode(rowsOf(customers, '得意先').map(toCodedMasterOption)),
+    // 入れ先は先頭に「0 売り先と同じ」（初期値）を置き、その後に納入先マスタの行を並べる
+    destinations: [
+      SAME_AS_CUSTOMER_OPTION,
+      ...sortByCode(rowsOf(destinations, '納入先').map(toCodedMasterOption)),
+    ],
+    deliveryMethods: sortByCode(
+      deliveryMethodRows.map(
+        (row): CodeOption<string> => ({ code: String(row.number), label: row.name, value: row.id }),
+      ),
+    ),
+    deliveryMethodIdsRequiringNote: deliveryMethodRows
+      .filter((row) => row.requires_note)
+      .map((row) => row.id),
+    sites: rowsOf(sites, '営業所').map(
+      (row): CodeOption<string> => ({ code: String(row.number), label: row.name, value: row.id }),
+    ),
+  }
+}
+
 export async function loadOrderEntryMasters(
   supabase: SupabaseClient<Database>,
 ): Promise<OrderEntryMasters> {
   const [
-    customers,
-    destinations,
-    deliveryMethods,
+    header,
     plateTypes,
     materials,
     products,
@@ -60,11 +92,8 @@ export async function loadOrderEntryMasters(
     processNotices,
     stamps,
     customerStamps,
-    sites,
   ] = await Promise.all([
-    supabase.from('customers').select('id, code, name, name_kana').eq('is_active', true),
-    supabase.from('delivery_destinations').select('id, code, name, name_kana').eq('is_active', true),
-    supabase.from('delivery_methods').select('id, number, name, requires_note').eq('is_active', true),
+    loadHeaderMasters(supabase),
     supabase.from('plate_types').select('id, number, name, applies_material_extra').eq('is_active', true),
     supabase
       .from('materials')
@@ -100,32 +129,10 @@ export async function loadOrderEntryMasters(
     // スタンプは番号順に並べる（番号を打って付け外しする）
     supabase.from('stamps').select('id, number, body').eq('is_active', true).order('number'),
     supabase.from('customer_stamps').select('customer_id, stamp_id'),
-    // 加工場所（営業所）。番号順に並べる
-    supabase.from('sites').select('id, number, name').eq('is_active', true).order('number'),
   ])
 
-  const deliveryMethodRows = rowsOf(deliveryMethods, '配達方法')
-
   return {
-    header: {
-      customers: sortByCode(rowsOf(customers, '得意先').map(toCodedMasterOption)),
-      // 入れ先は先頭に「0 売り先と同じ」（初期値）を置き、その後に納入先マスタの行を並べる
-      destinations: [
-        SAME_AS_CUSTOMER_OPTION,
-        ...sortByCode(rowsOf(destinations, '納入先').map(toCodedMasterOption)),
-      ],
-      deliveryMethods: sortByCode(
-        deliveryMethodRows.map(
-          (row): CodeOption<string> => ({ code: String(row.number), label: row.name, value: row.id }),
-        ),
-      ),
-      deliveryMethodIdsRequiringNote: deliveryMethodRows
-        .filter((row) => row.requires_note)
-        .map((row) => row.id),
-      sites: rowsOf(sites, '営業所').map(
-        (row): CodeOption<string> => ({ code: String(row.number), label: row.name, value: row.id }),
-      ),
-    },
+    header,
     items: {
       plateTypes: rowsOf(plateTypes, '種類'),
       // default_steel_making は DB 上 text 列（CHECK 制約で '電炉材' / '高炉材' に限定）のため、型だけ合わせる

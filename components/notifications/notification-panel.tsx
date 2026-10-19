@@ -1,8 +1,7 @@
 'use client'
 
 // 通知ベルを押したときに開く、未読の通知の一覧。
-// 1 件を押すとその通知を既読にする。「すべて既読にする」でまとめて既読にする。
-// 押したときの移動先（受付待ち一覧）は、その画面を作る PR 5 で足す。
+// 1 件を押すとその通知を既読にし、受付待ち一覧でその受付の行を開く。「すべて既読にする」でまとめて既読にする。
 
 import { useState } from 'react'
 import { formatRelativeTime } from '@/lib/notifications/format'
@@ -12,14 +11,15 @@ type NotificationPanelProps = {
   items: NotificationItem[]
   // 未読の総数（一覧に入りきらない分も含む）
   unreadCount: number
-  onMarkRead: (item: NotificationItem) => void
+  // 1 件を押した（既読にして、移動先を開く）
+  onOpen: (item: NotificationItem) => void
   onMarkAllRead: () => void
 }
 
 export function NotificationPanel({
   items,
   unreadCount,
-  onMarkRead,
+  onOpen,
   onMarkAllRead,
 }: NotificationPanelProps) {
   // 「3分前」などの基準にする時刻。一覧を開いた時点の時刻で固定する
@@ -57,8 +57,8 @@ export function NotificationPanel({
             <li key={item.id} className="border-b border-line last:border-b-0">
               <button
                 type="button"
-                onClick={() => onMarkRead(item)}
-                title="押すと既読にします"
+                onClick={() => onOpen(item)}
+                title="押すと既読にして、受付待ち一覧で開きます"
                 className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-canvas"
               >
                 {/* 未読の印 */}

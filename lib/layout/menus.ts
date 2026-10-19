@@ -35,7 +35,15 @@ export type MenuItem = {
   activePrefix?: string
   // 「提案」の印（まだ構想段階の機能）
   proposal?: boolean
+  // 件数のバッジ（どの件数を出すか）。件数そのものは共通レイアウトが読み、Sidebar に渡す
+  badge?: MenuBadgeKey
 }
+
+// 件数のバッジの種類。intakeWaiting: 受付待ちの件数（受付登録の項目に出す）。
+// CAD・受注登録の件数は、それぞれの画面を作る PR で足す
+export type MenuBadgeKey = 'intakeWaiting'
+
+export type MenuBadgeCounts = Partial<Record<MenuBadgeKey, number>>
 
 export type MenuSection = {
   // 見出し（「部署」「業務」など）。null は見出しなし
@@ -90,7 +98,7 @@ export const SHEARING_MENU: Menu = {
     {
       title: '業務',
       items: [
-        { label: '受付登録', icon: 'inbox', href: null },
+        { label: '受付登録', icon: 'inbox', href: '/intake', activePrefix: '/intake', badge: 'intakeWaiting' },
         { label: 'CAD', icon: 'monitor', href: null },
         { label: '受注登録', icon: 'pencil', href: '/orders/new', activePrefix: '/orders' },
         { label: '加工図面発行', icon: 'image', href: null },

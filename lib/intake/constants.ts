@@ -1,3 +1,5 @@
+import type { CodeOption } from '@/lib/code-input/code-option'
+
 // 受付〜受注登録で使うコード値と、その表示名（docs/intake/table-design.md「コード値と状態」）。
 //
 // DB には enum ではなく text＋check 制約で値を持つため、ここの値の一覧は
@@ -96,3 +98,12 @@ export const CONGESTION_LABELS: Record<Congestion, string> = {
 // --- Storage のバケット ---
 // 受付のファイルを置く非公開のバケット（supabase/migrations/20261018100600_create_intake_files_bucket.sql）
 export const INTAKE_FILES_BUCKET = 'intake-files'
+
+// --- 至急（intakes.is_urgent） ---
+// 受付登録の画面では、チェック欄ではなく番号の欄（0 通常 / 1 至急）で入れる。
+// テンキーから手を離さずに入力できるようにするため（部材区分 SPL・ショットを番号の欄にしたのと同じ考え方）。
+// 至急の受付は、受注登録待ち・CAD の先頭に並ぶ
+export const URGENT_OPTIONS: readonly CodeOption<boolean>[] = [
+  { code: '0', label: '通常', value: false },
+  { code: '1', label: '至急', value: true },
+]

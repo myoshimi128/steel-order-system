@@ -6,6 +6,8 @@ export type NotificationItem = {
   kind: string
   title: string
   body: string | null
+  // 通知のもとになった受付（受付の新着）。押したときに受付待ち一覧でその行を開くのに使う
+  intakeId: string | null
   // 作られた日時（ISO 8601 の文字列）
   createdAt: string
 }
@@ -16,6 +18,7 @@ export type NotificationRow = {
   kind: string
   title: string
   body: string | null
+  intake_id: string | null
   created_at: string
 }
 
@@ -25,6 +28,7 @@ export function toNotificationItem(row: NotificationRow): NotificationItem {
     kind: row.kind,
     title: row.title,
     body: row.body,
+    intakeId: row.intake_id,
     createdAt: row.created_at,
   }
 }

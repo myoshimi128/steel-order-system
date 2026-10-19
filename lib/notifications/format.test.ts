@@ -25,6 +25,7 @@ describe('prependNotification', () => {
   const item = (id: string): NotificationItem => ({
     id,
     kind: 'intake_new',
+    intakeId: null,
     title: '新しいメールが届きました',
     body: null,
     createdAt: '2026-10-19T00:00:00Z',

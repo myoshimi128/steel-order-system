@@ -20,7 +20,7 @@ export async function fetchUnreadNotifications(
   const { data, count, error } = await supabase
     .from('notifications')
     // count: 'exact' で、limit とは別に条件に合う行の総数も返してもらう（ベルの未読の数に使う）
-    .select('id, kind, title, body, created_at, notification_reads(notification_id)', {
+    .select('id, kind, title, body, intake_id, created_at, notification_reads(notification_id)', {
       count: 'exact',
     })
     .is('notification_reads', null)

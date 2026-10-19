@@ -17,6 +17,7 @@ export const CODE_LENGTHS = {
   site: 1, // 加工場所（営業所の番号 1〜9）
   memberClass: 1, // 部材区分
   spliceShot: 1, // ショット
+  urgent: 1, // 至急（0 通常 / 1 至急。受付登録）
   // --- ② 注文内容 ---
   cutRegion: 2, // 切断・区分（2 桁。「9 加工」だけは 1 桁で加工の行に切り替わる）
   plateType: 1, // 種類（0〜9）

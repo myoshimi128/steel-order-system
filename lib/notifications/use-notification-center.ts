@@ -4,10 +4,16 @@
 // NotificationsProvider（components/notifications/notifications-provider.tsx）が 1 回だけ使い、
 // ベル・新着のお知らせには Context で渡す。
 
+import { useRouter } from 'next/navigation'
 import { useCallback, useReducer } from 'react'
-import { markAllNotificationsRead, markNotificationRead } from '@/app/actions/notifications'
+import {
+  markAllNotificationsRead,
+  markIntakeNotificationsRead,
+  markNotificationRead,
+} from '@/app/actions/notifications'
 import type { Department } from '@/lib/intake/constants'
 import { notificationCenterReducer } from './center-reducer'
+import { notificationHref } from './link'
 import type { NotificationItem } from './types'
 import { useNotificationFeed } from './use-notification-feed'
 
@@ -19,6 +25,7 @@ type Params = {
 }
 
 export function useNotificationCenter({ initialUnread, initialUnreadCount, department }: Params) {
+  const router = useRouter()
   const [state, dispatch] = useReducer(notificationCenterReducer, {
     unread: initialUnread,
     unreadCount: initialUnreadCount,
@@ -52,11 +59,32 @@ export function useNotificationCenter({ initialUnread, initialUnreadCount, depar
     if (result?.error) console.error(result.error)
   }, [])
 
+  // 1 つの受付の通知を、まとめて既読にする（受付待ち一覧で行を選んだとき）。
+  // どの通知が未読かはサーバーで調べる（ベルの一覧に入っていない古い通知もあるため）
+  const markIntakeRead = useCallback(async (intakeId: string) => {
+    const result = await markIntakeNotificationsRead(intakeId)
+    if ('error' in result) {
+      console.error(result.error)
+      return
+    }
+    dispatch({ type: 'markedManyRead', ids: result.ids })
+  }, [])
+
+  // 通知を押した: 既読にして、移動先（受付の新着なら受付待ち一覧のその行）を開く
+  const open = useCallback(
+    (item: NotificationItem) => {
+      void markRead(item)
+      const href = notificationHref(item)
+      if (href) router.push(href)
+    },
+    [markRead, router]
+  )
+
   const dismissToast = useCallback((id: string) => {
     dispatch({ type: 'toastDismissed', id })
   }, [])
 
-  return { ...state, markRead, markAllRead, dismissToast }
+  return { ...state, markRead, markAllRead, markIntakeRead, open, dismissToast }
 }
 
 export type NotificationCenter = ReturnType<typeof useNotificationCenter>
