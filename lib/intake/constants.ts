@@ -95,6 +95,12 @@ export const CONGESTION_LABELS: Record<Congestion, string> = {
   consult: '要相談',
 }
 
+// --- CAD の作業中の経過時間（S-05 CAD） ---
+// 作業を始めてからこの時間（時間）がたっても作業中のままの行は、オレンジ系で目立たせる。
+// CAD の作業は終わったのに CSV を入れ忘れて、作業中のまま残っていることに気づけるようにするため。
+// 運用に合わせて変えるときは、この値だけを直す
+export const CAD_LONG_RUNNING_HOURS = 24
+
 // --- Storage のバケット ---
 // 受付のファイルを置く非公開のバケット（supabase/migrations/20261018100600_create_intake_files_bucket.sql）
 export const INTAKE_FILES_BUCKET = 'intake-files'

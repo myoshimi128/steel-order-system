@@ -30,6 +30,11 @@ export function isDxf(name: string): boolean {
   return fileExtension(name) === 'dxf'
 }
 
+// CAD で部品を作った後に出力する CSV（CAD の画面で受け付ける）
+export function isCsv(name: string): boolean {
+  return fileExtension(name) === 'csv'
+}
+
 // DXF への変換が必要なファイルか
 export function needsConversion(file: AttachmentFile): boolean {
   return file.kind === 'original' && !isDxf(file.originalName)

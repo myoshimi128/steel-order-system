@@ -1,7 +1,7 @@
--- 振り分け（S-04d）の結果を確かめる SQL（読むだけ。データは変えない）。
+-- 振り分け（S-04d）と CAD（S-05）の結果を確かめる SQL（読むだけ。データは変えない）。
 --
--- 受注登録待ち一覧（PR 8）と CAD（PR 7）の画面ができるまで、振り分け完了で作られた加工区分と、
--- 元データの削除を SQL Editor で確かめるために使う。'26-0001' の部分（4 か所）を確かめたい受付No. に書き換えて実行する。
+-- 振り分け完了で作られた加工区分と元データの削除（PR 6）、CAD の作業開始・CSV の登録（PR 7）を
+-- SQL Editor で確かめるために使う。'26-0001' の部分（5 か所）を確かめたい受付No. に書き換えて実行する。
 
 
 -- ============================================================
@@ -43,3 +43,18 @@ left join storage.objects o on o.bucket_id = 'intake-files' and o.name = f.stora
 where i.intake_no = '26-0001'  -- ← 確かめたい受付No.
   and f.kind = 'original'
   and o.name is not null;
+
+
+-- ============================================================
+-- 5. CAD（作業開始で cad_working と担当・開始日時、CSV を入れると ready と ready_at）
+-- ============================================================
+-- CSV の行（kind = csv）は加工区分に付き、外した CSV は deleted_at が入る
+select wu.status, u.name as cad_assignee, wu.cad_started_at, wu.ready_at,
+       f.original_name as csv_name, f.deleted_at as csv_deleted_at
+from public.work_units wu
+join public.intakes i on i.id = wu.intake_id
+left join public.users u on u.id = wu.cad_assignee
+left join public.intake_files f on f.work_unit_id = wu.id and f.kind = 'csv'
+where i.intake_no = '26-0001'  -- ← 確かめたい受付No.
+  and wu.kind = 'aitore'
+order by f.created_at;
