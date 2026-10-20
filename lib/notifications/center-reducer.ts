@@ -21,6 +21,8 @@ export type NotificationCenterAction =
   | { type: 'received'; item: NotificationItem }
   // 1 件を既読にした
   | { type: 'markedRead'; id: string }
+  // 1 つの受付の通知をまとめて既読にした（受付待ち一覧で行を選んだとき）。ids はサーバーで既読にした通知
+  | { type: 'markedManyRead'; ids: string[] }
   // 既読にできなかったので、未読に戻す
   | { type: 'unmarked'; item: NotificationItem }
   // すべて既読にした
@@ -49,6 +51,16 @@ export function notificationCenterReducer(
         unread: state.unread.filter((n) => n.id !== action.id),
         unreadCount: Math.max(0, state.unreadCount - 1),
         toasts: state.toasts.filter((n) => n.id !== action.id),
+      }
+    }
+    case 'markedManyRead': {
+      if (action.ids.length === 0) return state
+      const ids = new Set(action.ids)
+      return {
+        unread: state.unread.filter((n) => !ids.has(n.id)),
+        // サーバーで未読だった通知の数だけ減らす（一覧に入りきらない古い通知も含むため、一覧から数えない）
+        unreadCount: Math.max(0, state.unreadCount - action.ids.length),
+        toasts: state.toasts.filter((n) => !ids.has(n.id)),
       }
     }
     case 'unmarked': {

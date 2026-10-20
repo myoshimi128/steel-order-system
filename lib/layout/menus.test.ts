@@ -35,6 +35,13 @@ describe('isMenuItemActive', () => {
     expect(isMenuItemActive(item, '/orders-archive')).toBe(false)
   })
 
+  it('受付登録は /intake 以下のどの画面でも強調する', () => {
+    const item = findItem('受付登録')
+    expect(isMenuItemActive(item, '/intake')).toBe(true)
+    expect(isMenuItemActive(item, '/intake/register')).toBe(true)
+    expect(item.badge).toBe('intakeWaiting')
+  })
+
   it('マスタ管理は個別のマスタの画面でも強調する', () => {
     expect(isMenuItemActive(findItem('マスタ管理'), '/masters/customers/new')).toBe(true)
   })
@@ -73,6 +80,10 @@ describe('buildBreadcrumbs', () => {
     expect(buildBreadcrumbs('/masters/customers/new')).toEqual([
       { label: 'シャーリング部', href: '/shearing' },
       { label: 'マスタ管理', href: null },
+    ])
+    expect(buildBreadcrumbs('/intake/register')).toEqual([
+      { label: 'シャーリング部', href: '/shearing' },
+      { label: '受付登録', href: null },
     ])
     expect(buildBreadcrumbs('/shearing/lead-time')).toEqual([
       { label: 'シャーリング部', href: '/shearing' },

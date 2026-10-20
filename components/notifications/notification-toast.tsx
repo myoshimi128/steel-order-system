@@ -3,6 +3,7 @@
 // 新着のお知らせ 1 件（docs/intake/screen-design.md「通知（画面側）」の「右上にトースト（5 秒）」）。
 // 5 秒で消える。マウスを乗せている間は消えない（読んでいる途中で消えないように）。× で先に閉じられる。
 // お知らせを閉じても、通知は未読のまま（ベルの一覧に残る）。
+// 文の部分を押すと、既読にして受付待ち一覧のその行を開く（PR 5）。
 
 import { useState } from 'react'
 import { Icon } from '@/components/layout/icon'
@@ -14,10 +15,11 @@ const TOAST_DURATION_MS = 5000
 
 type NotificationToastProps = {
   item: NotificationItem
+  onOpen: () => void
   onDismiss: () => void
 }
 
-export function NotificationToast({ item, onDismiss }: NotificationToastProps) {
+export function NotificationToast({ item, onOpen, onDismiss }: NotificationToastProps) {
   const [hovered, setHovered] = useState(false)
   useAutoDismiss(onDismiss, TOAST_DURATION_MS, hovered)
 
@@ -32,10 +34,15 @@ export function NotificationToast({ item, onDismiss }: NotificationToastProps) {
       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-soft text-navy">
         <Icon name="bell" className="h-4 w-4" />
       </span>
-      <div className="min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={onOpen}
+        title="押すと受付待ち一覧で開きます"
+        className="min-w-0 flex-1 text-left"
+      >
         <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
         {item.body && <p className="mt-0.5 truncate text-xs text-neutral-600">{item.body}</p>}
-      </div>
+      </button>
       <button
         type="button"
         onClick={onDismiss}

@@ -5,6 +5,7 @@ import type { NotificationItem } from './types'
 const item = (id: string, minute = 0): NotificationItem => ({
   id,
   kind: 'intake_new',
+  intakeId: null,
   title: '新しいメールが届きました',
   body: null,
   createdAt: `2026-10-19T00:${String(minute).padStart(2, '0')}:00Z`,
@@ -57,5 +58,17 @@ describe('notificationCenterReducer', () => {
       unreadCount: 0,
       toasts: [],
     })
+  })
+
+  it('受付の通知をまとめて既読: 一覧とお知らせから外し、数を件数分減らす', () => {
+    const state: NotificationCenterState = { unread: [item('b', 2), item('a', 1)], unreadCount: 5, toasts: [item('b', 2)] }
+    const next = notificationCenterReducer(state, { type: 'markedManyRead', ids: ['b', 'old'] })
+    expect(next.unread.map((n) => n.id)).toEqual(['a'])
+    expect(next.unreadCount).toBe(3)
+    expect(next.toasts).toEqual([])
+  })
+
+  it('受付の通知をまとめて既読: 0 件なら変えない', () => {
+    expect(notificationCenterReducer(initial, { type: 'markedManyRead', ids: [] })).toBe(initial)
   })
 })

@@ -50,3 +50,39 @@ export async function markAllNotificationsRead(): Promise<MarkReadResult> {
   if (ids.length === 0) return undefined
   return insertReads(ids)
 }
+
+// 1 つの受付の通知を、すべて既読にする（受付待ち一覧で行を選んだとき。一覧の NEW の印を消す）。
+// 既読にした通知の id を返す（画面のベルの未読の数を、その分だけ減らすため）
+export async function markIntakeNotificationsRead(
+  intakeId: string
+): Promise<{ ids: string[] } | { error: string }> {
+  if (!UUID_PATTERN.test(intakeId)) return { error: '受付が正しくありません' }
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, notification_reads(notification_id)')
+    .eq('intake_id', intakeId)
+    .is('notification_reads', null)
+  if (error) return { error: `通知を読めませんでした: ${error.message}` }
+
+  const ids = data.map((row) => row.id)
+  if (ids.length === 0) return { ids }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'ログインし直してください' }
+
+  // 既読の行を作り、実際に作れた行の通知の id だけを返してもらう。
+  // ignoreDuplicates（すでに既読の行は飛ばす）と .select() を組み合わせると、飛ばした行は返ってこない。
+  // 通知を押した直後など、ほかの操作で同じ通知を既読にしていたときに、ベルの未読の数を 2 回減らさないため
+  const { data: inserted, error: insertError } = await supabase
+    .from('notification_reads')
+    .upsert(
+      ids.map((id) => ({ notification_id: id, user_id: user.id })),
+      { onConflict: 'notification_id,user_id', ignoreDuplicates: true }
+    )
+    .select('notification_id')
+  if (insertError) return { error: `既読にできませんでした: ${insertError.message}` }
+  return { ids: inserted.map((row) => row.notification_id) }
+}

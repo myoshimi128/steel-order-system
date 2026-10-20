@@ -8,8 +8,22 @@ import { AppHeader } from '@/components/layout/app-header'
 import { Sidebar } from '@/components/layout/sidebar'
 import { NotificationsProvider } from '@/components/notifications/notifications-provider'
 import { getCurrentUser } from '@/lib/auth'
+import { countIntakes } from '@/lib/intake/load-intakes'
 import { SIDEBAR_COOKIE_NAME, parseSidebarCookie } from '@/lib/layout/sidebar-state'
 import { loadUnreadNotifications } from '@/lib/notifications/load-unread'
+import { createClient } from '@/lib/supabase-server'
+
+// サイドメニューの「受付登録」に出す受付待ちの件数。受付を扱える事務・管理者だけ数える（ほかは null でバッジを出さない）。
+// 数えられなかったときもバッジを出さないだけにし、画面は出す
+async function loadWaitingIntakeCount(role: string | undefined): Promise<number | null> {
+  if (role !== 'office' && role !== 'admin') return null
+  try {
+    return await countIntakes(await createClient(), 'waiting')
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
 
 export default async function MainLayout({ children }: LayoutProps<'/'>) {
   // getCurrentUser は cache() で包んでいるため、ルートレイアウトと合わせてもデータの取得は 1 回だけ
@@ -21,7 +35,11 @@ export default async function MainLayout({ children }: LayoutProps<'/'>) {
   const preferCollapsed = parseSidebarCookie(cookieStore.get(SIDEBAR_COOKIE_NAME)?.value)
 
   // ヘッダーの通知ベルに最初に出す未読の通知。新着はその後ブラウザで Realtime から受け取る
-  const unread = await loadUnreadNotifications(user)
+  // サイドメニューの件数のバッジ（受付待ちの件数）も一緒に読む
+  const [unread, waitingIntakeCount] = await Promise.all([
+    loadUnreadNotifications(user),
+    loadWaitingIntakeCount(user?.role),
+  ])
 
   return (
     // 通知の状態（未読の一覧・数・新着のお知らせ）を、ヘッダーの通知ベルなどで使えるようにする
@@ -32,7 +50,7 @@ export default async function MainLayout({ children }: LayoutProps<'/'>) {
     >
       <AppHeader user={user} />
       <div className="flex flex-1">
-        <Sidebar initialPreferCollapsed={preferCollapsed} />
+        <Sidebar initialPreferCollapsed={preferCollapsed} initialWaitingIntakeCount={waitingIntakeCount} />
         {/* min-w-0 を付けないと、中身が広いときに横にはみ出してしまう（flex の子の最小幅の既定値のため） */}
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>

@@ -35,7 +35,7 @@ export function NotificationsProvider({
   return (
     <NotificationsContext.Provider value={center}>
       {children}
-      <NotificationToasts toasts={center.toasts} onDismiss={center.dismissToast} />
+      <NotificationToasts toasts={center.toasts} onOpen={center.open} onDismiss={center.dismissToast} />
     </NotificationsContext.Provider>
   )
 }

@@ -19,6 +19,12 @@ export type AnyIconName =
   | 'check'
   | 'plus'
   | 'x'
+  | 'mail'
+  | 'search'
+  | 'upload'
+  | 'paperclip'
+  | 'external'
+  | 'arrow-right'
 
 // 各アイコンの中身（24 × 24 の座標で描いた線）
 const PATHS: Record<AnyIconName, ReactNode> = {
@@ -81,6 +87,17 @@ const PATHS: Record<AnyIconName, ReactNode> = {
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
   plus: <path d="M12 5v14M5 12h14" />,
   x: <path d="M6 6l12 12M18 6 6 18" />,
+  mail: <path d="M3 5h18v14H3zM3 6l9 7 9-7" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6" />
+      <path d="M20 20l-4.5-4.5" />
+    </>
+  ),
+  upload: <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" />,
+  paperclip: <path d="M20 11l-8 8a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7-7" />,
+  external: <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />,
+  'arrow-right': <path d="M5 12h14M13 6l6 6-6 6" />,
 }
 
 export function Icon({ name, className = 'h-5 w-5' }: { name: AnyIconName; className?: string }) {
