@@ -293,6 +293,7 @@ export type Database = {
           original_name: string
           size_bytes: number | null
           slot: string | null
+          split_done: boolean
           storage_path: string
           updated_at: string
           updated_by: string | null
@@ -309,6 +310,7 @@ export type Database = {
           original_name: string
           size_bytes?: number | null
           slot?: string | null
+          split_done?: boolean
           storage_path: string
           updated_at?: string
           updated_by?: string | null
@@ -325,6 +327,7 @@ export type Database = {
           original_name?: string
           size_bytes?: number | null
           slot?: string | null
+          split_done?: boolean
           storage_path?: string
           updated_at?: string
           updated_by?: string | null
@@ -2058,6 +2061,18 @@ export type Database = {
       }
     }
     Functions: {
+      add_split_file: {
+        Args: {
+          p_file_id: string
+          p_intake_id: string
+          p_mime_type: string
+          p_original_name: string
+          p_size_bytes: number
+          p_slot: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
       add_work_unit: {
         Args: {
           p_intake_id: string
@@ -2111,6 +2126,7 @@ export type Database = {
       }
       register_intake: { Args: { p_intake_id: string }; Returns: string }
       release_intake: { Args: { p_intake_id: string }; Returns: undefined }
+      remove_split_file: { Args: { p_file_id: string }; Returns: string }
       save_intake: {
         Args: {
           p_destinations: Json
@@ -2119,6 +2135,10 @@ export type Database = {
           p_register?: boolean
         }
         Returns: string
+      }
+      set_original_split_done: {
+        Args: { p_done: boolean; p_file_id: string }
+        Returns: undefined
       }
     }
     Enums: {

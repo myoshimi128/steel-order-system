@@ -38,7 +38,7 @@ export function intakeListHref(params: {
 }
 
 // 一覧の上に出すお知らせの種類
-export type IntakeNotice = 'registered' | 'updated' | 'deleted' | 'estimate'
+export type IntakeNotice = 'registered' | 'updated' | 'deleted' | 'estimate' | 'dispatched'
 
 // お知らせの文。知らない値なら null
 export function intakeNoticeText(
@@ -56,6 +56,8 @@ export function intakeNoticeText(
       return `${label}を削除しました`
     case 'estimate':
       return `${label}を発行して見積・ミルシートに区分しました`
+    case 'dispatched':
+      return `${label}の振り分けを完了しました（先寸は受注登録待ち、アイトレは CAD へ）`
     default:
       return null
   }

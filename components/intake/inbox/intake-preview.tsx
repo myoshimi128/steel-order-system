@@ -4,7 +4,7 @@
 //
 //   受付待ち   : 差出人・受信日時・件名・本文（手動で追加した受付はメモ）・添付の一覧。
 //                下に「対象外」「見積・ミルシート」「この内容で受付登録 →」
-//   受付登録済 : 受付No.・受注情報の要約と添付。「受付の内容を直す」（処理区分 1 変更）と「振り分け（準備中）」
+//   受付登録済 : 受付No.・受注情報の要約と添付。「受付の内容を直す」（処理区分 1 変更）と「振り分け →」（S-04d）
 //   見積・ミルシート: 受付No.・中身と添付。「削除する」（処理区分 2 削除）
 //   対象外     : 中身と添付。「受付待ちに戻す」
 // ほかの人が対応中なら、上に「○○さんが対応中」を出す（止めずに、受付登録のときに確かめる）。
@@ -129,10 +129,10 @@ export function IntakePreview({ inbox }: { inbox: IntakeInbox }) {
             <Link href={`/intake/register?type=1&no=${row.intakeNo}`} className={SECONDARY_BUTTON}>
               受付の内容を直す
             </Link>
-            {/* 振り分けの画面（S-04d）は PR 6 で作る */}
-            <button type="button" disabled title="振り分けの画面は準備中です" className={`ml-auto ${PRIMARY_BUTTON}`}>
-              振り分け（準備中）
-            </button>
+            <Link href={`/intake/${row.id}/split`} className={`ml-auto ${PRIMARY_BUTTON}`}>
+              振り分け
+              <Icon name="arrow-right" className="h-4 w-4" />
+            </Link>
           </>
         )}
         {row.status === 'estimate' && row.intakeNo && (

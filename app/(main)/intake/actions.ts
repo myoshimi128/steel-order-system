@@ -281,3 +281,17 @@ export async function createIntakeFileDownloadUrl(fileId: string): Promise<Actio
   if (urlError) return { ok: false, error: `ファイルを開けませんでした: ${urlError.message}` }
   return { ok: true, url: data.signedUrl }
 }
+
+// 「すべて開く」用に、複数のファイルのダウンロード用の URL をまとめて作る（順番は渡した id の順）。
+// 作れなかったファイルは飛ばす（開けるものだけ開く）
+const DOWNLOAD_ALL_LIMIT = 50
+
+export async function createIntakeFileDownloadUrls(fileIds: string[]): Promise<ActionResult<{ urls: string[] }>> {
+  if (fileIds.length > DOWNLOAD_ALL_LIMIT || !fileIds.every(isUuid)) {
+    return { ok: false, error: 'ファイルが正しくありません' }
+  }
+  const results = await Promise.all(fileIds.map((id) => createIntakeFileDownloadUrl(id)))
+  const urls = results.flatMap((result) => (result.ok ? [result.url] : []))
+  if (urls.length === 0 && fileIds.length > 0) return { ok: false, error: 'ファイルを開けませんでした' }
+  return { ok: true, urls }
+}

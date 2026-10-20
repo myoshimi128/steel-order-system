@@ -14,6 +14,8 @@ export type IntakeFile = {
   slot: WorkUnitKind | null
   originalName: string
   sizeBytes: number | null
+  // 元データの「分割して保存済」の印（振り分けの画面で人がチェックする。元データ以外は false）
+  splitDone: boolean
   // 注文書の PDF を画面に埋め込むための、期限つきの URL（サーバーで作る。PDF 以外は null）
   viewUrl: string | null
 }
