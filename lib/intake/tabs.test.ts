@@ -28,6 +28,9 @@ describe('intakeNoticeText', () => {
   it('種類ごとの文', () => {
     expect(intakeNoticeText('registered', '26-0003')).toBe('受付No. 26-0003 を発行して受付登録しました')
     expect(intakeNoticeText('deleted', '26-0003')).toBe('受付No. 26-0003 を削除しました')
+    expect(intakeNoticeText('dispatched', '26-0003')).toBe(
+      '受付No. 26-0003 の振り分けを完了しました（先寸は受注登録待ち、アイトレは CAD へ）'
+    )
   })
 
   it('知らない種類なら null', () => {

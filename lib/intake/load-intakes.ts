@@ -27,7 +27,7 @@ const LIST_COLUMNS = `
   id, intake_no, channel, status, received_at, email_from, email_subject, email_body, memo,
   project_name, due_date_type, due_date, is_urgent, handling_by, handling_at,
   customers(name), sites(name), handler:users!intakes_handling_by_fkey(name),
-  intake_files(id, kind, slot, original_name, size_bytes, storage_path, deleted_at)
+  intake_files(id, kind, slot, original_name, size_bytes, storage_path, split_done, deleted_at)
 `
 
 const DETAIL_COLUMNS = `${LIST_COLUMNS},
@@ -43,6 +43,7 @@ type FileRow = {
   original_name: string
   size_bytes: number | null
   storage_path: string
+  split_done: boolean
   deleted_at: string | null
 }
 
@@ -87,6 +88,7 @@ function toFile(row: FileRow, viewUrls: Map<string, string>): IntakeFile {
     slot: row.slot as WorkUnitKind | null,
     originalName: row.original_name,
     sizeBytes: row.size_bytes,
+    splitDone: row.split_done,
     viewUrl: viewUrls.get(row.storage_path) ?? null,
   }
 }

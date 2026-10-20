@@ -3,7 +3,8 @@
 // DocumentViewer（docs/intake/screen-design.md「共通の部品」の DocumentViewer。受付登録 S-04c の左側）。
 //   ・タブ「注文書（PDF）」: 注文書の PDF を画面の中に表示する。PDF が複数あれば、上で切り替える
 //     ページ送り・拡大・印刷は、ブラウザの PDF の表示機能をそのまま使う（自作しない）。「別ウィンドウ」で新しいタブに開ける
-//   ・タブ「図面データ（件数）」: PDF 以外のファイル（DXF など）の一覧と「開く」（ダウンロード → 図面ソフトが開く）
+//   ・タブ「図面データ（件数）」: PDF 以外のファイル（DXF など）の一覧と「開く」（ダウンロード → 図面ソフトが開く）。
+//     2 件以上あれば「すべて図面ソフトで開く」も出す
 // 受注登録の画面の注文書のパネルにも、受付と受注をつなぐ PR 9 でこの部品を置く。
 
 import { useState } from 'react'
@@ -105,11 +106,12 @@ export function DocumentViewer({ files }: { files: readonly IntakeFile[] }) {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <IntakeFileList files={drawings} emptyText="図面データはありません" />
+          <IntakeFileList files={drawings} emptyText="図面データはありません" showOpenAll={drawings.length > 1} />
           {drawings.length > 0 && (
             <p className="text-xs leading-5 text-neutral-500">
               「開く」でダウンロードし、パソコンの図面ソフトで開きます。初回だけ、ブラウザのダウンロードの一覧で
               「この種類のファイルを常に開く」を選んでおくと、次からはすぐに図面ソフトが起動します。
+              「すべて開く」の初回は、ブラウザが複数のファイルのダウンロードを許可するか聞いてくるので、許可してください。
             </p>
           )}
         </div>

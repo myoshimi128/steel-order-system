@@ -1,6 +1,6 @@
 # 受付〜受注登録 テーブル設計書
 
-前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。社員No. の一意制約とユーザー作成時のトリガーは `20261019100000_employee_no_login.sql`（PR 4）。納期連絡の公開の関数は `20261019110000_create_publish_lead_times.sql`（PR 4b）。受付待ち一覧・受付登録の関数は `20261020100000_create_intake_registration_functions.sql`（PR 5）。まだマイグレーションにしていない分（`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
+前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。社員No. の一意制約とユーザー作成時のトリガーは `20261019100000_employee_no_login.sql`（PR 4）。納期連絡の公開の関数は `20261019110000_create_publish_lead_times.sql`（PR 4b）。受付待ち一覧・受付登録の関数は `20261020100000_create_intake_registration_functions.sql`（PR 5）。振り分けの列と関数は `20261021100000_add_split_file_functions.sql`（PR 6）。まだマイグレーションにしていない分（`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
 
 本体のテーブル（`orders` `users` など）の変更は、本体の `docs/table-design.md` にも反映している。
 
@@ -210,10 +210,11 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | storage_path | text | × | `{intake_id}/{id}.{拡張子}`。一意 |
 | original_name | text | × | 元のファイル名 |
 | mime_type / size_bytes | | ○ | |
+| split_done | boolean | × | 元データの「分割して保存済」の印（既定 false。人がチェックする。kind=`original` の行だけで使う。PR 6） |
 | deleted_at | timestamptz | ○ | 論理削除（元データは振り分け完了で入る） |
 | uploaded_by / updated_by / created_at / updated_at | | | |
 
-**制約**：`(work_unit_id, intake_id)` → `work_units(id, intake_id)`（別の受付の加工区分には付けられない）／振り分けの枠の中は同じ名前を 1 つだけ（`(intake_id, slot, original_name)` の部分一意）→ 同じ名前は **差し替え（update）** で扱う
+**制約**：`(work_unit_id, intake_id)` → `work_units(id, intake_id)`（別の受付の加工区分には付けられない）／振り分けの枠の中は同じ名前を 1 つだけ（`(intake_id, slot, original_name)` の部分一意）→ 同じ名前は **差し替え** で扱う（前の行を論理削除して新しい行を足す。`add_split_file()`）
 
 **トリガー**：kind=`csv` が追加されたら、そのアイトレを `ready` にする
 
@@ -287,6 +288,9 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | `delete_intake(intake_id)` | 処理区分 2 削除（PR 5）。`deleted_at` を入れる論理削除。受付登録済・振り分け完了・完了・見積の受付が対象（受付待ち・対象外は「対象外」で扱う）。受注のある受付の削除の禁止は PR 9 のトリガー |
 | `claim_intake(intake_id)` → uuid | 対応中にする（PR 5）。受付待ちで、空き・自分・開始から 30 分過ぎのときだけ自分と今の日時を入れる。条件つきの update 1 回で決めるため、同時に開いても 1 人に決まる。その後の対応中の人を返す |
 | `release_intake(intake_id)` | 対応中を外す（PR 5）。自分が対応中のときだけ |
+| `add_split_file(intake_id, file_id, slot, original_name, storage_path, mime_type, size_bytes)` → text | 振り分けの枠にファイルの行を足す（PR 6）。実物は呼ぶ前に Storage に置く。同じ枠に同じ名前があれば、前の行を論理削除して差し替え、前の置き場所を返す（アプリが実物を消す）。論理削除と追加を 1 つの transaction で行う。受付登録済の受付だけ（違えば `SPLIT_NOT_REGISTERED` のエラー）。事務・管理者だけ |
+| `remove_split_file(file_id)` → text | 振り分けの枠からファイルを外す（PR 6）。論理削除して置き場所を返す（アプリが実物を消す）。受付登録済の受付だけ |
+| `set_original_split_done(file_id, done)` | 元データの「分割して保存済」の印を付け外しする（PR 6）。受付登録済の受付だけ |
 | `publish_lead_times(dept, items jsonb, summary, message, expires_on, expected_history_id) → uuid` | 納期連絡の「ホームに公開」（PR 4b）。工程（`items` の並び順で `sort_order`。`id` が空の行は追加）・部署メッセージを書き換え、`lead_time_history` に要約を 1 行残して、その id を返す。事務・管理者だけ。部署メッセージの行をロックしてから、最新の履歴が `expected_history_id`（画面を開いた時点の最新）と違えば `LEAD_TIME_CONFLICT` のエラー（ほかの人が先に公開した）。既存の工程がすべて渡されていなければエラー（工程は削除できないため）。要相談の工程は日数を空にする。`message`・`expires_on`・`expected_history_id` は初期値 null（型の生成で省略できる引数になる） |
 | `create_order(p_order, p_items)`（本体・変更。PR 9） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
 
@@ -340,6 +344,13 @@ waiting ──受付登録──→ registered ──振り分け完了──→
    - 公開してはいけないもの：`private` スキーマ全体（`private.intake_no_counters`・`private.assign_intake_no`・既存の `private.order_no_counters`・`private.next_order_no`）。どのテーブルも `anon` に権限を付けない
 5. 確認・デモ用に、必要なら seed 006 を実行する（本番の DB では実行しない）
 
+### マイグレーションの実行の手順（PR 6）
+
+1. SQL Editor で `20261021100000_add_split_file_functions.sql` を実行する
+2. `npm run db:types` で型を再生成する（列と 3 つの関数の型は、生成と同じ形で `lib/database.types.ts` に先に入れてあるため、再生成しても差は出ない想定）
+3. テーブルは増えないため、Data API の設定画面での確認は不要
+4. 振り分けの結果（加工区分・ファイル・Storage の実物）は、seed 010（`supabase/seed/010_work_unit_check.sql`。読むだけの SQL）で確かめられる
+
 ### マイグレーションの実行の手順（PR 5）
 
 1. SQL Editor で `20261020100000_create_intake_registration_functions.sql` を実行する
@@ -359,8 +370,9 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 - バケット `intake-files`（非公開）、パス `{intake_id}/{file_id}.{拡張子}`（日本語の名前はキーに使わない）
 - アップロードの順番（PR 5 で決めた）：① ファイルの id を画面で決める → ② ブラウザから Storage に置く → ③ 置けたファイルの行（`intake_files`）をまとめて作る → ④ 行を作れなかったら、② で置いた実物を Storage から消す。先に行を作る順だと、置くのに失敗したときに行を消す必要があるが、`intake_files` には削除の権限を付けていない（業務データは物理削除しない）ため、この順にする（`lib/intake/upload-intake-files.ts`）
 - ファイルはブラウザから Storage に直接置く（Server Action には送れる大きさの上限があるため、通さない）。置けるのは事務・管理者だけ（Storage のポリシー）。PDF には `application/pdf` の種類を付けて置き、署名付き URL を開いたときにブラウザの中で表示されるようにする
-- 振り分けの枠の差し替え：同じ枠に同じ `original_name` があれば、既存の行の Storage を上書きし、`updated_by` / `updated_at` を更新する
-- 元データの削除：`complete_split()` が削除するパスを返す → アプリが Storage から削除する（失敗した分を後でまとめて削除する仕組みは Phase 2）
+- 振り分けの枠の差し替え（PR 6 で決めた）：同じ枠に同じ `original_name` があれば、前の行を論理削除して新しい行を足し、前の実物を Storage から消す（`add_split_file()`）。上書きにしないのは、置き場所（ファイルの id）を毎回新しくして、行と実物の対応を 1 対 1 に保つため
+- 元データを枠へドラッグしたとき：サーバーが Storage の中で元データを複製（`copy`）してから、枠の行を作る
+- 元データの削除：`complete_split()` が削除するパスを返す → アプリが Storage から削除する（失敗した分を後でまとめて削除する仕組みは Phase 2）。元データは振り分け完了で消すため（置き場所を圧迫しないため）、まれに見返したいときは、受付のメール（会社のメールソフト）の添付から確認する
 
 ## 通知（DB 側）
 

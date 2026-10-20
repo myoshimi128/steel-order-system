@@ -177,7 +177,8 @@ export function IntakeRegisterScreen({
       }
       router.push(
         mode === 'new'
-          ? intakeListHref({ notice: 'registered', no: result.intakeNo })
+          ? // 受付登録の後は、そのまま振り分けの画面へ進む（発行した受付No. を上に知らせる）
+            `/intake/${intake.id}/split?notice=registered&no=${result.intakeNo}`
           : intakeListHref({ tab: 'registered', notice: 'updated', no: result.intakeNo })
       )
     })

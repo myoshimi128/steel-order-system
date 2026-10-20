@@ -4,6 +4,7 @@
 //   ・行ごとに形式の印・ファイル名・大きさ。DXF への変換が必要なファイルには「DXF への変換が必要」と出す
 //   ・「開く」: PDF は新しいタブで表示し、それ以外（DXF など）はダウンロードする
 //     （ダウンロードしたファイルは、パソコンの関連付けで図面ソフトが開く。docs/intake/screen-design.md「DXF を開く」）
+//   ・showOpenAll を付けると、上に「すべて図面ソフトで開く」を出す（PDF 以外を順にダウンロードする）
 
 import { Icon } from '@/components/layout/icon'
 import { attachmentTypeLabel, formatFileSize, isPdf, needsConversion } from '@/lib/intake/attachments'
@@ -14,15 +15,32 @@ type IntakeFileListProps = {
   files: readonly IntakeFile[]
   // ファイルがないときの文
   emptyText?: string
+  // 上に「すべて図面ソフトで開く」を出すか
+  showOpenAll?: boolean
 }
 
-export function IntakeFileList({ files, emptyText = '添付ファイルはありません' }: IntakeFileListProps) {
+export function IntakeFileList({
+  files,
+  emptyText = '添付ファイルはありません',
+  showOpenAll = false,
+}: IntakeFileListProps) {
   const opener = useFileOpener()
 
   if (files.length === 0) return <p className="text-sm text-neutral-500">{emptyText}</p>
 
   return (
     <div className="flex flex-col gap-2">
+      {showOpenAll && (
+        <button
+          type="button"
+          onClick={() => void opener.openAll(files.filter((file) => !isPdf(file.originalName)).map((file) => file.id))}
+          disabled={opener.openingId !== null}
+          className="flex items-center justify-center gap-2 rounded bg-navy px-4 py-2.5 text-sm font-bold text-white hover:bg-navy-hover disabled:opacity-60"
+        >
+          <Icon name="external" className="h-4 w-4" />
+          {opener.openingId === 'all' ? '開いています…' : 'すべて図面ソフトで開く'}
+        </button>
+      )}
       <ul className="flex flex-col gap-2">
         {files.map((file) => {
           const conversion = needsConversion(file)
