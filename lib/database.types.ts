@@ -2061,6 +2061,17 @@ export type Database = {
       }
     }
     Functions: {
+      add_cad_csv: {
+        Args: {
+          p_file_id: string
+          p_mime_type: string
+          p_original_name: string
+          p_size_bytes: number
+          p_storage_path: string
+          p_work_unit_id: string
+        }
+        Returns: string
+      }
       add_split_file: {
         Args: {
           p_file_id: string
@@ -2082,6 +2093,7 @@ export type Database = {
         }
         Returns: string
       }
+      cancel_cad_work: { Args: { p_work_unit_id: string }; Returns: undefined }
       claim_intake: { Args: { p_intake_id: string }; Returns: string }
       classify_intake: {
         Args: { p_intake_id: string; p_status: string }
@@ -2126,6 +2138,7 @@ export type Database = {
       }
       register_intake: { Args: { p_intake_id: string }; Returns: string }
       release_intake: { Args: { p_intake_id: string }; Returns: undefined }
+      remove_cad_csv: { Args: { p_file_id: string }; Returns: string }
       remove_split_file: { Args: { p_file_id: string }; Returns: string }
       save_intake: {
         Args: {
@@ -2140,6 +2153,7 @@ export type Database = {
         Args: { p_done: boolean; p_file_id: string }
         Returns: undefined
       }
+      start_cad_work: { Args: { p_work_unit_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

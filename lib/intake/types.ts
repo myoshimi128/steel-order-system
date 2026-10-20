@@ -1,8 +1,8 @@
-// 受付待ち一覧・受付登録の画面で扱う受付の形（DB の列名ではなく、画面で使いやすい名前にしたもの）。
+// 受付待ち一覧・受付登録・CAD の画面で扱う受付の形（DB の列名ではなく、画面で使いやすい名前にしたもの）。
 // サーバー（lib/intake/load-intakes.ts）で DB から読んで、この形にして画面に渡す。
 
 import type { DueDateType } from '@/lib/order-entry/constants'
-import type { IntakeChannel, IntakeFileKind, IntakeStatus, WorkUnitKind } from './constants'
+import type { IntakeChannel, IntakeFileKind, IntakeStatus, WorkUnitKind, WorkUnitStatus } from './constants'
 import type { HandlingInfo } from './handling'
 import type { IntakeInfoSource } from './intake-form'
 
@@ -40,6 +40,39 @@ export type IntakeListRow = HandlingInfo & {
   isUrgent: boolean
   siteName: string | null
   files: IntakeFile[]
+}
+
+// CAD の一覧の 1 行（アイトレの加工区分 1 件に、受付の情報とファイルを付けたもの。S-05 CAD）
+export type CadUnit = {
+  // 加工区分（work_units）の id
+  id: string
+  // 作業待ち・作業中・CSV 登録済（受注登録待ち）。起票完了（done）は一覧に出さない
+  status: Extract<WorkUnitStatus, 'cad_waiting' | 'cad_working' | 'ready'>
+  // CAD の担当と作業開始の日時（作業待ちのときは null）
+  assigneeId: string | null
+  assigneeName: string | null
+  startedAt: string | null
+  // CSV が登録されて受注登録待ちに入った日時（CSV 登録済のタブの並び順に使う）
+  readyAt: string | null
+  // 受付の情報
+  intakeId: string
+  intakeNo: string | null
+  customerName: string | null
+  projectName: string | null
+  dueDateType: DueDateType | null
+  dueDate: string | null
+  deliveryMethodName: string | null
+  isUrgent: boolean
+  siteName: string | null
+  registeredAt: string | null
+  // 同じ受付に、起票完了していない先寸の加工区分もあるか（右のパネルに「先寸あり」と出す）
+  hasSakisun: boolean
+  // この加工区分の図面（振り分けたアイトレの DXF など）
+  drawings: IntakeFile[]
+  // この加工区分に登録した CAD の CSV
+  csvFiles: IntakeFile[]
+  // 受付の注文書の PDF
+  orderPdfs: IntakeFile[]
 }
 
 // 受付登録の画面で開く受付（一覧の 1 行に、保存済みの受注情報を足したもの）

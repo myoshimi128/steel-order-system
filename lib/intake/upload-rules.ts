@@ -9,7 +9,7 @@
 // 置く順番は「Storage に置く → 成功したら intake_files の行を作る → 行を作れなかったら Storage から消す」
 // （lib/intake/upload-intake-files.ts）。ファイルの id は画面で先に決める。
 
-import { fileExtension, isDxf, isPdf } from './attachments'
+import { fileExtension, isCsv, isDxf, isPdf } from './attachments'
 import type { IntakeFileKind } from './constants'
 
 // 1 ファイルの上限（バイト）。52428800 = 50MB
@@ -41,9 +41,23 @@ export function uploadKindFor(name: string): IntakeFileKind {
 
 // Storage に置くときのファイルの種類（Content-Type）。
 // PDF に application/pdf を付けると、署名付き URL を開いたときにブラウザの中で表示される
-// （付けないと、ダウンロードになることがある）
+// （付けないと、ダウンロードになることがある）。CAD の CSV は text/csv にする
 export function uploadContentTypeFor(name: string): string {
-  return isPdf(name) ? 'application/pdf' : 'application/octet-stream'
+  if (isPdf(name)) return 'application/pdf'
+  if (isCsv(name)) return 'text/csv'
+  return 'application/octet-stream'
+}
+
+// --- CAD の CSV（S-05 CAD のドロップ枠） ---
+// 入れられるのは CSV だけ。大きさの上限は PDF・DXF と同じ
+export const CSV_UPLOAD_ACCEPT = '.csv,text/csv'
+
+// 入れられない CSV の理由。入れられるなら null
+export function csvRejectionReason(file: UploadCandidate): string | null {
+  if (!isCsv(file.name)) return 'CSV のファイルを入れてください'
+  if (file.size > MAX_UPLOAD_BYTES) return '1 ファイル 50MB までです'
+  if (file.size === 0) return '中身が空のファイルです'
+  return null
 }
 
 // Storage の置き場所 {受付の id}/{ファイルの id}.{拡張子}

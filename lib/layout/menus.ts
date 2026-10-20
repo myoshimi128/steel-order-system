@@ -39,9 +39,11 @@ export type MenuItem = {
   badge?: MenuBadgeKey
 }
 
-// 件数のバッジの種類。intakeWaiting: 受付待ちの件数（受付登録の項目に出す）。
-// CAD・受注登録の件数は、それぞれの画面を作る PR で足す
-export type MenuBadgeKey = 'intakeWaiting'
+// 件数のバッジの種類。
+//   intakeWaiting: 受付待ちの件数（受付登録の項目に出す）
+//   cadActive    : 作業待ち・作業中のアイトレの件数（CAD の項目に出す）
+// 受注登録の件数は、受注登録待ちの画面を作る PR（8）で足す
+export type MenuBadgeKey = 'intakeWaiting' | 'cadActive'
 
 export type MenuBadgeCounts = Partial<Record<MenuBadgeKey, number>>
 
@@ -90,7 +92,7 @@ export const HOME_MENU: Menu = {
   ],
 }
 
-// シャーリング部のメニュー。今ある画面（受注登録・納期連絡・マスタ管理）だけを押せるようにする
+// シャーリング部のメニュー。今ある画面（受付登録・CAD・受注登録・納期連絡・マスタ管理）だけを押せるようにする
 export const SHEARING_MENU: Menu = {
   kind: 'shearing',
   sections: [
@@ -99,7 +101,7 @@ export const SHEARING_MENU: Menu = {
       title: '業務',
       items: [
         { label: '受付登録', icon: 'inbox', href: '/intake', activePrefix: '/intake', badge: 'intakeWaiting' },
-        { label: 'CAD', icon: 'monitor', href: null },
+        { label: 'CAD', icon: 'monitor', href: '/cad', badge: 'cadActive' },
         { label: '受注登録', icon: 'pencil', href: '/orders/new', activePrefix: '/orders' },
         { label: '加工図面発行', icon: 'image', href: null },
         { label: '送り状発行', icon: 'ticket', href: null },

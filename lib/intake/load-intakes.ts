@@ -36,7 +36,8 @@ const DETAIL_COLUMNS = `${LIST_COLUMNS},
 `
 
 // 読んだ行の形（select の文字列から型を推論させると長くなるため、使う列だけを書いた型で受ける）
-type FileRow = {
+// ファイルの行の形と toFile・createViewUrls は、CAD の一覧（load-cad-units.ts）でも使う
+export type FileRow = {
   id: string
   kind: string
   slot: string | null
@@ -81,7 +82,7 @@ type DetailRowData = ListRowData & {
 }
 
 // DB の text 列（check 制約で値を限定）は、生成された型では string のため、ここで画面の型に合わせる
-function toFile(row: FileRow, viewUrls: Map<string, string>): IntakeFile {
+export function toFile(row: FileRow, viewUrls: Map<string, string>): IntakeFile {
   return {
     id: row.id,
     kind: row.kind as IntakeFileKind,
@@ -132,7 +133,7 @@ function toListRow(row: ListRowData, viewUrls: Map<string, string>): IntakeListR
 // 注文書の PDF に、画面に埋め込むための期限つきの URL（署名付き URL）を作る。
 // バケットは非公開のため、URL を知っていても期限が切れたら開けない。
 // 置き場所（storage_path）→ URL の対応を返す
-async function createViewUrls(supabase: Client, files: FileRow[]): Promise<Map<string, string>> {
+export async function createViewUrls(supabase: Client, files: FileRow[]): Promise<Map<string, string>> {
   const paths = files
     .filter((file) => file.deleted_at === null && isPdf(file.original_name))
     .map((file) => file.storage_path)

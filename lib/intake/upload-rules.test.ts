@@ -5,6 +5,7 @@ import {
   uploadContentTypeFor,
   uploadKindFor,
   uploadRejectionReason,
+  csvRejectionReason,
 } from './upload-rules'
 
 describe('uploadRejectionReason', () => {
@@ -32,6 +33,27 @@ describe('uploadKindFor / uploadContentTypeFor', () => {
     expect(uploadKindFor('a.dxf')).toBe('original')
     expect(uploadContentTypeFor('a.PDF')).toBe('application/pdf')
     expect(uploadContentTypeFor('a.dxf')).toBe('application/octet-stream')
+  })
+
+  it('CAD の CSV は text/csv', () => {
+    expect(uploadContentTypeFor('部品.CSV')).toBe('text/csv')
+  })
+})
+
+describe('csvRejectionReason', () => {
+  it('CSV で 50MB 以下なら入れられる', () => {
+    expect(csvRejectionReason({ name: '部品.csv', size: 1000 })).toBeNull()
+    expect(csvRejectionReason({ name: 'a.CSV', size: MAX_UPLOAD_BYTES })).toBeNull()
+  })
+
+  it('CSV 以外は入れられない（DXF・PDF も）', () => {
+    expect(csvRejectionReason({ name: 'a.dxf', size: 1000 })).toBe('CSV のファイルを入れてください')
+    expect(csvRejectionReason({ name: 'a.pdf', size: 1000 })).toBe('CSV のファイルを入れてください')
+  })
+
+  it('50MB を超える・空のファイルは入れられない', () => {
+    expect(csvRejectionReason({ name: 'a.csv', size: MAX_UPLOAD_BYTES + 1 })).toBe('1 ファイル 50MB までです')
+    expect(csvRejectionReason({ name: 'a.csv', size: 0 })).toBe('中身が空のファイルです')
   })
 })
 

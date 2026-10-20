@@ -53,7 +53,13 @@ describe('isMenuItemActive', () => {
   })
 
   it('準備中の項目は強調しない', () => {
-    expect(isMenuItemActive(findItem('CAD'), '/cad')).toBe(false)
+    expect(isMenuItemActive(findItem('加工図面発行'), '/')).toBe(false)
+  })
+
+  it('CAD は /cad で強調し、作業待ち・作業中の件数を出す', () => {
+    const item = findItem('CAD')
+    expect(isMenuItemActive(item, '/cad')).toBe(true)
+    expect(item.badge).toBe('cadActive')
   })
 
   it('ホームのメニューのホームは / のときだけ強調する', () => {
@@ -84,6 +90,10 @@ describe('buildBreadcrumbs', () => {
     expect(buildBreadcrumbs('/intake/register')).toEqual([
       { label: 'シャーリング部', href: '/shearing' },
       { label: '受付登録', href: null },
+    ])
+    expect(buildBreadcrumbs('/cad')).toEqual([
+      { label: 'シャーリング部', href: '/shearing' },
+      { label: 'CAD', href: null },
     ])
     expect(buildBreadcrumbs('/shearing/lead-time')).toEqual([
       { label: 'シャーリング部', href: '/shearing' },

@@ -196,7 +196,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 
 **制約**：先寸は `ready`/`done` のみ／`(id, intake_id)` 一意（ファイルからの参照用）
 
-**トリガー**：状態に応じて日時を自動で記録、`done` から戻すのを禁止、すべて `done` になったら受付を `closed` にする
+**トリガー**：状態に応じて日時を自動で記録（作業開始の日時と担当は、作業待ちから作業中になったときだけ。CSV を外して `ready` から作業中に戻したときは、最初の開始日時と担当を残す。PR 7）、`done` から戻すのを禁止、すべて `done` になったら受付を `closed` にする
 
 ### intake_files（ファイル）
 
@@ -214,9 +214,9 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | deleted_at | timestamptz | ○ | 論理削除（元データは振り分け完了で入る） |
 | uploaded_by / updated_by / created_at / updated_at | | | |
 
-**制約**：`(work_unit_id, intake_id)` → `work_units(id, intake_id)`（別の受付の加工区分には付けられない）／振り分けの枠の中は同じ名前を 1 つだけ（`(intake_id, slot, original_name)` の部分一意）→ 同じ名前は **差し替え** で扱う（前の行を論理削除して新しい行を足す。`add_split_file()`）
+**制約**：`(work_unit_id, intake_id)` → `work_units(id, intake_id)`（別の受付の加工区分には付けられない）／振り分けの枠の中は同じ名前を 1 つだけ（`(intake_id, slot, original_name)` の部分一意）→ 同じ名前は **差し替え** で扱う（前の行を論理削除して新しい行を足す。`add_split_file()`）／CAD の CSV は、同じ加工区分の中で同じ名前を 1 つだけ（`(work_unit_id, original_name)` の部分一意。同じ名前は `add_cad_csv()` で差し替え。PR 7）
 
-**トリガー**：kind=`csv` が追加されたら、そのアイトレを `ready` にする
+**トリガー**：kind=`csv` が追加されたら、そのアイトレ（作業待ち・作業中）を `ready` にする。CAD の画面は `add_cad_csv()` で行を足し、状態の変更はこのトリガーに任せる
 
 受注は必ず受付を通すため、受注の注文書・図面は「受注 → 加工区分（`orders.work_unit_id`）→ ファイル」または「受注 → 受付（`orders.intake_id`）→ ファイル」でたどる。本体の `attachments`（受注に直接付ける注文書）は使わない。
 
@@ -291,6 +291,10 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | `add_split_file(intake_id, file_id, slot, original_name, storage_path, mime_type, size_bytes)` → text | 振り分けの枠にファイルの行を足す（PR 6）。実物は呼ぶ前に Storage に置く。同じ枠に同じ名前があれば、前の行を論理削除して差し替え、前の置き場所を返す（アプリが実物を消す）。論理削除と追加を 1 つの transaction で行う。受付登録済の受付だけ（違えば `SPLIT_NOT_REGISTERED` のエラー）。事務・管理者だけ |
 | `remove_split_file(file_id)` → text | 振り分けの枠からファイルを外す（PR 6）。論理削除して置き場所を返す（アプリが実物を消す）。受付登録済の受付だけ |
 | `set_original_split_done(file_id, done)` | 元データの「分割して保存済」の印を付け外しする（PR 6）。受付登録済の受付だけ |
+| `start_cad_work(work_unit_id)` → uuid | CAD の作業開始（PR 7）。作業待ちのアイトレを作業中にし、担当を自分にする（開始日時はトリガー）。作業待ちのときだけの条件で 1 回の update で決めるため、同時に押しても 1 人に決まる。その後の担当を返す（先にほかの人が始めていたらその人）。作業待ち・作業中でなければ `CAD_STATUS_CHANGED` のエラー。事務・管理者だけ |
+| `cancel_cad_work(work_unit_id)` | 作業開始の取り消し（PR 7）。作業中 → 作業待ちに戻し、担当と開始日時を空にする。担当以外の人もできる（画面で確認のダイアログ）。作業中でなければ `CAD_STATUS_CHANGED` |
+| `add_cad_csv(work_unit_id, file_id, original_name, storage_path, mime_type, size_bytes)` → text | CAD の CSV の行を足す（PR 7）。実物は呼ぶ前に Storage に置く。作業中・CSV 登録済のアイトレだけ（作業待ちは不可）。加工区分の行をロックし、同じ名前の CSV があれば前の行を論理削除して差し替え、前の置き場所を返す（アプリが実物を消す）。insert のトリガーで作業中のアイトレが `ready` になる。拡張子 .csv 以外はエラー |
+| `remove_cad_csv(file_id)` → text | CAD の CSV を外す（PR 7）。CSV 登録済（`ready`）の間だけ。論理削除して置き場所を返す（アプリが実物を消す）。CSV が 0 件になったら作業中に戻す。担当以外の人もできる。受注のある加工区分で外せないようにする確認は PR 9 で足す |
 | `publish_lead_times(dept, items jsonb, summary, message, expires_on, expected_history_id) → uuid` | 納期連絡の「ホームに公開」（PR 4b）。工程（`items` の並び順で `sort_order`。`id` が空の行は追加）・部署メッセージを書き換え、`lead_time_history` に要約を 1 行残して、その id を返す。事務・管理者だけ。部署メッセージの行をロックしてから、最新の履歴が `expected_history_id`（画面を開いた時点の最新）と違えば `LEAD_TIME_CONFLICT` のエラー（ほかの人が先に公開した）。既存の工程がすべて渡されていなければエラー（工程は削除できないため）。要相談の工程は日数を空にする。`message`・`expires_on`・`expected_history_id` は初期値 null（型の生成で省略できる引数になる） |
 | `create_order(p_order, p_items)`（本体・変更。PR 9） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
 
@@ -343,6 +347,13 @@ waiting ──受付登録──→ registered ──振り分け完了──→
    - 公開するもの：`intakes`・`intake_destinations`・`intake_site_changes`・`work_units`・`intake_files`・`notifications`・`notification_reads`・`lead_time_items`・`lead_time_messages`・`lead_time_history`・`work_unit_queue_view`
    - 公開してはいけないもの：`private` スキーマ全体（`private.intake_no_counters`・`private.assign_intake_no`・既存の `private.order_no_counters`・`private.next_order_no`）。どのテーブルも `anon` に権限を付けない
 5. 確認・デモ用に、必要なら seed 006 を実行する（本番の DB では実行しない）
+
+### マイグレーションの実行の手順（PR 7）
+
+1. SQL Editor で `20261022100000_add_cad_functions.sql` を実行する
+2. `npm run db:types` で型を再生成する（4 つの関数の型は、生成と同じ形で `lib/database.types.ts` に先に入れてあるため、再生成しても差は出ない想定）
+3. テーブルは増えないため、Data API の設定画面での確認は不要
+4. 作業開始・CSV の登録の結果は、seed 010（`supabase/seed/010_work_unit_check.sql` の 5。読むだけの SQL）で確かめられる
 
 ### マイグレーションの実行の手順（PR 6）
 
