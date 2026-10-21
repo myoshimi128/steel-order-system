@@ -1,17 +1,19 @@
-// 受注登録待ちの加工場所のタブ（本社／A営業所／B営業所。件数つき）。
-// URL の ?site= で切り替える（受付待ち一覧のタブ components/intake/inbox/intake-tabs.tsx と同じ見た目）。
+// 加工場所（営業所）のタブ（本社／A営業所／B営業所。件数つき）。受注登録待ち（S-06a）と CAD（S-05）で共通。
+// URL の ?site= で切り替える。リンク先の URL は使う画面が hrefFor で作る（画面ごとに ? の中身が違うため）。
+// 見た目は受付待ち一覧のタブ（components/intake/inbox/intake-tabs.tsx）と同じ。
 
 import Link from 'next/link'
-import { queueHref, type QueueSite } from '@/lib/intake/queue'
+import type { SiteTab } from '@/lib/intake/site-tabs'
 
-type QueueSiteTabsProps = {
-  sites: readonly QueueSite[]
-  current: QueueSite | null
-  // 営業所の id → 件数
+type SiteTabsProps = {
+  sites: readonly SiteTab[]
+  current: SiteTab | null
+  // 営業所の id → 件数（CAD は作業待ち・作業中の件数。サイドメニューのバッジと同じ数）
   counts: Map<string, number>
+  hrefFor: (site: SiteTab) => string
 }
 
-export function QueueSiteTabs({ sites, current, counts }: QueueSiteTabsProps) {
+export function SiteTabs({ sites, current, counts, hrefFor }: SiteTabsProps) {
   return (
     <nav aria-label="加工場所" className="flex gap-1 border-b border-line px-4">
       {sites.map((site) => {
@@ -19,7 +21,7 @@ export function QueueSiteTabs({ sites, current, counts }: QueueSiteTabsProps) {
         return (
           <Link
             key={site.id}
-            href={queueHref({ site: site.code })}
+            href={hrefFor(site)}
             aria-current={active ? 'page' : undefined}
             className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-3 text-sm ${
               active ? 'border-navy font-bold text-navy' : 'border-transparent text-neutral-600 hover:text-neutral-900'

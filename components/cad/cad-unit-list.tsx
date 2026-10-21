@@ -2,7 +2,8 @@
 
 // CAD の一覧の表（画面イメージ 05 の左側）。
 //   上: 検索の欄（受付No.・売り先・工事名で絞り込む）と並び順の説明
-//   列: 納期（至急の印）・受付No.・売り先／工事名・加工場所・図面・状態／担当・操作
+//   列: 納期（至急の印）・受付No.・売り先／工事名・図面・状態／担当・操作
+//   （加工場所は上のタブで分けているため、列には出さない）
 //   下: 作業開始の案内
 // 1280px の画面に右のパネルと並べるため、売り先と工事名、状態と担当は 1 つの列に 2 段で出す。
 // 行の中身は CadUnitRow。
@@ -52,7 +53,6 @@ export function CadUnitList({ board }: { board: CadBoard }) {
               <th className="w-16 px-3 py-2 font-semibold">納期</th>
               <th className="w-[72px] px-2 py-2 font-semibold">受付No.</th>
               <th className="px-2 py-2 font-semibold">売り先／工事名</th>
-              <th className="w-16 px-2 py-2 font-semibold">加工場所</th>
               <th className="w-[68px] px-2 py-2 font-semibold">図面</th>
               <th className="w-28 px-2 py-2 font-semibold">状態／担当</th>
               <th className="w-[92px] px-2 py-2 font-semibold">

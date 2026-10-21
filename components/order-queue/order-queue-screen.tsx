@@ -8,20 +8,21 @@
 // 状態と操作は useOrderQueue（lib/intake/use-order-queue.ts）が持つ。
 
 import { useState } from 'react'
+import { SiteTabs } from '@/components/intake/site-tabs'
 import { Icon } from '@/components/layout/icon'
 import { StepIndicator } from '@/components/order-entry/step-indicator'
-import { countQueueBySite, type QueueSite } from '@/lib/intake/queue'
+import { queueHref } from '@/lib/intake/queue'
+import { countBySite, type SiteTab } from '@/lib/intake/site-tabs'
 import type { QueueUnit } from '@/lib/intake/types'
 import { useOrderQueue } from '@/lib/intake/use-order-queue'
 import { AddWorkUnitDialog } from './add-work-unit-dialog'
 import { QueueList } from './queue-list'
-import { QueueSiteTabs } from './queue-site-tabs'
 
 type OrderQueueScreenProps = {
   units: QueueUnit[]
-  sites: QueueSite[]
+  sites: SiteTab[]
   // 開いているタブの営業所
-  site: QueueSite | null
+  site: SiteTab | null
   // 追加・起票完了の結果のお知らせ（なければ null）
   notice: string | null
 }
@@ -63,7 +64,12 @@ export function OrderQueueScreen({ units, sites, site, notice }: OrderQueueScree
 
       {/* 一覧は画面の高さに合わせ、表の中でスクロールする */}
       <section className="mt-4 flex h-[calc(100dvh-var(--header-height)-140px)] min-h-[560px] flex-col rounded border border-line bg-white">
-        <QueueSiteTabs sites={sites} current={site} counts={countQueueBySite(units)} />
+        <SiteTabs
+          sites={sites}
+          current={site}
+          counts={countBySite(units)}
+          hrefFor={(tab) => queueHref({ site: tab.code })}
+        />
         <QueueList queue={queue} />
         <div className="border-t border-line px-4 py-3 text-xs text-neutral-500">
           <p>先寸は振り分け完了ですぐに、アイトレは CAD で CSV が登録されるとここに並びます。</p>

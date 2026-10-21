@@ -4,8 +4,10 @@
 
 import { OrderQueueScreen } from '@/components/order-queue/order-queue-screen'
 import { getCurrentUser } from '@/lib/auth'
-import { loadQueueSites, loadQueueUnits } from '@/lib/intake/load-queue-units'
-import { queueNoticeText, selectQueueSite } from '@/lib/intake/queue'
+import { loadQueueUnits } from '@/lib/intake/load-queue-units'
+import { loadSiteTabs } from '@/lib/intake/load-sites'
+import { queueNoticeText } from '@/lib/intake/queue'
+import { selectSiteTab } from '@/lib/intake/site-tabs'
 import { createClient } from '@/lib/supabase-server'
 
 type QueuePageProps = {
@@ -27,8 +29,8 @@ export default async function OrderQueuePage({ searchParams }: QueuePageProps) {
   }
 
   const supabase = await createClient()
-  const [units, sites] = await Promise.all([loadQueueUnits(supabase), loadQueueSites(supabase)])
-  const site = selectQueueSite(sites, params.site, user.siteId)
+  const [units, sites] = await Promise.all([loadQueueUnits(supabase), loadSiteTabs(supabase)])
+  const site = selectSiteTab(sites, params.site, user.siteId)
 
   return (
     <OrderQueueScreen

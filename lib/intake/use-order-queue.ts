@@ -13,13 +13,14 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { completeWorkUnit } from '@/app/(main)/orders/queue/actions'
 import { WORK_UNIT_KIND_LABELS } from './constants'
-import { filterQueueUnits, queueHref, rowsForQueueSite, type QueueSite } from './queue'
+import { filterQueueUnits, queueHref, rowsForQueueSite } from './queue'
+import type { SiteTab } from './site-tabs'
 import type { QueueUnit } from './types'
 import { useTableChanges, type IntakeRealtimeTable } from './use-intake-changes'
 
 type Params = {
   units: QueueUnit[]
-  site: QueueSite | null
+  site: SiteTab | null
 }
 
 const REALTIME_TABLES: readonly IntakeRealtimeTable[] = ['work_units', 'intakes']

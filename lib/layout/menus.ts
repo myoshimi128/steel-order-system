@@ -41,7 +41,7 @@ export type MenuItem = {
 
 // 件数のバッジの種類。
 //   intakeWaiting: 受付待ちの件数（受付登録の項目に出す）
-//   cadActive    : 作業待ち・作業中のアイトレの件数（CAD の項目に出す）
+//   cadActive    : 作業待ち・作業中のアイトレの件数（CAD の項目に出す。ログイン中のユーザーの営業所の分、管理者は全部）
 //   orderReady   : 受注登録待ちの件数（受注登録の項目に出す。ログイン中のユーザーの営業所の分、管理者は全部）
 export type MenuBadgeKey = 'intakeWaiting' | 'cadActive' | 'orderReady'
 

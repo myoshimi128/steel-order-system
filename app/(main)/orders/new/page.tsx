@@ -11,7 +11,8 @@ import {
   parsePanelWidthCookie,
 } from '@/lib/order-entry/document-panel-state'
 import { loadOrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
-import { loadQueueSites, loadQueueUnit } from '@/lib/intake/load-queue-units'
+import { loadQueueUnit } from '@/lib/intake/load-queue-units'
+import { loadSiteTabs } from '@/lib/intake/load-sites'
 import { createClient } from '@/lib/supabase-server'
 
 // 受注登録画面（新規）。docs/screen-design.md「受注登録画面」。
@@ -51,7 +52,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
   const unitId = typeof params.unit === 'string' && UUID_PATTERN.test(params.unit) ? params.unit : null
   let queueBanner: ReactNode = undefined
   if (unitId) {
-    const [found, sites] = await Promise.all([loadQueueUnit(supabase, unitId), loadQueueSites(supabase)])
+    const [found, sites] = await Promise.all([loadQueueUnit(supabase, unitId), loadSiteTabs(supabase)])
     if (found) {
       const siteCode = sites.find((site) => site.id === found.unit.siteId)?.code ?? null
       queueBanner = <QueueSourceBanner unit={found.unit} siteCode={siteCode} inQueue={found.status === 'ready'} />

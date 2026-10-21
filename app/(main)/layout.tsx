@@ -44,13 +44,13 @@ export default async function MainLayout({ children }: LayoutProps<'/'>) {
 
   // ヘッダーの通知ベルに最初に出す未読の通知。新着はその後ブラウザで Realtime から受け取る
   // サイドメニューの件数のバッジ（受付待ち・CAD・受注登録待ちの件数）も一緒に読む。
-  // 受注登録待ちは、ログイン中のユーザーの営業所の分（管理者は全部の営業所。countScopeSiteId）
-  const readySiteId = user ? countScopeSiteId(user) : null
+  // CAD・受注登録待ちは、ログイン中のユーザーの営業所の分（管理者と営業所が空のユーザーは全部の営業所。countScopeSiteId）
+  const scopeSiteId = user ? countScopeSiteId(user) : null
   const [unread, waitingIntakeCount, activeCadCount, readyUnitCount] = await Promise.all([
     loadUnreadNotifications(user),
     loadBadgeCount(user?.role, (supabase) => countIntakes(supabase, 'waiting')),
-    loadBadgeCount(user?.role, (supabase) => countActiveCadUnits(supabase)),
-    loadBadgeCount(user?.role, (supabase) => countReadyUnits(supabase, readySiteId)),
+    loadBadgeCount(user?.role, (supabase) => countActiveCadUnits(supabase, scopeSiteId)),
+    loadBadgeCount(user?.role, (supabase) => countReadyUnits(supabase, scopeSiteId)),
   ])
 
   return (

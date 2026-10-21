@@ -62,7 +62,6 @@ export function CadUnitRow({ unit, board }: { unit: CadUnit; board: CadBoard }) 
           {unit.projectName}
         </span>
       </td>
-      <td className="truncate px-2 py-3 text-xs">{unit.siteName}</td>
       <td className="px-2 py-3">
         {drawingIds.length > 0 ? (
           <button

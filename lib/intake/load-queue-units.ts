@@ -10,7 +10,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/database.types'
 import type { DueDateType } from '@/lib/order-entry/constants'
 import type { WorkUnitKind, WorkUnitOrigin } from './constants'
-import type { QueueSite } from './queue'
 import type { QueueUnit } from './types'
 
 type Client = SupabaseClient<Database>
@@ -96,17 +95,6 @@ export async function loadQueueUnit(
   if (!data) return null
   const row = data as unknown as QueueRowData & { status: string }
   return { unit: toQueueUnit(row), status: row.status }
-}
-
-// 営業所のタブ（使っている営業所を、番号の順に）
-export async function loadQueueSites(supabase: Client): Promise<QueueSite[]> {
-  const { data, error } = await supabase
-    .from('sites')
-    .select('id, number, code, name')
-    .eq('is_active', true)
-    .order('number')
-  if (error) throw new Error(`営業所を読めませんでした: ${error.message}`)
-  return data
 }
 
 // 受注登録待ちの件数（サイドメニューの「受注登録」のバッジ・部署ホームのカード）。

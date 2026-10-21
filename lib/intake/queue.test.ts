@@ -1,21 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
-  countQueueBySite,
   countScopeSiteId,
   filterQueueUnits,
   queueHref,
   queueNoticeText,
   queueOriginLabel,
   rowsForQueueSite,
-  selectQueueSite,
-  type QueueSite,
 } from './queue'
 import type { QueueUnit } from './types'
-
-const SITES: QueueSite[] = [
-  { id: 's1', number: 1, code: 'honsha', name: '本社' },
-  { id: 's2', number: 2, code: 'a', name: 'A営業所' },
-]
 
 const unit = (id: string, overrides: Partial<QueueUnit> = {}): QueueUnit => ({
   id,
@@ -37,22 +29,6 @@ const unit = (id: string, overrides: Partial<QueueUnit> = {}): QueueUnit => ({
   ...overrides,
 })
 
-describe('selectQueueSite', () => {
-  it('URL のコードの営業所を開く', () => {
-    expect(selectQueueSite(SITES, 'a', 's1')?.id).toBe('s2')
-  })
-
-  it('指定がない・知らないコードなら、ユーザーの営業所', () => {
-    expect(selectQueueSite(SITES, undefined, 's2')?.id).toBe('s2')
-    expect(selectQueueSite(SITES, 'x', 's2')?.id).toBe('s2')
-  })
-
-  it('ユーザーの営業所もなければ先頭の営業所', () => {
-    expect(selectQueueSite(SITES, undefined, null)?.id).toBe('s1')
-    expect(selectQueueSite([], undefined, null)).toBeNull()
-  })
-})
-
 describe('queueHref / queueNoticeText', () => {
   it('タブとお知らせを URL に付ける', () => {
     expect(queueHref()).toBe('/orders/queue')
@@ -68,7 +44,7 @@ describe('queueHref / queueNoticeText', () => {
   })
 })
 
-describe('countQueueBySite / rowsForQueueSite', () => {
+describe('rowsForQueueSite', () => {
   const units = [
     unit('late', { dueDate: '2026-10-24' }),
     unit('urgent', { isUrgent: true, dueDate: '2026-10-30' }),
@@ -76,12 +52,6 @@ describe('countQueueBySite / rowsForQueueSite', () => {
     unit('early', { dueDate: '2026-10-03' }),
     unit('other-site', { siteId: 's2' }),
   ]
-
-  it('営業所ごとの件数', () => {
-    const counts = countQueueBySite(units)
-    expect(counts.get('s1')).toBe(4)
-    expect(counts.get('s2')).toBe(1)
-  })
 
   it('タブの営業所の行だけを、至急 → 納期の早い順 → 日付なし で並べる', () => {
     expect(rowsForQueueSite(units, 's1').map((u) => u.id)).toEqual(['urgent', 'early', 'late', 'none'])

@@ -20,7 +20,7 @@ type SidebarProps = {
   initialPreferCollapsed: boolean
   // 受付待ちの件数（共通レイアウトで数えたもの）。事務・管理者でなければ null（バッジを出さない）
   initialWaitingIntakeCount: number | null
-  // CAD の作業待ち・作業中の件数（同上）
+  // CAD の作業待ち・作業中の件数（ログイン中のユーザーの営業所の分。管理者は全部。同上）
   initialActiveCadCount: number | null
   // 受注登録待ちの件数（ログイン中のユーザーの営業所の分。管理者は全部。同上）
   initialReadyUnitCount: number | null

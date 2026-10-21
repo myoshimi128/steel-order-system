@@ -70,6 +70,8 @@ export type CadUnit = {
   dueDate: string | null
   deliveryMethodName: string | null
   isUrgent: boolean
+  // 加工場所（一覧の加工場所のタブで絞り込む）
+  siteId: string | null
   siteName: string | null
   registeredAt: string | null
   // 同じ受付に、起票完了していない先寸の加工区分もあるか（右のパネルに「先寸あり」と出す）
