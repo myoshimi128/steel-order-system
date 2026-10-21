@@ -12,7 +12,7 @@
 //   注文書  : useDocumentPanel（左のパネルの幅と開閉。F2 で開閉）
 // ここでは画面の切り替えと保存の流れ（確認 → Server Action の呼び出し → 結果の表示）だけを扱う。
 
-import { useEffect, useState, useTransition, type KeyboardEvent } from 'react'
+import { useEffect, useState, useTransition, type KeyboardEvent, type ReactNode } from 'react'
 import { createOrder } from '@/app/(main)/orders/new/actions'
 import { findCodeOption } from '@/lib/code-input/code-option'
 import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
@@ -45,6 +45,9 @@ type OrderEntryScreenProps = {
   // 注文書のパネルの保存されている幅と開閉（サーバーが cookie から読む）
   initialPanelWidth: number | null
   initialPanelOpen: boolean
+  // 受注登録待ちの一覧の行から開いたときに、見出しの横に出す帯（どの受付・区分から開いたか）。
+  // 帯があるときは、進み具合の先頭に「受注登録待ち」を加える
+  queueBanner?: ReactNode
 }
 
 type StatusMessage = { kind: 'success' | 'error' | 'info'; text: string }
@@ -54,7 +57,13 @@ function shortDate(value: string): string {
   return value ? value.slice(5).replace('-', '/') : ''
 }
 
-export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPanelOpen }: OrderEntryScreenProps) {
+export function OrderEntryScreen({
+  masters,
+  today,
+  initialPanelWidth,
+  initialPanelOpen,
+  queueBanner,
+}: OrderEntryScreenProps) {
   const [step, setStep] = useState<OrderEntryStep>('info')
 
   const header = useOrderHeader(masters.header, today)
@@ -229,8 +238,11 @@ export function OrderEntryScreen({ masters, today, initialPanelWidth, initialPan
       className="flex h-[calc(100dvh-var(--header-height))] min-h-0 flex-col gap-3 bg-canvas px-6 py-4"
     >
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-navy">受注登録</h1>
-        <StepIndicator current={step} />
+        <div className="flex min-w-0 items-center gap-4">
+          <h1 className="shrink-0 text-xl font-bold text-navy">受注登録</h1>
+          {queueBanner}
+        </div>
+        <StepIndicator current={step} withQueue={queueBanner !== undefined} />
       </div>
 
       {/* 左に注文書のパネル、右に画面ごとの中身。パネルの最大の幅は、この枠の幅から決まる */}

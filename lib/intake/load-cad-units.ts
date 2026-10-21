@@ -114,12 +114,15 @@ export async function loadCadUnits(supabase: Client): Promise<CadUnit[]> {
 
 // サイドメニューの「CAD」の件数（作業待ち・作業中のアイトレ）。
 // ビュー work_unit_queue_view は論理削除した受付と起票完了を除いてあるため、状態で絞るだけでよい
-export async function countActiveCadUnits(supabase: Client): Promise<number> {
-  const { count, error } = await supabase
+// siteId を渡すと、その営業所（加工場所）の分だけを数える（部署ホームのカード。省略・null なら全部の営業所）
+export async function countActiveCadUnits(supabase: Client, siteId: string | null = null): Promise<number> {
+  let query = supabase
     .from('work_unit_queue_view')
     .select('work_unit_id', { count: 'exact', head: true })
     .eq('kind', 'aitore')
     .in('status', [...CAD_ACTIVE_STATUSES])
+  if (siteId) query = query.eq('site_id', siteId)
+  const { count, error } = await query
   if (error) throw new Error(`CAD の件数を数えられませんでした: ${error.message}`)
   return count ?? 0
 }

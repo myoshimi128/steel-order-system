@@ -3,13 +3,15 @@
 // サイドメニュー（docs/screen-design.md「共通レイアウト」）。
 // ・URL に応じて、ホームのメニューかシャーリング部のメニューを出す（lib/layout/menus.ts）
 // ・開閉できる。閉じるとアイコンだけの幅になる。開閉の状態は useSidebar が持ち、cookie に保存する
-// ・項目に件数のバッジを出す（受付登録の項目に受付待ちの件数、CAD の項目に作業待ち・作業中の件数。
+// ・項目に件数のバッジを出す（受付登録の項目に受付待ちの件数、CAD の項目に作業待ち・作業中の件数、
+//   受注登録の項目に受注登録待ちの件数。
 //   受付・加工区分の変更を Realtime で受け取って更新する）
 
 import Link from 'next/link'
 import { Icon } from '@/components/layout/icon'
 import { SidebarItem } from '@/components/layout/sidebar-item'
 import { useActiveCadCount } from '@/lib/intake/use-active-cad-count'
+import { useReadyUnitCount } from '@/lib/intake/use-ready-unit-count'
 import { useWaitingIntakeCount } from '@/lib/intake/use-waiting-intake-count'
 import { isMenuItemActive, selectMenu, type MenuBadgeCounts } from '@/lib/layout/menus'
 import { useSidebar } from '@/lib/layout/use-sidebar'
@@ -20,18 +22,27 @@ type SidebarProps = {
   initialWaitingIntakeCount: number | null
   // CAD の作業待ち・作業中の件数（同上）
   initialActiveCadCount: number | null
+  // 受注登録待ちの件数（ログイン中のユーザーの営業所の分。管理者は全部。同上）
+  initialReadyUnitCount: number | null
 }
 
-export function Sidebar({ initialPreferCollapsed, initialWaitingIntakeCount, initialActiveCadCount }: SidebarProps) {
+export function Sidebar({
+  initialPreferCollapsed,
+  initialWaitingIntakeCount,
+  initialActiveCadCount,
+  initialReadyUnitCount,
+}: SidebarProps) {
   const { pathname, collapsed, toggle } = useSidebar(initialPreferCollapsed)
   const waitingIntakeCount = useWaitingIntakeCount(
     initialWaitingIntakeCount,
     initialWaitingIntakeCount !== null
   )
   const activeCadCount = useActiveCadCount(initialActiveCadCount, initialActiveCadCount !== null)
+  const readyUnitCount = useReadyUnitCount(initialReadyUnitCount, initialReadyUnitCount !== null)
   const badgeCounts: MenuBadgeCounts = {
     intakeWaiting: waitingIntakeCount ?? undefined,
     cadActive: activeCadCount ?? undefined,
+    orderReady: readyUnitCount ?? undefined,
   }
   const menu = selectMenu(pathname)
 

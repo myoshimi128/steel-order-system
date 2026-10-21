@@ -56,6 +56,14 @@ describe('isMenuItemActive', () => {
     expect(isMenuItemActive(findItem('加工図面発行'), '/')).toBe(false)
   })
 
+  it('受注登録は受注登録待ちの一覧を開き、受注登録の画面でも強調する。受注登録待ちの件数を出す', () => {
+    const item = findItem('受注登録')
+    expect(item.href).toBe('/orders/queue')
+    expect(isMenuItemActive(item, '/orders/queue')).toBe(true)
+    expect(isMenuItemActive(item, '/orders/new')).toBe(true)
+    expect(item.badge).toBe('orderReady')
+  })
+
   it('CAD は /cad で強調し、作業待ち・作業中の件数を出す', () => {
     const item = findItem('CAD')
     expect(isMenuItemActive(item, '/cad')).toBe(true)

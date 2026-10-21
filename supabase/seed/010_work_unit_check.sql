@@ -1,7 +1,8 @@
--- 振り分け（S-04d）と CAD（S-05）の結果を確かめる SQL（読むだけ。データは変えない）。
+-- 振り分け（S-04d）・CAD（S-05）・受注登録待ち（S-06a・S-06b）の結果を確かめる SQL（読むだけ。データは変えない）。
 --
--- 振り分け完了で作られた加工区分と元データの削除（PR 6）、CAD の作業開始・CSV の登録（PR 7）を
--- SQL Editor で確かめるために使う。'26-0001' の部分（5 か所）を確かめたい受付No. に書き換えて実行する。
+-- 振り分け完了で作られた加工区分と元データの削除（PR 6）、CAD の作業開始・CSV の登録（PR 7）、
+-- 受注登録待ちに追加・起票完了（PR 8）を
+-- SQL Editor で確かめるために使う。'26-0001' の部分（6 か所）を確かめたい受付No. に書き換えて実行する。
 
 
 -- ============================================================
@@ -58,3 +59,17 @@ left join public.intake_files f on f.work_unit_id = wu.id and f.kind = 'csv'
 where i.intake_no = '26-0001'  -- ← 確かめたい受付No.
   and wu.kind = 'aitore'
 order by f.created_at;
+
+
+-- ============================================================
+-- 6. 受注登録待ちに追加・起票完了（区分ごとの作られ方・メモ・状態と、追加分のファイル）
+-- ============================================================
+-- 追加した区分は origin が oversight / verbal / other。起票を完了した区分は status = done と done_at が入る。
+-- 受付のすべての区分が done になると、受付の状態（1 の select）が closed になり、追加すると dispatched に戻る
+select wu.kind, wu.origin, wu.note, wu.status, wu.ready_at, wu.done_at,
+       f.kind as file_kind, f.original_name
+from public.work_units wu
+join public.intakes i on i.id = wu.intake_id
+left join public.intake_files f on f.work_unit_id = wu.id and f.kind = 'added' and f.deleted_at is null
+where i.intake_no = '26-0001'  -- ← 確かめたい受付No.
+order by wu.created_at, f.original_name;
