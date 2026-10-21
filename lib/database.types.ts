@@ -14,51 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      attachments: {
-        Row: {
-          created_at: string
-          file_name: string
-          file_type: string
-          id: string
-          order_id: string
-          storage_path: string
-          uploaded_by: string
-        }
-        Insert: {
-          created_at?: string
-          file_name: string
-          file_type: string
-          id?: string
-          order_id: string
-          storage_path: string
-          uploaded_by: string
-        }
-        Update: {
-          created_at?: string
-          file_name?: string
-          file_type?: string
-          id?: string
-          order_id?: string
-          storage_path?: string
-          uploaded_by?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "attachments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "attachments_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       customer_stamps: {
         Row: {
           customer_id: string
@@ -1157,6 +1112,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          branch_no: number
           created_at: string
           created_by: string
           customer_contact: string | null
@@ -1169,6 +1125,8 @@ export type Database = {
           due_date_type: string
           field_note: string | null
           id: string
+          intake_id: string
+          is_urgent: boolean
           joint_no: string | null
           member_class: string
           order_date: string
@@ -1177,10 +1135,13 @@ export type Database = {
           remarks: string | null
           site_id: string
           splice_shot: boolean | null
+          staff_id: string
           status: string
           updated_at: string
+          work_unit_id: string
         }
         Insert: {
+          branch_no: number
           created_at?: string
           created_by: string
           customer_contact?: string | null
@@ -1193,18 +1154,23 @@ export type Database = {
           due_date_type: string
           field_note?: string | null
           id?: string
+          intake_id: string
+          is_urgent?: boolean
           joint_no?: string | null
           member_class?: string
           order_date: string
-          order_no?: string
+          order_no: string
           project_name?: string | null
           remarks?: string | null
           site_id: string
           splice_shot?: boolean | null
+          staff_id?: string
           status?: string
           updated_at?: string
+          work_unit_id: string
         }
         Update: {
+          branch_no?: number
           created_at?: string
           created_by?: string
           customer_contact?: string | null
@@ -1217,6 +1183,8 @@ export type Database = {
           due_date_type?: string
           field_note?: string | null
           id?: string
+          intake_id?: string
+          is_urgent?: boolean
           joint_no?: string | null
           member_class?: string
           order_date?: string
@@ -1225,8 +1193,10 @@ export type Database = {
           remarks?: string | null
           site_id?: string
           splice_shot?: boolean | null
+          staff_id?: string
           status?: string
           updated_at?: string
+          work_unit_id?: string
         }
         Relationships: [
           {
@@ -1258,11 +1228,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_intake_id_fkey"
+            columns: ["intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_unit_queue_view"
+            referencedColumns: ["intake_id"]
+          },
+          {
             foreignKeyName: "orders_site_id_fkey"
             columns: ["site_id"]
             isOneToOne: false
             referencedRelation: "sites"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_unit_same_intake_fkey"
+            columns: ["work_unit_id", "intake_id"]
+            isOneToOne: false
+            referencedRelation: "work_units"
+            referencedColumns: ["id", "intake_id"]
           },
         ]
       }

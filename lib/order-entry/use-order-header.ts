@@ -5,12 +5,15 @@
 //   ・各欄の入力値（番号の欄は打った番号、文字・日付の欄はその値）を持つ
 //   ・部材区分（SPL はスプライス専用の受注）・納期種別・配達の値に応じて、表示する欄と入力順を決める
 //   ・保存用の値（OrderHeaderInput）への変換と、保存前の確認（必須項目など）
+//   ・受注登録待ちの加工区分から開いたときは、受付の値を初期値にする（lib/order-entry/intake-defaults.ts）。
+//     受付から入った値のままの欄かどうか（fromIntake）を画面に渡し、薄い青に見せる
 //
 // 画面の部品（components/order-entry/header/*）はこのフックの戻り値を表示するだけにする
 // （CLAUDE.md「UI実装方針」）。
 
 import { useState } from 'react'
 import { findCodeOption, type CodeOption } from '@/lib/code-input/code-option'
+import { URGENT_OPTIONS } from '@/lib/intake/constants'
 import {
   DUE_DATE_TYPE_OPTIONS,
   dueDateTypeNeedsDate,
@@ -20,6 +23,7 @@ import {
   SHOT_OPTIONS,
   SPLICE_MEMBER_CLASS,
 } from './constants'
+import { isFromIntake, type IntakeHeaderDefaults } from './intake-defaults'
 import {
   validateOrderHeader,
   type OrderHeaderErrors,
@@ -34,6 +38,10 @@ export type HeaderFieldId =
   | 'jointNo'
   | 'spliceShot'
   | 'orderDate'
+  // 担当者（自社。社員No. を打つ）
+  | 'staffId'
+  // 至急（0 通常 / 1 至急）
+  | 'isUrgent'
   | 'customerId'
   | 'customerContact'
   | 'deliveryDestinationId'
@@ -59,25 +67,37 @@ export type HeaderMasterOptions = {
   deliveryMethodIdsRequiringNote: readonly string[]
   // 加工場所（営業所。番号＝sites.number、値＝id）
   sites: readonly CodeOption<string>[]
+  // 担当者（自社の社員。番号＝社員No.、名称＝氏名、値＝ユーザーの id）
+  staff: readonly CodeOption<string>[]
 }
 
-// 加工場所の初期値（1 本社）。ユーザーの所属する営業所の列（users.site_id）ができたら、その営業所にする。
-// 受付の機能ができたら、受付の加工場所を初期値にする
+// 初期値の元（画面を開いたときに決まり、続けて登録するときもこの値に戻す）
+export type HeaderDefaultsSource = {
+  // ログイン中のユーザーの社員No.（担当者の初期値）
+  staffCode: string
+  // 受付の値から作った初期値（受注登録待ちの加工区分から開いたとき）。なければ null
+  intake: IntakeHeaderDefaults | null
+}
+
+// 加工場所の初期値（1 本社）。受付から開いたときは、受付の加工場所を初期値にする
 const DEFAULT_SITE_CODE = '1'
 
 // 部材区分を SPL（スプライス専用の受注）にしたときのショットの初期値（1 有）
 const SPLICE_SHOT_DEFAULT_CODE = '1'
 
 // 新規入力の初期値。
-// 処理区分（0 新規）・部材区分（0 無分類）・受注日（今日）・納期（3 後報）・配達（0 宵積み）は初期値があるため、
-// Enter だけで進める。受付の機能ができたら、納期・配達などの初期値は受付の値にする
-function initialValues(today: string): HeaderValues {
-  return {
+// 処理区分（0 新規）・部材区分（0 無分類）・受注日（今日）・担当者（ログイン中のユーザー）・至急（0 通常）・
+// 納期（3 後報）・配達（0 宵積み）は初期値があるため、Enter だけで進める。
+// 受付から開いたときは、売り先・納期・配達・加工場所・至急などを受付の値にする（intake-defaults.ts）
+function initialValues(today: string, defaults: HeaderDefaultsSource): HeaderValues {
+  const base: HeaderValues = {
     processingType: '0',
     memberClass: '0',
     jointNo: '',
     spliceShot: '',
     orderDate: today,
+    staffId: defaults.staffCode,
+    isUrgent: '0',
     customerId: '',
     customerContact: '',
     // 入れ先は「0 売り先と同じ」を初期値にする（Enter だけで進める）
@@ -89,9 +109,14 @@ function initialValues(today: string): HeaderValues {
     // 配達の初期値は 0 宵積み（いつもの値）
     deliveryMethodId: '0',
     deliveryMethodNote: '',
-    // 加工場所の初期値は当面 1 本社
     siteId: DEFAULT_SITE_CODE,
   }
+  if (!defaults.intake) return base
+  // 受付で空だった欄（売り先が未定・配達や加工場所がマスタにないなど）は、いつもの初期値のままにする
+  const fromIntake = Object.fromEntries(
+    Object.entries(defaults.intake).filter(([field, value]) => value !== '' || field === 'dueDate')
+  )
+  return { ...base, ...fromIntake }
 }
 
 // 番号の欄のうち、マスタや定数の選択肢から名称を引く欄。
@@ -105,9 +130,11 @@ type CodeFieldId =
   | 'dueDateType'
   | 'deliveryMethodId'
   | 'siteId'
+  | 'staffId'
+  | 'isUrgent'
 
-export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
-  const [values, setValues] = useState<HeaderValues>(() => initialValues(today))
+export function useOrderHeader(masters: HeaderMasterOptions, today: string, defaults: HeaderDefaultsSource) {
+  const [values, setValues] = useState<HeaderValues>(() => initialValues(today, defaults))
   const [errors, setErrors] = useState<HeaderErrors>({})
 
   // 番号の欄ごとの選択肢
@@ -120,6 +147,8 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     dueDateType: DUE_DATE_TYPE_OPTIONS,
     deliveryMethodId: masters.deliveryMethods,
     siteId: masters.sites,
+    staffId: masters.staff,
+    isUrgent: URGENT_OPTIONS,
   }
 
   // 番号から選んだ値を引く（見つからなければ undefined）
@@ -143,10 +172,12 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
 
   // 入力順（① 受注情報の画面の並びどおり、左上から右下）。表示されない欄は入れない。
   // 受注 No.・受付 No. は入力できないため含めない。最後は登録ボタン（画面を進めるボタン）
-  //   処理区分 → 受注日 → 売り先 → 納期 → 客先担当 → 配達 → 工事名 → 入れ先 → 加工場所 → 部材区分（→ 継手番号 → ショット）
+  //   処理区分 → 受注日 → 担当者 → 至急 → 売り先 → 納期 → 客先担当 → 配達 → 工事名 → 入れ先 → 加工場所 → 部材区分（→ 継手番号 → ショット）
   const fieldOrder: string[] = [
     'processingType',
     'orderDate',
+    'staffId',
+    'isUrgent',
     'customerId',
     'dueDateType',
     ...(needsDueDate ? ['dueDate'] : []),
@@ -204,6 +235,8 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
       deliveryMethodId,
       deliveryMethodNote: requiresDeliveryNote ? values.deliveryMethodNote.trim() : '',
       siteId: findCodeOption(masters.sites, values.siteId)?.value ?? null,
+      staffId: findCodeOption(masters.staff, values.staffId)?.value ?? null,
+      isUrgent: findCodeOption(URGENT_OPTIONS, values.isUrgent)?.value ?? false,
     }
   }
 
@@ -238,11 +271,20 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     return next
   }
 
-  // 保存後に次の受注を入力するため、初期値に戻す
+  // 保存後に次の受注を入力するため、初期値に戻す（受付から開いたときは、受付の値に戻す）
   function reset() {
-    setValues(initialValues(today))
+    setValues(initialValues(today, defaults))
     setErrors({})
   }
+
+  // 欄の今の値が、受付から入った値のままか（画面で薄い青に見せる）
+  function fromIntake(field: HeaderFieldId): boolean {
+    return isFromIntake(field, values[field], defaults.intake)
+  }
+
+  // 加工場所を受付の加工場所から変えたか（受付の加工場所も変わる旨を、欄の下に出す）
+  const siteChangedFromIntake =
+    defaults.intake !== null && defaults.intake.siteId !== '' && values.siteId !== defaults.intake.siteId
 
   return {
     values,
@@ -259,6 +301,8 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string) {
     toInput,
     validate,
     reset,
+    fromIntake,
+    siteChangedFromIntake,
   }
 }
 

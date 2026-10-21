@@ -5,7 +5,8 @@
 //     ページ送り・拡大・印刷は、ブラウザの PDF の表示機能をそのまま使う（自作しない）。「別ウィンドウ」で新しいタブに開ける
 //   ・タブ「図面データ（件数）」: PDF 以外のファイル（DXF など）の一覧と「開く」（ダウンロード → 図面ソフトが開く）。
 //     2 件以上あれば「すべて図面ソフトで開く」も出す
-// 受注登録の画面の注文書のパネルにも、受付と受注をつなぐ PR 9 でこの部品を置く。
+// 受注登録の画面の注文書のパネル（components/order-entry/document-panel/document-panel.tsx）にも置く（PR 9）。
+// className で外枠の見た目を足せる（パネルの中では枠線を消して高さいっぱいに広げる）。
 
 import { useState } from 'react'
 import { Icon } from '@/components/layout/icon'
@@ -15,7 +16,7 @@ import type { IntakeFile } from '@/lib/intake/types'
 
 type ViewerTab = 'pdf' | 'drawings'
 
-export function DocumentViewer({ files }: { files: readonly IntakeFile[] }) {
+export function DocumentViewer({ files, className = '' }: { files: readonly IntakeFile[]; className?: string }) {
   const pdfs = files.filter((file) => isPdf(file.originalName))
   const drawings = files.filter((file) => !isPdf(file.originalName))
 
@@ -30,7 +31,7 @@ export function DocumentViewer({ files }: { files: readonly IntakeFile[] }) {
     }`
 
   return (
-    <section className="flex min-h-0 flex-col rounded border border-line bg-white">
+    <section className={`flex min-h-0 flex-col rounded border border-line bg-white ${className}`}>
       <div role="tablist" aria-label="受付のファイル" className="flex gap-1 border-b border-line px-3">
         <button type="button" role="tab" aria-selected={tab === 'pdf'} onClick={() => setTab('pdf')} className={tabClass(tab === 'pdf')}>
           <Icon name="paperclip" className="h-4 w-4" />

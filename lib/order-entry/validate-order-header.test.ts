@@ -19,10 +19,16 @@ const VALID: OrderHeaderInput = {
   deliveryMethodId: 'delivery-0',
   deliveryMethodNote: '',
   siteId: 'site-honsha',
+  staffId: 'user-1',
+  isUrgent: false,
 }
 const NO_NOTE = { deliveryMethodRequiresNote: false }
 
 describe('validateOrderHeader', () => {
+  it('担当者（自社）が空ならエラー', () => {
+    expect(validateOrderHeader({ ...VALID, staffId: null }, NO_NOTE).staffId).toBe('担当者を選択してください')
+  })
+
   it('必須項目がそろっていればエラーなし（担当者・工事名は任意）', () => {
     const errors = validateOrderHeader(VALID, NO_NOTE)
     expect(errors).toEqual({})
@@ -128,6 +134,13 @@ describe('buildOrderPayload', () => {
     expect(buildOrderPayload({ ...VALID, memberClass: 'GPL' }, false)).toMatchObject({
       member_class: 'GPL',
       site_id: 'site-honsha',
+    })
+  })
+
+  it('担当者と至急を保存する', () => {
+    expect(buildOrderPayload({ ...VALID, isUrgent: true }, false)).toMatchObject({
+      staff_id: 'user-1',
+      is_urgent: true,
     })
   })
 })

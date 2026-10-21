@@ -8,7 +8,9 @@
 // 画面側でも同じ確認・計算をしているが、画面を経由しない呼び出しもありうるため、
 // サーバー側でもう一度確認し、重量・仕入単価も計算し直す（画面から送られた単価は使わない）。
 // 登録は DB の関数 create_order で 1 つの transaction として行い、途中で失敗したら全体を取り消す。
+// 受注は受注登録待ちの加工区分（受付）から起票する。受注No.（{受付No.}-{枝番}）は create_order の中で採番する。
 
+import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth'
 import {
   buildOrderItemPayload,
@@ -86,13 +88,25 @@ export type CreateOrderResult =
       message?: string
     }
 
+// どの受付・加工区分から起票するか（受注登録待ちの一覧で選んだ行）
+export type OrderIntakeLink = {
+  intakeId: string
+  workUnitId: string
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function createOrder(
   header: OrderHeaderInput,
   items: ItemRowValues[],
   aux: OrderAuxInput,
+  link: OrderIntakeLink,
 ): Promise<CreateOrderResult> {
   if (!(await canEnterOrders())) {
     return { ok: false, message: '受注を登録する権限がありません' }
+  }
+  if (!UUID_PATTERN.test(link.intakeId) || !UUID_PATTERN.test(link.workUnitId)) {
+    return { ok: false, message: '受注登録待ちの一覧から受注登録を始めてください' }
   }
   const supabase = await createClient()
   const masters = await loadOrderEntryMasters(supabase)
@@ -168,14 +182,27 @@ export async function createOrder(
     itemPayloads.push({ ...payload, processes: [] })
   }
 
-  // --- 登録（ヘッダー・明細・スタンプを 1 つの transaction で） ---
-  // フリーコメントとスタンプは、ヘッダーの JSON（p_order）に入れて渡す
+  // --- 登録（枝番の採番・ヘッダー・明細・スタンプを 1 つの transaction で） ---
+  // フリーコメントとスタンプ、受付・加工区分は、ヘッダーの JSON（p_order）に入れて渡す
   const { data: orderNo, error } = await supabase.rpc('create_order', {
-    p_order: { ...buildOrderPayload(header, deliveryMethodRequiresNote), ...buildOrderAuxPayload(aux) },
+    p_order: {
+      ...buildOrderPayload(header, deliveryMethodRequiresNote),
+      ...buildOrderAuxPayload(aux),
+      intake_id: link.intakeId,
+      work_unit_id: link.workUnitId,
+    },
     p_items: itemPayloads,
   })
+  if (error?.message.includes('WORK_UNIT_NOT_READY')) {
+    return {
+      ok: false,
+      message: 'この区分は受注登録待ちではありません（ほかの人が起票を完了した可能性があります）。受注登録待ちの一覧を開き直してください',
+    }
+  }
   if (error || !orderNo) {
     return { ok: false, message: `登録に失敗しました: ${error?.message ?? '不明なエラー'}` }
   }
+  // 受注登録待ちの一覧・メニューの件数・この画面の上部（次の枝番・登録済みの受注）を作り直す
+  revalidatePath('/', 'layout')
   return { ok: true, orderNo }
 }

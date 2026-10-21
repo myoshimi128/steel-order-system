@@ -10,13 +10,19 @@
 //   注意事項: notices.ts（得意先と明細の内容から、受注に関係するものだけに絞り込む。表示のみ）
 //   欄の移動: useFieldNavigation（今の画面の欄だけを入力順に並べる）
 //   注文書  : useDocumentPanel（左のパネルの幅と開閉。F2 で開閉）
-// ここでは画面の切り替えと保存の流れ（確認 → Server Action の呼び出し → 結果の表示）だけを扱う。
+//   受付  : 受注登録待ちの加工区分から開く。受付の値を受注情報の初期値にし（intake-defaults.ts）、
+//           注文書のパネルに受付の注文書 PDF とこの区分のファイルを出す。登録すると受付No.＋枝番の受注No. が付く
+// ここでは画面の切り替えと保存の流れ（確認 → Server Action の呼び出し → 結果の表示 → 登録後の選択）だけを扱う。
 
-import { useEffect, useState, useTransition, type KeyboardEvent, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState, useTransition, type KeyboardEvent } from 'react'
 import { createOrder } from '@/app/(main)/orders/new/actions'
+import { completeWorkUnit } from '@/app/(main)/orders/queue/actions'
+import { queueHref } from '@/lib/intake/queue'
 import { findCodeOption } from '@/lib/code-input/code-option'
 import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { DUE_DATE_TYPE_OPTIONS, MEMBER_CLASS_OPTIONS } from '@/lib/order-entry/constants'
+import { intakeHeaderDefaults, nextOrderNoText, type OrderIntakeSource } from '@/lib/order-entry/intake-defaults'
 import { firstItemFieldId, itemFieldId, itemFieldOrder } from '@/lib/order-entry/item-row'
 import type { ItemFieldName } from '@/lib/order-entry/item-types'
 import type { OrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
@@ -34,6 +40,7 @@ import { OrderHeader } from './header/order-header'
 import { KeyGuide } from './items/key-guide'
 import { OrderItemsTable } from './items/order-items-table'
 import { OrderSummary } from './order-summary'
+import { RegisteredDialog } from './registered-dialog'
 import { StepIndicator } from './step-indicator'
 import { AuxArea } from './support-area/aux-area'
 import { CustomerNoticeStrip } from './support-area/customer-notice-strip'
@@ -45,9 +52,10 @@ type OrderEntryScreenProps = {
   // 注文書のパネルの保存されている幅と開閉（サーバーが cookie から読む）
   initialPanelWidth: number | null
   initialPanelOpen: boolean
-  // 受注登録待ちの一覧の行から開いたときに、見出しの横に出す帯（どの受付・区分から開いたか）。
-  // 帯があるときは、進み具合の先頭に「受注登録待ち」を加える
-  queueBanner?: ReactNode
+  // 受注登録待ちの一覧で選んだ加工区分と、その受付の情報（受注情報の初期値・注文書のパネル・上部の表示）
+  intake: OrderIntakeSource
+  // ログイン中のユーザーの社員No.（担当者の初期値）
+  staffCode: string
 }
 
 type StatusMessage = { kind: 'success' | 'error' | 'info'; text: string }
@@ -62,11 +70,18 @@ export function OrderEntryScreen({
   today,
   initialPanelWidth,
   initialPanelOpen,
-  queueBanner,
+  intake,
+  staffCode,
 }: OrderEntryScreenProps) {
+  const router = useRouter()
   const [step, setStep] = useState<OrderEntryStep>('info')
 
-  const header = useOrderHeader(masters.header, today)
+  // 受注情報の初期値の元（担当者はログイン中のユーザー、それ以外は受付の値）。画面を開いたときに 1 回だけ作る
+  const [headerDefaults] = useState(() => ({
+    staffCode,
+    intake: intakeHeaderDefaults(intake, masters.header),
+  }))
+  const header = useOrderHeader(masters.header, today, headerDefaults)
   // スプライス専用の受注か（部材区分が SPL）とショットの有無で、明細の番号の解釈と単価が変わる。
   // 部材区分を切り替えても明細は残し、切り替え後の受注で使えない番号の行にはエラーを出す
   const context = { isSplice: header.isSplice, spliceShot: header.spliceShot }
@@ -117,6 +132,12 @@ export function OrderEntryScreen({
   const [isPending, startTransition] = useTransition()
   // 画面下部に出すメッセージ（保存の結果・キー操作の案内など）
   const [status, setStatus] = useState<StatusMessage | null>(null)
+  // 登録した受注No.（登録の後に、続けて登録するか・起票を完了するかを選ぶ画面を出す）
+  const [registeredOrderNo, setRegisteredOrderNo] = useState<string | null>(null)
+  const [completing, startCompleting] = useTransition()
+  const [completeError, setCompleteError] = useState<string | null>(null)
+  // 戻る先の受注登録待ちのタブ（加工場所を変えて登録したときは、受付の加工場所も変わるため、利用者の営業所のタブを開く）
+  const queueSiteCode = header.siteChangedFromIntake ? null : intake.siteCode
 
   // 画面を切り替えて、指定した欄へ移る（欄は切り替えた後の画面に出るため、画面の更新後に移る）
   function goTo(next: OrderEntryStep, focusId: string) {
@@ -173,14 +194,15 @@ export function OrderEntryScreen({
     const itemRows = items.rows
     const auxInput = aux.toInput()
     startTransition(async () => {
-      const response = await createOrder(headerInput, itemRows, auxInput)
+      const response = await createOrder(headerInput, itemRows, auxInput, {
+        intakeId: intake.intakeId,
+        workUnitId: intake.workUnitId,
+      })
       if (response.ok) {
         setStatus({ kind: 'success', text: `受注No. ${response.orderNo} を登録しました` })
-        // 次の受注を続けて入力できるよう、初期値に戻して ① の最初の欄へ移る
-        header.reset()
-        items.reset()
-        aux.reset()
-        goTo('info', 'processingType')
+        // 続けて登録するか・この区分の起票を完了するかを選ぶ（RegisteredDialog）
+        setRegisteredOrderNo(response.orderNo)
+        setCompleteError(null)
         return
       }
       if (response.headerErrors && hasErrors(response.headerErrors)) {
@@ -196,6 +218,30 @@ export function OrderEntryScreen({
     })
   }
 
+  // 登録の後: 同じ区分で続けて登録する。明細・スタンプ・フリーコメントを空にし、受注情報を受付の初期値に戻す。
+  // 画面を作り直して（router.refresh）、上部の次の枝番と登録済みの受注を新しくする
+  function continueSameUnit() {
+    header.reset()
+    items.reset()
+    aux.reset()
+    setRegisteredOrderNo(null)
+    goTo('info', 'processingType')
+    router.refresh()
+  }
+
+  // 登録の後: この区分の起票を完了して、受注登録待ちの一覧に戻る（一覧から消える）
+  function completeAndReturn() {
+    setCompleteError(null)
+    startCompleting(async () => {
+      const result = await completeWorkUnit(intake.workUnitId)
+      if (!result.ok) {
+        setCompleteError(result.error)
+        return
+      }
+      router.push(queueHref({ site: queueSiteCode, notice: 'completed', no: intake.intakeNo }))
+    })
+  }
+
   // 画面を進めるボタンでも Shift+Enter で前の欄へ戻れるようにする（Enter はボタンの既定動作で押される）
   function handleButtonKeyDown(event: KeyboardEvent<HTMLButtonElement>, id: string) {
     if (event.key === 'Enter' && event.shiftKey) {
@@ -206,7 +252,7 @@ export function OrderEntryScreen({
 
   // ② の上部に出す受注情報の要約
   const summary = [
-    { label: '受注No.', value: '（登録時に採番）' },
+    { label: '受注No.', value: `${nextOrderNoText(intake)}（登録時に採番）` },
     { label: '部材', value: findCodeOption(MEMBER_CLASS_OPTIONS, header.values.memberClass)?.label ?? '' },
     { label: '売り先', value: findCodeOption(masters.header.customers, header.values.customerId)?.label ?? '' },
     {
@@ -238,21 +284,24 @@ export function OrderEntryScreen({
       className="flex h-[calc(100dvh-var(--header-height))] min-h-0 flex-col gap-3 bg-canvas px-6 py-4"
     >
       <div className="flex items-center justify-between">
-        <div className="flex min-w-0 items-center gap-4">
-          <h1 className="shrink-0 text-xl font-bold text-navy">受注登録</h1>
-          {queueBanner}
-        </div>
-        <StepIndicator current={step} withQueue={queueBanner !== undefined} />
+        <h1 className="shrink-0 text-xl font-bold text-navy">受注登録</h1>
+        <StepIndicator current={step} withQueue />
       </div>
 
       {/* 左に注文書のパネル、右に画面ごとの中身。パネルの最大の幅は、この枠の幅から決まる */}
       <div ref={setPanelContainer} className="flex min-h-0 flex-1 gap-4">
-        <DocumentPanel panel={panel} />
+        <DocumentPanel panel={panel} files={intake.files} />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded border border-line bg-white">
           {step === 'info' && (
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <OrderHeader header={header} navigation={navigation} masters={masters.header} today={today} />
+              <OrderHeader
+                header={header}
+                navigation={navigation}
+                masters={masters.header}
+                today={today}
+                intake={intake}
+              />
             </div>
           )}
 
@@ -342,6 +391,18 @@ export function OrderEntryScreen({
           )}
         </div>
       </footer>
+
+      {registeredOrderNo && (
+        <RegisteredDialog
+          orderNo={registeredOrderNo}
+          intakeNo={intake.intakeNo}
+          completing={completing}
+          error={completeError}
+          onContinue={continueSameUnit}
+          onComplete={completeAndReturn}
+          onBackToQueue={() => router.push(queueHref({ site: queueSiteCode }))}
+        />
+      )}
     </div>
   )
 }

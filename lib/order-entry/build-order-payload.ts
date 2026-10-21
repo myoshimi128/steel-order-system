@@ -47,6 +47,9 @@ export function buildOrderPayload(
     delivery_method_note: deliveryMethodRequiresNote ? nullIfEmpty(input.deliveryMethodNote) : null,
     // 加工場所（営業所）
     site_id: input.siteId,
+    // 担当者（自社）と至急
+    staff_id: input.staffId,
+    is_urgent: input.isUrgent,
   }
 }
 

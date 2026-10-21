@@ -79,24 +79,6 @@ export async function loadQueueUnits(supabase: Client): Promise<QueueUnit[]> {
   return (data as unknown as QueueRowData[]).map(toQueueUnit)
 }
 
-// 1 件（受注登録の画面の上の帯に出す。一覧の行を押して開いたとき）。
-// 一覧から外れた後（起票完了など）に開いても帯を出せるよう、状態では絞らず、今の状態も返す。見つからなければ null
-export async function loadQueueUnit(
-  supabase: Client,
-  workUnitId: string
-): Promise<{ unit: QueueUnit; status: string } | null> {
-  const { data, error } = await supabase
-    .from('work_units')
-    .select(`status, ${QUEUE_COLUMNS}`)
-    .eq('id', workUnitId)
-    .is('intakes.deleted_at', null)
-    .maybeSingle()
-  if (error) throw new Error(`受注登録待ちを読めませんでした: ${error.message}`)
-  if (!data) return null
-  const row = data as unknown as QueueRowData & { status: string }
-  return { unit: toQueueUnit(row), status: row.status }
-}
-
 // 受注登録待ちの件数（サイドメニューの「受注登録」のバッジ・部署ホームのカード）。
 // siteId を渡すとその営業所の分だけ、null なら全部の営業所を数える（lib/intake/queue.ts の countScopeSiteId）。
 // ビュー work_unit_queue_view は論理削除した受付と起票完了を除いてあるため、状態で絞るだけでよい

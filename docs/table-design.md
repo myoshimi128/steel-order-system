@@ -463,6 +463,7 @@
 | `member_class` | text | 部材区分。`NONE`（無分類）/ `DF` / `GPL` / `BH` / `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注** |
 | `site_id` | uuid | FK → `sites`。加工場所。出荷待ちを加工場所ごとに分けるのに使う。NOT NULL。受注登録画面の作り直しで前倒しして追加（既存の受注は本社にした） |
 | `staff_id` | uuid | FK → `users`。担当者（自社）。画面の初期値はログイン中のユーザーで、変更できる。加工指示書に印字する |
+| `is_urgent` | boolean | 至急。NOT NULL、既定 false。受付の至急（`intakes.is_urgent`）を初期値として入れ、受注情報の番号の欄（0 通常 / 1 至急）で変えられる。現場で優先して加工してもらうための印で、現場用伝票の印刷や受注の一覧で使う |
 | `order_date` | date | 受注日。登録日を初期値とし、必要な場合のみ変更する |
 | `customer_id` | uuid | FK → `customers`。売り先（得意先） |
 | `customer_contact` | text | 担当者（客先担当）。得意先側の窓口担当者 |
@@ -510,7 +511,7 @@
 - 採番関数は、Data API で公開していない `private` スキーマに置く。ブラウザから直接呼ばれて番号が飛ぶことを防ぐためである
 - 受付No. の採番は docs/intake/table-design.md「番号」を参照
 
-以前は「年 2 桁 + 年内の連番 5 桁」（例: `2600001`）を、`orders.order_no` の初期値の採番関数 `private.next_order_no()` で採番していた（`supabase/migrations/20260930100000_add_order_no_numbering.sql`）。受付No.＋枝番に切り替えるマイグレーションで、この初期値・採番関数・採番テーブル（`private.order_no_counters`）を削除する。切り替えの前に登録したテストデータの受注は削除する。
+以前は「年 2 桁 + 年内の連番 5 桁」（例: `2600001`）を、`orders.order_no` の初期値の採番関数 `private.next_order_no()` で採番していた（`supabase/migrations/20260930100000_add_order_no_numbering.sql`）。受付No.＋枝番に切り替えるマイグレーション（`supabase/migrations/20261024100000_link_orders_to_intakes.sql`。PR 9）で、この初期値・採番関数・採番テーブル（`private.order_no_counters`）を削除した。切り替えの前に登録したテストデータの受注（出荷のテストデータも含む）は、同じマイグレーションの先頭で削除した。
 
 **受注の登録（create_order）**
 
@@ -520,13 +521,13 @@
 - 明細の各要素は `processes` に、その材料にぶら下がる加工（`order_item_processes` の列名をキーにした JSON の配列）を持つ。材料の行を登録した ID を `order_item_id` に入れて加工を登録する（単位を省略した場合は「個」）。加工の項目（`spec_fields`）も JSON のまま受け取って登録する
 - ヘッダーの JSON に、フリーコメント（`field_note`）と、チェックしたスタンプの id の配列（`stamp_ids`）を持つ。明細の後に `order_stamps` に登録する（スプライス専用の受注の「ショット加工」は含めない）
 - ヘッダーの JSON に部材区分（`member_class`）を持つ（以前の `is_splice` の代わり。受注登録画面の作り直しで変更）
-- ヘッダーの JSON に、受付（`intake_id`）・加工区分（`work_unit_id`）・加工場所（`site_id`）・担当者（`staff_id`）を持つ。受注の insert の前に `private.issue_order_branch()` で枝番を採番し、受注番号を決める。加工場所が受付と違えば、受付の加工場所も更新する（docs/intake/table-design.md「関数」）。この変更は、受付のテーブルを作るマイグレーション（PR 3）ではなく、受注登録画面と受付をつなぐ PR 9 で行う（受注に必須の受付の列を先に足すと、受付のない今の受注登録画面から登録できなくなるため）
+- ヘッダーの JSON に、受付（`intake_id`）・加工区分（`work_unit_id`）・加工場所（`site_id`）・担当者（`staff_id`）・至急（`is_urgent`）を持つ。加工区分が受注登録待ち（`ready`）でその受付のものかを確かめ（違えば `WORK_UNIT_NOT_READY` のエラー）、受注の insert の前に `private.issue_order_branch()` で枝番を採番し、受注番号を決める。加工場所が受付と違えば、受付の加工場所も更新する（docs/intake/table-design.md「関数」）。この変更は、受付のテーブルを作るマイグレーション（PR 3）ではなく、受注登録画面と受付をつなぐ PR 9 で行った（受注に必須の受付の列を先に足すと、受付のない今の受注登録画面から登録できなくなるため）
 - `security invoker`（呼び出したユーザーの権限で実行）にして、`orders`・`order_items` の RLS をそのまま効かせる
 - 登録の操作をした人（`created_by`）は引数で受け取らず、ログイン中のユーザー（`auth.uid()`）を入れる
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
 - 実行権限は `authenticated` にだけ付与する
 
-実装は `supabase/migrations/20260930100300_create_create_order_function.sql`（加工の登録を加えたものは `20261001100000_create_order_with_processes.sql`、フリーコメントとスタンプを加えたものは `20261003100100_add_stamp_numbers_and_save_order_aux.sql`）を参照。
+実装は `supabase/migrations/20260930100300_create_create_order_function.sql`（加工の登録を加えたものは `20261001100000_create_order_with_processes.sql`、フリーコメントとスタンプを加えたものは `20261003100100_add_stamp_numbers_and_save_order_aux.sql`、受付とつないだものは `20261024100000_link_orders_to_intakes.sql`）を参照。
 
 ### order\_items（受注明細）
 
@@ -639,7 +640,7 @@
 
 ### attachments（添付ファイル）【廃止】
 
-**このテーブルは使わない。** 注文書・図面・CSV は受付の時点で `intake_files` に保存し、受注からは受付（`orders.intake_id`）・加工区分（`orders.work_unit_id`）を通してたどる（docs/intake/table-design.md「intake_files」）。ファイルの置き場所を 1 つにし、受付と受注で同じファイルを別々に持たないためである。参照しているコードを外したあとのマイグレーションでテーブルを削除する。以下は廃止前の定義の記録である。
+**このテーブルは使わない。** 注文書・図面・CSV は受付の時点で `intake_files` に保存し、受注からは受付（`orders.intake_id`）・加工区分（`orders.work_unit_id`）を通してたどる（docs/intake/table-design.md「intake_files」）。ファイルの置き場所を 1 つにし、受付と受注で同じファイルを別々に持たないためである。テーブルは `supabase/migrations/20261024100000_link_orders_to_intakes.sql`（PR 9）で削除した。以下は廃止前の定義の記録である。
 
 | カラム | 型 | 説明 |
 | --- | --- | --- |

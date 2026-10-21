@@ -41,6 +41,9 @@ function toErrorMessage(error: { message: string; code?: string }, fallback: str
   if (error.message.includes('INTAKE_NOT_WAITING')) {
     return 'この受付はすでに受付登録されています（ほかの人が先に登録した可能性があります）。一覧を開き直してください。'
   }
+  if (error.message.includes('INTAKE_HAS_ORDERS')) {
+    return 'この受付には受注が登録されているため、削除できません。'
+  }
   if (error.message.includes('INTAKE_STATUS_CHANGED')) {
     return 'この受付の状態がすでに変わっています。一覧を開き直してください。'
   }
