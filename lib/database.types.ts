@@ -2093,6 +2093,16 @@ export type Database = {
         }
         Returns: string
       }
+      add_work_unit_with_files: {
+        Args: {
+          p_files: Json
+          p_intake_id: string
+          p_kind: string
+          p_note: string
+          p_origin: string
+        }
+        Returns: string
+      }
       cancel_cad_work: { Args: { p_work_unit_id: string }; Returns: undefined }
       claim_intake: { Args: { p_intake_id: string }; Returns: string }
       classify_intake: {

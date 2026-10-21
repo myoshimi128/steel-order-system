@@ -2,7 +2,7 @@
 
 // CAD（S-05）の状態と操作をまとめたカスタムフック。
 //
-//   ・タブの行（並び順つき）と検索（受付No.・売り先・工事名）
+//   ・加工場所のタブ・状態のタブの行（並び順つき）と検索（受付No.・売り先・工事名）
 //   ・選んだ行（右のパネルに出す）。URL の ?unit= に持ち、ない・別のタブの行なら一覧の先頭を選ぶ
 //   ・作業開始、作業開始の取り消し（担当以外の人もできる。確認のダイアログを出す）
 //   ・CSV を入れる（作業中・CSV 登録済の行だけ）、CSV を外す（確認のダイアログを出す）
@@ -14,8 +14,9 @@ import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import { addCadCsvFiles, cancelCadWork, removeCadCsv, startCadWork } from '@/app/(main)/cad/actions'
 import { useNow } from '@/lib/hooks/use-now'
-import { cadHref, filterCadUnits, rowsForCadTab, type CadTab } from './cad'
+import { cadHref, cadUnitsForSite, filterCadUnits, rowsForCadTab, type CadTab } from './cad'
 import { elapsedMinutes, formatElapsed, isLongRunning } from './cad-elapsed'
+import type { SiteTab } from './site-tabs'
 import type { CadUnit, IntakeFile } from './types'
 import { useTableChanges, type IntakeRealtimeTable } from './use-intake-changes'
 import { uploadFilesWith } from './upload-intake-files'
@@ -23,6 +24,8 @@ import { csvRejectionReason } from './upload-rules'
 
 type Params = {
   units: CadUnit[]
+  // 開いている加工場所のタブの営業所
+  site: SiteTab | null
   tab: CadTab
   // URL の ?unit=（選んだ行）
   initialUnitId: string | null
@@ -37,13 +40,13 @@ const REALTIME_TABLES: readonly IntakeRealtimeTable[] = ['work_units', 'intakes'
 // 作業中の行の経過時間の表示（作業中でなければ null）
 export type CadElapsed = { text: string; long: boolean }
 
-export function useCadBoard({ units, tab, initialUnitId, userId }: Params) {
+export function useCadBoard({ units, site, tab, initialUnitId, userId }: Params) {
   const router = useRouter()
   // 経過時間の表示を 1 分ごとに進める
   const now = useNow(60_000)
 
   const [query, setQuery] = useState('')
-  const tabRows = rowsForCadTab(units, tab)
+  const tabRows = rowsForCadTab(cadUnitsForSite(units, site?.id ?? null), tab)
   const visibleRows = filterCadUnits(tabRows, query)
 
   const [selectedId, setSelectedId] = useState<string | null>(initialUnitId)
@@ -53,7 +56,7 @@ export function useCadBoard({ units, tab, initialUnitId, userId }: Params) {
   // 行を選ぶ。URL の ?unit= も書き換える（再読み込みしても同じ行が開くように。画面の移動はしない）
   function select(id: string) {
     setSelectedId(id)
-    window.history.replaceState(null, '', cadHref({ tab, unit: id }))
+    window.history.replaceState(null, '', cadHref({ site: site?.code, tab, unit: id }))
   }
 
   // ほかの人の作業開始・CSV の登録が届いたら、一覧を読み直す（選んだ行・検索の文字はそのまま残る）

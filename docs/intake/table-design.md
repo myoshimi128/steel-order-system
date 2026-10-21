@@ -281,8 +281,9 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | `register_intake(intake_id) → text` | 受付登録。売り先・加工場所をチェック → 採番 → `registered`・登録者を記録・対応中を解除 |
 | `complete_split(intake_id, no_file_kinds text[]) → text[]` | 振り分け完了。枠ごとに加工区分を作ってファイルを紐付け、図面なしの区分（`array['sakisun']` など）も作る。元データを論理削除し、**Storage から消すパスを返す**。`dispatched` にする |
 | `add_work_unit(intake_id, kind, origin, note) → uuid` | 受注登録待ちに追加（見落とし・口頭など）。振り分け完了後のみ。`closed` なら `dispatched` に戻す |
+| `add_work_unit_with_files(intake_id, kind, origin, note, files jsonb)` → uuid | 受注登録待ちに追加（PR 8。S-06b）。加工区分と、一緒に入れた図面・注文書の行（kind=`added`。`files` はファイルの id・元の名前・置き場所・種類・大きさの配列。空でもよい）を 1 つの transaction で作る。実物は呼ぶ前に Storage に置く。振り分け完了・完了の受付だけ（違えば `INTAKE_NOT_DISPATCHED` のエラー）。理由は見落とし・口頭・その他で、その他はメモ必須。置き場所が `{受付の id}/{ファイルの id}` の形でなければエラー。`closed` なら `dispatched` に戻す。事務・管理者だけ。画面からはこちらを使い、`add_work_unit` は使わない |
 | `private.issue_order_branch(intake_id) → (branch_no, order_no)` | 受注No. の枝番を採番する。`create_order` の中からだけ呼ぶ。`security definer`（PR 9） |
-| `complete_work_unit(work_unit_id)` | 起票完了（`ready` → `done`） |
+| `complete_work_unit(work_unit_id)` | 起票完了（`ready` → `done`）。受注登録待ちの一覧の「起票を完了」（PR 8）と、注文内容の登録の後（PR 9）で使う。間違って作った区分を外すときも同じ関数を使い、見分ける列は持たない（PR 9 で受注と加工区分がつながれば、受注があるかどうかで見分けられる） |
 | `save_intake(intake_id, info jsonb, destinations jsonb, register boolean)` → text | 受付登録（処理区分 0 新規）と変更（1 変更）（PR 5）。受注情報の列を書き、入れ先を消して入れ直し（`destinations` は納入先の id か null＝売り先と同じの配列。並び順で `seq`）、`register = true` なら続けて `register_intake` で採番する。1 つの transaction で行い、受付No. を返す。新規は受付待ちだけ（違えば `INTAKE_NOT_WAITING` のエラー＝ほかの人が先に登録した）、変更は受付登録済・振り分け完了・完了だけ。事務・管理者だけ（関数の中でもロールを確かめる） |
 | `classify_intake(intake_id, status)` → text | 受付待ち → 見積・ミルシート（受付No. を採番して返す）／対象外、対象外 → 受付待ち（PR 5）。それ以外の移り方は `INTAKE_STATUS_CHANGED` のエラー。対応中の表示も外す |
 | `delete_intake(intake_id)` | 処理区分 2 削除（PR 5）。`deleted_at` を入れる論理削除。受付登録済・振り分け完了・完了・見積の受付が対象（受付待ち・対象外は「対象外」で扱う）。受注のある受付の削除の禁止は PR 9 のトリガー |
@@ -347,6 +348,13 @@ waiting ──受付登録──→ registered ──振り分け完了──→
    - 公開するもの：`intakes`・`intake_destinations`・`intake_site_changes`・`work_units`・`intake_files`・`notifications`・`notification_reads`・`lead_time_items`・`lead_time_messages`・`lead_time_history`・`work_unit_queue_view`
    - 公開してはいけないもの：`private` スキーマ全体（`private.intake_no_counters`・`private.assign_intake_no`・既存の `private.order_no_counters`・`private.next_order_no`）。どのテーブルも `anon` に権限を付けない
 5. 確認・デモ用に、必要なら seed 006 を実行する（本番の DB では実行しない）
+
+### マイグレーションの実行の手順（PR 8）
+
+1. SQL Editor で `20261023100000_add_work_unit_with_files.sql` を実行する
+2. `npm run db:types` で型を再生成する（関数の型は、生成と同じ形で `lib/database.types.ts` に先に入れてあるため、再生成しても差は出ない想定）
+3. テーブルは増えないため、Data API の設定画面での確認は不要
+4. 追加した区分・ファイルと起票完了の結果は、seed 010（`supabase/seed/010_work_unit_check.sql` の 6。読むだけの SQL）で確かめられる
 
 ### マイグレーションの実行の手順（PR 7）
 

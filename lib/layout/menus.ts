@@ -41,9 +41,9 @@ export type MenuItem = {
 
 // 件数のバッジの種類。
 //   intakeWaiting: 受付待ちの件数（受付登録の項目に出す）
-//   cadActive    : 作業待ち・作業中のアイトレの件数（CAD の項目に出す）
-// 受注登録の件数は、受注登録待ちの画面を作る PR（8）で足す
-export type MenuBadgeKey = 'intakeWaiting' | 'cadActive'
+//   cadActive    : 作業待ち・作業中のアイトレの件数（CAD の項目に出す。ログイン中のユーザーの営業所の分、管理者は全部）
+//   orderReady   : 受注登録待ちの件数（受注登録の項目に出す。ログイン中のユーザーの営業所の分、管理者は全部）
+export type MenuBadgeKey = 'intakeWaiting' | 'cadActive' | 'orderReady'
 
 export type MenuBadgeCounts = Partial<Record<MenuBadgeKey, number>>
 
@@ -102,7 +102,8 @@ export const SHEARING_MENU: Menu = {
       items: [
         { label: '受付登録', icon: 'inbox', href: '/intake', activePrefix: '/intake', badge: 'intakeWaiting' },
         { label: 'CAD', icon: 'monitor', href: '/cad', badge: 'cadActive' },
-        { label: '受注登録', icon: 'pencil', href: '/orders/new', activePrefix: '/orders' },
+        // 受注登録は受注登録待ち（起票待ちのカゴ）の一覧から始める。受注登録の画面（/orders/new）を開いている間も強調する
+        { label: '受注登録', icon: 'pencil', href: '/orders/queue', activePrefix: '/orders', badge: 'orderReady' },
         { label: '加工図面発行', icon: 'image', href: null },
         { label: '送り状発行', icon: 'ticket', href: null },
         { label: 'ミルシート作成', icon: 'sheet', href: null },

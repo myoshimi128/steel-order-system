@@ -1,6 +1,8 @@
 // CAD（S-05）の一覧のタブ・並び順・表示の文（docs/intake/screen-design.md「S-05 CAD」）。
 //
-// タブは URL の ?tab= で切り替え、選んだ行は ?unit= に持つ（再読み込み・戻るでも同じ行が開くように）。
+// タブは 2 段。上は加工場所（営業所）のタブで URL の ?site=（lib/intake/site-tabs.ts。受注登録待ちと共通）、
+// その下が作業の状態のタブで ?tab=。選んだ行は ?unit= に持つ（再読み込み・戻るでも同じ行が開くように）。
+// 加工場所のタブの件数は作業待ち・作業中の件数で、サイドメニューの「CAD」のバッジ（ユーザーの営業所の件数）とそろう。
 //   ・作業待ち・作業中（active）: CAD 作業待ち・作業中のアイトレ。並び順は「至急 → 納期 → 日付なし → 受付登録の古い順」
 //   ・CSV 登録済（csv）        : CSV を登録して受注登録待ちに入ったアイトレ（起票前）。登録が新しい順
 //     （CSV の入れ間違いに気づいて直すときに、直前に登録したものを探しやすくするため）
@@ -21,9 +23,10 @@ export function parseCadTab(value: string | string[] | undefined): CadTab {
   return value === 'csv' ? 'csv' : 'active'
 }
 
-// CAD の一覧の URL を作る（タブ・選んだ行）
-export function cadHref(params: { tab?: CadTab; unit?: string | null }): string {
+// CAD の一覧の URL を作る（加工場所のタブ・状態のタブ・選んだ行）
+export function cadHref(params: { site?: string | null; tab?: CadTab; unit?: string | null }): string {
   const search = new URLSearchParams()
+  if (params.site) search.set('site', params.site)
   if (params.tab && params.tab !== 'active') search.set('tab', params.tab)
   if (params.unit) search.set('unit', params.unit)
   const query = search.toString()
@@ -35,7 +38,22 @@ export function cadTabOf(unit: Pick<CadUnit, 'status'>): CadTab {
   return unit.status === 'ready' ? 'csv' : 'active'
 }
 
-// タブの件数
+// 加工場所のタブの行（その営業所のアイトレだけ）
+export function cadUnitsForSite<T extends Pick<CadUnit, 'siteId'>>(units: readonly T[], siteId: string | null): T[] {
+  return units.filter((unit) => unit.siteId === siteId)
+}
+
+// 加工場所のタブの件数（営業所ごとの作業待ち・作業中の件数。サイドメニューのバッジと同じ数え方）
+export function countActiveCadBySite(units: readonly Pick<CadUnit, 'siteId' | 'status'>[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const unit of units) {
+    if (unit.siteId === null || cadTabOf(unit) !== 'active') continue
+    counts.set(unit.siteId, (counts.get(unit.siteId) ?? 0) + 1)
+  }
+  return counts
+}
+
+// 状態のタブの件数
 export function countCadTabs(units: readonly Pick<CadUnit, 'status'>[]): Record<CadTab, number> {
   const counts: Record<CadTab, number> = { active: 0, csv: 0 }
   for (const unit of units) counts[cadTabOf(unit)] += 1

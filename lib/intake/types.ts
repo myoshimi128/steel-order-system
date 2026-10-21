@@ -2,7 +2,14 @@
 // サーバー（lib/intake/load-intakes.ts）で DB から読んで、この形にして画面に渡す。
 
 import type { DueDateType } from '@/lib/order-entry/constants'
-import type { IntakeChannel, IntakeFileKind, IntakeStatus, WorkUnitKind, WorkUnitStatus } from './constants'
+import type {
+  IntakeChannel,
+  IntakeFileKind,
+  IntakeStatus,
+  WorkUnitKind,
+  WorkUnitOrigin,
+  WorkUnitStatus,
+} from './constants'
 import type { HandlingInfo } from './handling'
 import type { IntakeInfoSource } from './intake-form'
 
@@ -63,6 +70,8 @@ export type CadUnit = {
   dueDate: string | null
   deliveryMethodName: string | null
   isUrgent: boolean
+  // 加工場所（一覧の加工場所のタブで絞り込む）
+  siteId: string | null
   siteName: string | null
   registeredAt: string | null
   // 同じ受付に、起票完了していない先寸の加工区分もあるか（右のパネルに「先寸あり」と出す）
@@ -73,6 +82,32 @@ export type CadUnit = {
   csvFiles: IntakeFile[]
   // 受付の注文書の PDF
   orderPdfs: IntakeFile[]
+}
+
+// 受注登録待ちの一覧の 1 行（ready の加工区分 1 件に、受付の情報を付けたもの。S-06a）
+export type QueueUnit = {
+  // 加工区分（work_units）の id
+  id: string
+  kind: WorkUnitKind
+  // 作られ方（振り分け・見落とし追加・口頭・その他）と、追加のときのメモ
+  origin: WorkUnitOrigin
+  note: string | null
+  // 受注登録待ちに入った日時
+  readyAt: string | null
+  // CAD の CSV が登録されているか（アイトレの「✓ CSV 登録済」）
+  hasCsv: boolean
+  // 受付の情報
+  intakeId: string
+  intakeNo: string | null
+  customerName: string | null
+  projectName: string | null
+  dueDateType: DueDateType | null
+  dueDate: string | null
+  isUrgent: boolean
+  siteId: string | null
+  // 受付の担当者（自社の担当者）
+  staffName: string | null
+  registeredAt: string | null
 }
 
 // 受付登録の画面で開く受付（一覧の 1 行に、保存済みの受注情報を足したもの）

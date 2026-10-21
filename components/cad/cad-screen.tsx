@@ -2,12 +2,15 @@
 
 // CAD（S-05。docs/intake/screen-design.md「S-05 CAD」、画面イメージ 05）。
 //   ・上: 説明・見出し・操作の結果のお知らせ／エラー
-//   ・左: タブ（作業待ち・作業中 / CSV 登録済）と一覧
+//   ・左: 加工場所のタブ（件数は作業待ち・作業中の数＝サイドメニューのバッジと同じ）、
+//         その下に状態のタブ（作業待ち・作業中 / CSV 登録済）と一覧
 //   ・右: 選んだ行のパネル（受付の情報・図面・注文書・CSV の枠）
 // CSV を選ぶ画面（隠したファイルの欄）はここに 1 つだけ置き、一覧の行の「CSV を登録」と右のパネルの枠の両方から開く。
 // 状態と操作は useCadBoard（lib/intake/use-cad-board.ts）が持つ。
 
-import { countCadTabs, type CadTab } from '@/lib/intake/cad'
+import { SiteTabs } from '@/components/intake/site-tabs'
+import { cadHref, cadUnitsForSite, countActiveCadBySite, countCadTabs, type CadTab } from '@/lib/intake/cad'
+import type { SiteTab } from '@/lib/intake/site-tabs'
 import type { CadUnit } from '@/lib/intake/types'
 import { CAD_CSV_INPUT_ID, useCadBoard } from '@/lib/intake/use-cad-board'
 import { CSV_UPLOAD_ACCEPT } from '@/lib/intake/upload-rules'
@@ -17,13 +20,16 @@ import { CadUnitPanel } from './cad-unit-panel'
 
 type CadScreenProps = {
   units: CadUnit[]
+  sites: SiteTab[]
+  // 開いている加工場所のタブの営業所
+  site: SiteTab | null
   tab: CadTab
   initialUnitId: string | null
   userId: string
 }
 
-export function CadScreen({ units, tab, initialUnitId, userId }: CadScreenProps) {
-  const board = useCadBoard({ units, tab, initialUnitId, userId })
+export function CadScreen({ units, sites, site, tab, initialUnitId, userId }: CadScreenProps) {
+  const board = useCadBoard({ units, site, tab, initialUnitId, userId })
 
   return (
     <main className="flex flex-1 flex-col bg-canvas px-5 py-5">
@@ -45,7 +51,13 @@ export function CadScreen({ units, tab, initialUnitId, userId }: CadScreenProps)
           1280px の画面で一覧の列が収まるよう、右のパネルは受付待ち一覧（400px）より細くする */}
       <div className="mt-4 grid h-[calc(100dvh-var(--header-height)-140px)] min-h-[560px] grid-cols-[minmax(0,1fr)_360px] gap-4">
         <section className="flex min-h-0 flex-col rounded border border-line bg-white">
-          <CadTabs current={tab} counts={countCadTabs(units)} />
+          <SiteTabs
+            sites={sites}
+            current={site}
+            counts={countActiveCadBySite(units)}
+            hrefFor={(target) => cadHref({ site: target.code, tab })}
+          />
+          <CadTabs site={site?.code ?? null} current={tab} counts={countCadTabs(cadUnitsForSite(units, site?.id ?? null))} />
           <CadUnitList board={board} />
         </section>
         <section className="flex min-h-0 flex-col rounded border border-line bg-white">

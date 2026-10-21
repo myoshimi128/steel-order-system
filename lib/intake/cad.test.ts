@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   cadHref,
+  cadUnitsForSite,
+  countActiveCadBySite,
   cadStatusLabel,
   countCadTabs,
   filterCadUnits,
@@ -26,6 +28,7 @@ const unit = (id: string, overrides: Partial<CadUnit> = {}): CadUnit => ({
   dueDate: null,
   deliveryMethodName: null,
   isUrgent: false,
+  siteId: 's1',
   siteName: null,
   registeredAt: null,
   hasSakisun: false,
@@ -46,6 +49,28 @@ describe('parseCadTab / cadHref', () => {
     expect(cadHref({})).toBe('/cad')
     expect(cadHref({ tab: 'active', unit: 'u1' })).toBe('/cad?unit=u1')
     expect(cadHref({ tab: 'csv', unit: 'u1' })).toBe('/cad?tab=csv&unit=u1')
+    expect(cadHref({ site: 'a', tab: 'csv', unit: 'u1' })).toBe('/cad?site=a&tab=csv&unit=u1')
+  })
+})
+
+describe('cadUnitsForSite / countActiveCadBySite', () => {
+  const units = [
+    unit('w1', { siteId: 's1' }),
+    unit('k1', { siteId: 's1', status: 'cad_working' }),
+    unit('r1', { siteId: 's1', status: 'ready' }),
+    unit('w2', { siteId: 's2' }),
+    unit('none', { siteId: null }),
+  ]
+
+  it('加工場所のタブの行は、その営業所のアイトレだけ', () => {
+    expect(cadUnitsForSite(units, 's1').map((u) => u.id)).toEqual(['w1', 'k1', 'r1'])
+  })
+
+  it('加工場所のタブの件数は、作業待ち・作業中だけを数える（CSV 登録済・営業所なしは数えない）', () => {
+    const counts = countActiveCadBySite(units)
+    expect(counts.get('s1')).toBe(2)
+    expect(counts.get('s2')).toBe(1)
+    expect(counts.size).toBe(2)
   })
 })
 

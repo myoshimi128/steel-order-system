@@ -10,11 +10,14 @@ import { NotificationsProvider } from '@/components/notifications/notifications-
 import { getCurrentUser } from '@/lib/auth'
 import { countActiveCadUnits } from '@/lib/intake/load-cad-units'
 import { countIntakes } from '@/lib/intake/load-intakes'
+import { countReadyUnits } from '@/lib/intake/load-queue-units'
+import { countScopeSiteId } from '@/lib/intake/queue'
 import { SIDEBAR_COOKIE_NAME, parseSidebarCookie } from '@/lib/layout/sidebar-state'
 import { loadUnreadNotifications } from '@/lib/notifications/load-unread'
 import { createClient } from '@/lib/supabase-server'
 
-// サイドメニューの件数のバッジ（「受付登録」に受付待ちの件数、「CAD」に作業待ち・作業中の件数）。
+// サイドメニューの件数のバッジ（「受付登録」に受付待ちの件数、「CAD」に作業待ち・作業中の件数、
+// 「受注登録」に受注登録待ちの件数）。
 // 受付を扱える事務・管理者だけ数える（ほかは null でバッジを出さない）。
 // 数えられなかったときもバッジを出さないだけにし、画面は出す
 async function loadBadgeCount(
@@ -40,11 +43,14 @@ export default async function MainLayout({ children }: LayoutProps<'/'>) {
   const preferCollapsed = parseSidebarCookie(cookieStore.get(SIDEBAR_COOKIE_NAME)?.value)
 
   // ヘッダーの通知ベルに最初に出す未読の通知。新着はその後ブラウザで Realtime から受け取る
-  // サイドメニューの件数のバッジ（受付待ち・CAD の件数）も一緒に読む
-  const [unread, waitingIntakeCount, activeCadCount] = await Promise.all([
+  // サイドメニューの件数のバッジ（受付待ち・CAD・受注登録待ちの件数）も一緒に読む。
+  // CAD・受注登録待ちは、ログイン中のユーザーの営業所の分（管理者と営業所が空のユーザーは全部の営業所。countScopeSiteId）
+  const scopeSiteId = user ? countScopeSiteId(user) : null
+  const [unread, waitingIntakeCount, activeCadCount, readyUnitCount] = await Promise.all([
     loadUnreadNotifications(user),
     loadBadgeCount(user?.role, (supabase) => countIntakes(supabase, 'waiting')),
-    loadBadgeCount(user?.role, countActiveCadUnits),
+    loadBadgeCount(user?.role, (supabase) => countActiveCadUnits(supabase, scopeSiteId)),
+    loadBadgeCount(user?.role, (supabase) => countReadyUnits(supabase, scopeSiteId)),
   ])
 
   return (
@@ -60,6 +66,7 @@ export default async function MainLayout({ children }: LayoutProps<'/'>) {
           initialPreferCollapsed={preferCollapsed}
           initialWaitingIntakeCount={waitingIntakeCount}
           initialActiveCadCount={activeCadCount}
+          initialReadyUnitCount={readyUnitCount}
         />
         {/* min-w-0 を付けないと、中身が広いときに横にはみ出してしまう（flex の子の最小幅の既定値のため） */}
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
