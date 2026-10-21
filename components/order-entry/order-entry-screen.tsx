@@ -12,22 +12,29 @@
 //   注文書  : useDocumentPanel（左のパネルの幅と開閉。F2 で開閉）
 //   受付  : 受注登録待ちの加工区分から開く。受付の値を受注情報の初期値にし（intake-defaults.ts）、
 //           注文書のパネルに受付の注文書 PDF とこの区分のファイルを出す。登録すると受付No.＋枝番の受注No. が付く
+//   変更  : 処理区分 1 変更で受注No. から呼び出したときは、呼び出した受注の値（order-to-form.ts で戻したもの）を入力値にして始め、
+//           「変更を保存」で update_order に保存する（受注No.・枝番・受付は変えない。ほかの人が先に保存していたら断る）
+//   処理区分: 新規の画面で 1 変更・2 削除を打つと受注の呼び出しの画面へ、変更の画面で 0 新規・2 削除を打つとその画面へ移る
 // ここでは画面の切り替えと保存の流れ（確認 → Server Action の呼び出し → 結果の表示 → 登録後の選択）だけを扱う。
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition, type KeyboardEvent } from 'react'
+import { updateOrder } from '@/app/(main)/orders/edit/actions'
 import { createOrder } from '@/app/(main)/orders/new/actions'
 import { completeWorkUnit } from '@/app/(main)/orders/queue/actions'
 import { queueHref } from '@/lib/intake/queue'
 import { findCodeOption } from '@/lib/code-input/code-option'
 import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
-import { DUE_DATE_TYPE_OPTIONS, MEMBER_CLASS_OPTIONS } from '@/lib/order-entry/constants'
+import { DUE_DATE_TYPE_OPTIONS, MEMBER_CLASS_OPTIONS, PROCESSING_TYPE_OPTIONS } from '@/lib/order-entry/constants'
 import { intakeHeaderDefaults, nextOrderNoText, type OrderIntakeSource } from '@/lib/order-entry/intake-defaults'
 import { firstItemFieldId, itemFieldId, itemFieldOrder } from '@/lib/order-entry/item-row'
 import type { ItemFieldName } from '@/lib/order-entry/item-types'
 import type { OrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
 import { customerNoticesFor, orderNoticeConditions } from '@/lib/order-entry/notices'
 import { SUBMIT_BUTTON_ID, TO_ITEMS_BUTTON_ID, type OrderEntryStep } from '@/lib/order-entry/order-entry-steps'
+import { orderEditHref } from '@/lib/order-entry/order-no'
+import type { OrderSaveFailure } from '@/lib/order-entry/prepare-order-payload'
+import type { OrderEditValues } from '@/lib/order-entry/order-to-form'
 import { useDocumentPanel } from '@/lib/order-entry/use-document-panel'
 import { useItemCalculations } from '@/lib/order-entry/use-item-calculations'
 import { FREE_COMMENT_FIELD_ID, STAMP_CODE_FIELD_ID, useOrderAux } from '@/lib/order-entry/use-order-aux'
@@ -56,6 +63,8 @@ type OrderEntryScreenProps = {
   intake: OrderIntakeSource
   // ログイン中のユーザーの社員No.（担当者の初期値）
   staffCode: string
+  // 処理区分 1 変更で呼び出した受注（新規では省略）
+  edit?: OrderEditValues
 }
 
 type StatusMessage = { kind: 'success' | 'error' | 'info'; text: string }
@@ -72,25 +81,33 @@ export function OrderEntryScreen({
   initialPanelOpen,
   intake,
   staffCode,
+  edit,
 }: OrderEntryScreenProps) {
   const router = useRouter()
   const [step, setStep] = useState<OrderEntryStep>('info')
 
-  // 受注情報の初期値の元（担当者はログイン中のユーザー、それ以外は受付の値）。画面を開いたときに 1 回だけ作る
-  const [headerDefaults] = useState(() => ({
-    staffCode,
-    intake: intakeHeaderDefaults(intake, masters.header),
-  }))
+  // 受注情報の初期値の元。画面を開いたときに 1 回だけ作る。
+  //   新規: 担当者はログイン中のユーザー、それ以外は受付の値
+  //   変更: 呼び出した受注の値（受付の値として薄い青には見せない）
+  const [headerDefaults] = useState(() =>
+    edit
+      ? { staffCode, intake: null, values: edit.header }
+      : { staffCode, intake: intakeHeaderDefaults(intake, masters.header) },
+  )
   const header = useOrderHeader(masters.header, today, headerDefaults)
   // スプライス専用の受注か（部材区分が SPL）とショットの有無で、明細の番号の解釈と単価が変わる。
   // 部材区分を切り替えても明細は残し、切り替え後の受注で使えない番号の行にはエラーを出す
   const context = { isSplice: header.isSplice, spliceShot: header.spliceShot }
-  const items = useOrderItems(masters.items, context)
+  const items = useOrderItems(masters.items, context, edit?.items)
   // 単価の基準日は受注日（料金改定があっても受注日時点の単価を使う）
   const { rows: calculations, totals } = useItemCalculations(items.rows, items.checks, header.values.orderDate)
 
   // スタンプ・フリーコメント。得意先を選ぶと、その得意先の指定スタンプにチェックが入る
-  const aux = useOrderAux(masters.aux, header.customerId)
+  const aux = useOrderAux(
+    masters.aux,
+    header.customerId,
+    edit ? { overrides: edit.stampOverrides, freeComment: edit.freeComment } : undefined,
+  )
   // 得意先の注意事項。得意先・切断方法・加工種別の条件がすべて受注に当てはまるものだけ。
   // ② 注文内容の明細の上に出す
   const notices = customerNoticesFor(
@@ -128,6 +145,24 @@ export function OrderEntryScreen({
   useEffect(() => {
     focusFirst()
   }, [focusFirst])
+
+  // 処理区分を打ち替えたら、その処理区分の画面へ移る（新規 ↔ 受注No. で呼び出す変更・削除）。
+  // 変更の画面から離れるときは、直した内容が消えるため確かめる
+  const processingType = findCodeOption(PROCESSING_TYPE_OPTIONS, header.values.processingType)?.value
+  useEffect(() => {
+    if (!edit) {
+      if (processingType === 'edit' || processingType === 'delete') router.push(orderEditHref({ type: processingType }))
+      return
+    }
+    if (processingType === 'new' || processingType === 'delete') {
+      if (!window.confirm('直した内容は保存されません。処理区分を切り替えますか？')) return
+      router.push(
+        processingType === 'new' ? queueHref() : orderEditHref({ type: 'delete', no: edit.orderNo }),
+      )
+    }
+    // 処理区分が変わったときだけ動かす
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processingType])
 
   const [isPending, startTransition] = useTransition()
   // 画面下部に出すメッセージ（保存の結果・キー操作の案内など）
@@ -194,6 +229,16 @@ export function OrderEntryScreen({
     const itemRows = items.rows
     const auxInput = aux.toInput()
     startTransition(async () => {
+      // 変更: 受注No.・枝番・受付は変えずに保存し、受注No. の呼び出しの画面に戻って結果を知らせる
+      if (edit) {
+        const updated = await updateOrder(edit.orderId, edit.updatedAt, headerInput, itemRows, auxInput)
+        if (updated.ok) {
+          router.push(orderEditHref({ type: 'edit', notice: 'updated', no: updated.orderNo }))
+          return
+        }
+        showSaveErrors(updated)
+        return
+      }
       const response = await createOrder(headerInput, itemRows, auxInput, {
         intakeId: intake.intakeId,
         workUnitId: intake.workUnitId,
@@ -205,17 +250,22 @@ export function OrderEntryScreen({
         setCompleteError(null)
         return
       }
-      if (response.headerErrors && hasErrors(response.headerErrors)) {
-        header.setErrors(response.headerErrors)
-        goTo('info', infoOrder.find((id) => id in (response.headerErrors ?? {})) ?? infoOrder[0])
-      } else if (response.itemErrors && Object.keys(response.itemErrors).length > 0) {
-        items.setServerErrors(response.itemErrors, response.itemsError)
-        goTo('items', firstItemErrorId(response.itemErrors))
-      } else {
-        items.setServerErrors(response.itemErrors, response.itemsError)
-      }
-      setStatus({ kind: 'error', text: response.message ?? '入力内容を確認してください' })
+      showSaveErrors(response)
     })
+  }
+
+  // 保存できなかったときに、エラーの欄のある画面に戻ってエラーを出す（新規・変更で共通）
+  function showSaveErrors(response: OrderSaveFailure) {
+    if (response.headerErrors && hasErrors(response.headerErrors)) {
+      header.setErrors(response.headerErrors)
+      goTo('info', infoOrder.find((id) => id in (response.headerErrors ?? {})) ?? infoOrder[0])
+    } else if (response.itemErrors && Object.keys(response.itemErrors).length > 0) {
+      items.setServerErrors(response.itemErrors, response.itemsError)
+      goTo('items', firstItemErrorId(response.itemErrors))
+    } else {
+      items.setServerErrors(response.itemErrors, response.itemsError)
+    }
+    setStatus({ kind: 'error', text: response.message ?? '入力内容を確認してください' })
   }
 
   // 登録の後: 同じ区分で続けて登録する。明細・スタンプ・フリーコメントを空にし、受注情報を受付の初期値に戻す。
@@ -252,7 +302,7 @@ export function OrderEntryScreen({
 
   // ② の上部に出す受注情報の要約
   const summary = [
-    { label: '受注No.', value: `${nextOrderNoText(intake)}（登録時に採番）` },
+    { label: '受注No.', value: edit ? `${edit.orderNo}（変更）` : `${nextOrderNoText(intake)}（登録時に採番）` },
     { label: '部材', value: findCodeOption(MEMBER_CLASS_OPTIONS, header.values.memberClass)?.label ?? '' },
     { label: '売り先', value: findCodeOption(masters.header.customers, header.values.customerId)?.label ?? '' },
     {
@@ -284,8 +334,9 @@ export function OrderEntryScreen({
       className="flex h-[calc(100dvh-var(--header-height))] min-h-0 flex-col gap-3 bg-canvas px-6 py-4"
     >
       <div className="flex items-center justify-between">
-        <h1 className="shrink-0 text-xl font-bold text-navy">受注登録</h1>
-        <StepIndicator current={step} withQueue />
+        <h1 className="shrink-0 text-xl font-bold text-navy">{edit ? '受注の変更' : '受注登録'}</h1>
+        {/* 変更は受注登録待ちの一覧から始めないため、進み具合に「受注登録待ち」を出さない */}
+        <StepIndicator current={step} withQueue={!edit} />
       </div>
 
       {/* 左に注文書のパネル、右に画面ごとの中身。パネルの最大の幅は、この枠の幅から決まる */}
@@ -301,6 +352,7 @@ export function OrderEntryScreen({
                 masters={masters.header}
                 today={today}
                 intake={intake}
+                editingOrderNo={edit?.orderNo}
               />
             </div>
           )}
@@ -385,14 +437,14 @@ export function OrderEntryScreen({
                 disabled={isPending}
                 className={primaryButton}
               >
-                {isPending ? '登録中…' : '登録して現場用伝票を印刷'}
+                {isPending ? (edit ? '保存中…' : '登録中…') : edit ? '変更を保存' : '登録して現場用伝票を印刷'}
               </button>
             </>
           )}
         </div>
       </footer>
 
-      {registeredOrderNo && (
+      {!edit && registeredOrderNo && (
         <RegisteredDialog
           orderNo={registeredOrderNo}
           intakeNo={intake.intakeNo}

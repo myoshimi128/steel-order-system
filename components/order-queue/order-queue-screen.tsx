@@ -7,11 +7,13 @@
 // 「受注登録待ちに追加」（S-06b）はこの画面の上に重ねるモーダル（AddWorkUnitDialog）。
 // 状態と操作は useOrderQueue（lib/intake/use-order-queue.ts）が持つ。
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { SiteTabs } from '@/components/intake/site-tabs'
 import { Icon } from '@/components/layout/icon'
 import { StepIndicator } from '@/components/order-entry/step-indicator'
 import { queueHref } from '@/lib/intake/queue'
+import { orderEditHref } from '@/lib/order-entry/order-no'
 import { countBySite, type SiteTab } from '@/lib/intake/site-tabs'
 import type { QueueUnit } from '@/lib/intake/types'
 import { useOrderQueue } from '@/lib/intake/use-order-queue'
@@ -38,7 +40,14 @@ export function OrderQueueScreen({ units, sites, site, notice }: OrderQueueScree
           <p className="text-sm text-neutral-500">振り分けが終わった注文から選んで、受注登録します</p>
           <h1 className="mt-1 text-2xl font-bold text-neutral-900">受注登録</h1>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
+          {/* 処理区分 1 変更・2 削除の入口（登録済みの受注を受注No. で呼び出す） */}
+          <Link
+            href={orderEditHref({ type: 'edit' })}
+            className="rounded border border-line bg-white px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-canvas"
+          >
+            受注No. で呼び出す（変更・削除）
+          </Link>
           <button
             type="button"
             onClick={() => setAddOpen(true)}
@@ -47,7 +56,9 @@ export function OrderQueueScreen({ units, sites, site, notice }: OrderQueueScree
             <Icon name="plus" className="h-4 w-4" />
             受注登録待ちに追加
           </button>
-          <StepIndicator current="queue" withQueue />
+          <div className="ml-3">
+            <StepIndicator current="queue" withQueue />
+          </div>
         </div>
       </div>
 

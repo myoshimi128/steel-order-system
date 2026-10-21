@@ -2119,6 +2119,10 @@ export type Database = {
       current_user_department: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
       delete_intake: { Args: { p_intake_id: string }; Returns: undefined }
+      delete_order: {
+        Args: { p_expected_updated_at: string; p_order_id: string }
+        Returns: string
+      }
       get_pricing_rows: {
         Args: {
           p_as_of: string
@@ -2162,6 +2166,15 @@ export type Database = {
         Returns: undefined
       }
       start_cad_work: { Args: { p_work_unit_id: string }; Returns: string }
+      update_order: {
+        Args: {
+          p_expected_updated_at: string
+          p_items: Json
+          p_order: Json
+          p_order_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

@@ -77,6 +77,8 @@ export type HeaderDefaultsSource = {
   staffCode: string
   // 受付の値から作った初期値（受注登録待ちの加工区分から開いたとき）。なければ null
   intake: IntakeHeaderDefaults | null
+  // 処理区分 1 変更で呼び出した受注の値（lib/order-entry/order-to-form.ts で戻したもの）。あればそのまま使う
+  values?: HeaderValues
 }
 
 // 加工場所の初期値（1 本社）。受付から開いたときは、受付の加工場所を初期値にする
@@ -90,6 +92,7 @@ const SPLICE_SHOT_DEFAULT_CODE = '1'
 // 納期（3 後報）・配達（0 宵積み）は初期値があるため、Enter だけで進める。
 // 受付から開いたときは、売り先・納期・配達・加工場所・至急などを受付の値にする（intake-defaults.ts）
 function initialValues(today: string, defaults: HeaderDefaultsSource): HeaderValues {
+  if (defaults.values) return defaults.values
   const base: HeaderValues = {
     processingType: '0',
     memberClass: '0',
@@ -246,13 +249,13 @@ export function useOrderHeader(masters: HeaderMasterOptions, today: string, defa
       deliveryMethodRequiresNote: requiresDeliveryNote,
     })
 
-    // 変更・削除（受注の呼び出し）は次の作業で実装するため、今は新規だけを受け付ける
+    // 処理区分は、開いた画面の処理区分（新規の画面は 0 新規、変更の画面は 1 変更）のときだけ保存できる。
+    // ほかの処理区分を打つと、画面がその処理区分の画面へ移る（components/order-entry/order-entry-screen.tsx）
     const processingType = findCodeOption(PROCESSING_TYPE_OPTIONS, values.processingType)?.value
-    if (processingType !== 'new') {
+    const expected = defaults.values ? 'edit' : 'new'
+    if (processingType !== expected) {
       next.processingType =
-        processingType === undefined
-          ? '処理区分を選択してください'
-          : '変更・削除は現在未対応です（新規のみ登録できます）'
+        processingType === undefined ? '処理区分を選択してください' : '処理区分を確認してください'
     }
 
     // 番号が入力されているのに選択肢にない欄は、「選択してください」ではなく
