@@ -39,6 +39,10 @@ export type OrderHeaderInput = {
   deliveryMethodNote: string
   // 加工場所（営業所の id）。未選択は null
   siteId: string | null
+  // 担当者（自社。ユーザーの id）。未選択は null
+  staffId: string | null
+  // 至急（現場で優先して加工してもらう印）
+  isUrgent: boolean
 }
 
 // 欄ごとのエラー。キーは OrderHeaderInput の項目名
@@ -90,6 +94,10 @@ export function validateOrderHeader(
 
   if (!input.siteId) {
     errors.siteId = '加工場所を選択してください'
+  }
+
+  if (!input.staffId) {
+    errors.staffId = '担当者を選択してください'
   }
 
   return errors

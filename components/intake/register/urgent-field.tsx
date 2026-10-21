@@ -1,6 +1,6 @@
 'use client'
 
-// 至急の欄（受付登録）。チェック欄ではなく番号の欄で入れる（0 通常 / 1 至急。初期値 0）。
+// 至急の欄（受付登録・受注情報で共通）。チェック欄ではなく番号の欄で入れる（0 通常 / 1 至急。初期値 0）。
 // テンキーから手を離さずに入力できるようにするため（部材区分 SPL・ショットを番号の欄にしたのと同じ考え方）。
 // 1 至急のときは、欄の枠と名称を赤くして目立たせる（赤は至急・要相談・重要・必須だけに使う）。
 
@@ -14,9 +14,17 @@ type UrgentFieldProps = NavigationFieldProps & {
   code: string
   onCodeChange: (code: string) => void
   error?: string
+  // 1 至急のときに右に出す案内（受付登録と受注情報で違う）
+  urgentNote?: string
 }
 
-export function UrgentField({ code, onCodeChange, error, ...navigation }: UrgentFieldProps) {
+export function UrgentField({
+  code,
+  onCodeChange,
+  error,
+  urgentNote = '受注登録待ち・CAD の先頭に並びます',
+  ...navigation
+}: UrgentFieldProps) {
   const urgent = findCodeOption(URGENT_OPTIONS, code)?.value === true
   return (
     <div
@@ -36,7 +44,7 @@ export function UrgentField({ code, onCodeChange, error, ...navigation }: Urgent
         nameWidthClass="w-12"
       />
       <span className={`mt-2 text-xs ${urgent ? 'font-bold' : 'text-neutral-400'}`}>
-        {urgent ? '受注登録待ち・CAD の先頭に並びます' : '1 で至急'}
+        {urgent ? urgentNote : '1 で至急'}
       </span>
     </div>
   )

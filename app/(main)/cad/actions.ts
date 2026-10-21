@@ -28,6 +28,9 @@ type Client = Awaited<ReturnType<typeof createClient>>
 
 // DB の関数のエラーを、画面に出す文にする
 function toErrorMessage(error: { message: string; code?: string }, fallback: string): string {
+  if (error.message.includes('CAD_HAS_ORDERS')) {
+    return 'この区分の受注が登録されているため、CSV を外せません。'
+  }
   if (error.message.includes('CAD_STATUS_CHANGED')) {
     return 'この加工区分の状態がすでに変わっています（ほかの人が操作した可能性があります）。一覧を読み直しました。'
   }

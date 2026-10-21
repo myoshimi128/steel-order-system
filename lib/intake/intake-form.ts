@@ -18,11 +18,8 @@ import {
 import type { HeaderMasterOptions } from '@/lib/order-entry/use-order-header'
 import { URGENT_OPTIONS } from './constants'
 
-// 受付登録で使うマスタの選択肢。受注情報と同じもの（売り先・入れ先・配達・加工場所）に、担当者（社員）を足す
-export type IntakeFormMasters = HeaderMasterOptions & {
-  // 担当者（番号＝社員No.、名称＝氏名、値＝ユーザーの id）
-  staff: readonly CodeOption<string>[]
-}
+// 受付登録で使うマスタの選択肢。受注情報と同じもの（売り先・入れ先・配達・加工場所・担当者）
+export type IntakeFormMasters = HeaderMasterOptions
 
 // 入れ先以外の欄の入力値（番号の欄は打った番号、文字・日付の欄はその値）
 export type IntakeFormValues = {

@@ -42,15 +42,17 @@ function rowsOf<T>(result: { data: T[] | null; error: { message: string } | null
   return result.data ?? []
 }
 
-// 受注情報（受付登録と受注登録で共通の入力欄）で使うマスタ: 売り先・入れ先・配達・加工場所。
+// 受注情報（受付登録と受注登録で共通の入力欄）で使うマスタ: 売り先・入れ先・配達・加工場所・担当者（社員）。
 // 受付登録の画面（app/(main)/intake/）でも使うため、明細のマスタとは分けて読めるようにしている
 export async function loadHeaderMasters(supabase: SupabaseClient<Database>): Promise<HeaderMasterOptions> {
-  const [customers, destinations, deliveryMethods, sites] = await Promise.all([
+  const [customers, destinations, deliveryMethods, sites, users] = await Promise.all([
     supabase.from('customers').select('id, code, name, name_kana').eq('is_active', true),
     supabase.from('delivery_destinations').select('id, code, name, name_kana').eq('is_active', true),
     supabase.from('delivery_methods').select('id, number, name, requires_note').eq('is_active', true),
     // 加工場所（営業所）。番号順に並べる
     supabase.from('sites').select('id, number, name').eq('is_active', true).order('number'),
+    // 担当者は社員No. で打つ。使用中のユーザーだけを選択肢にする（users はログインしていれば誰でも読める）
+    supabase.from('users').select('id, employee_no, name').eq('is_active', true),
   ])
 
   const deliveryMethodRows = rowsOf(deliveryMethods, '配達方法')
@@ -72,6 +74,11 @@ export async function loadHeaderMasters(supabase: SupabaseClient<Database>): Pro
       .map((row) => row.id),
     sites: rowsOf(sites, '営業所').map(
       (row): CodeOption<string> => ({ code: String(row.number), label: row.name, value: row.id }),
+    ),
+    staff: sortByCode(
+      rowsOf(users, 'ユーザー').map(
+        (row): CodeOption<string> => ({ code: row.employee_no, label: row.name, value: row.id }),
+      ),
     ),
   }
 }

@@ -1,6 +1,6 @@
 # 受付〜受注登録 テーブル設計書
 
-前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。社員No. の一意制約とユーザー作成時のトリガーは `20261019100000_employee_no_login.sql`（PR 4）。納期連絡の公開の関数は `20261019110000_create_publish_lead_times.sql`（PR 4b）。受付待ち一覧・受付登録の関数は `20261020100000_create_intake_registration_functions.sql`（PR 5）。振り分けの列と関数は `20261021100000_add_split_file_functions.sql`（PR 6）。まだマイグレーションにしていない分（`orders` の変更と受注No. の切り替え）の下書きは `docs/intake/schema-draft.sql` に残し、PR 9 でマイグレーションにしたら削除する。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
+前提: `docs/intake/basic-design.md` / `docs/intake/screen-design.md`。受付のテーブル・関数・トリガー・ビュー・RLS・Realtime・Storage は `supabase/migrations/20261018100000`〜`20261018100600` の 7 ファイル（PR 3）。社員No. の一意制約とユーザー作成時のトリガーは `20261019100000_employee_no_login.sql`（PR 4）。納期連絡の公開の関数は `20261019110000_create_publish_lead_times.sql`（PR 4b）。受付待ち一覧・受付登録の関数は `20261020100000_create_intake_registration_functions.sql`（PR 5）。振り分けの列と関数は `20261021100000_add_split_file_functions.sql`（PR 6）。受注（`orders`）の変更と受注No. の切り替えは `20261024100000_link_orders_to_intakes.sql`（PR 9a）。下書きの `docs/intake/schema-draft.sql` は PR 9a で削除した。確認・デモ用のサンプルデータは seed 006（`supabase/seed/006_demo_data.sql`）。
 
 本体のテーブル（`orders` `users` など）の変更は、本体の `docs/table-design.md` にも反映している。
 
@@ -31,9 +31,9 @@ lead_time_items / lead_time_messages / lead_time_history（目安納期）
 | `intake_files` | 新規 | ファイルの情報（実体は Storage）。受注に関わるファイルはすべてここに持つ |
 | `notifications` / `notification_reads` | 新規 | 新着の通知と既読 |
 | `lead_time_items` / `lead_time_messages` / `lead_time_history` | 新規 | 目安納期・部署メッセージ・更新履歴 |
-| `orders` | **既存を変更（PR 9）** | 受付との紐付け・担当者を追加。受注No. の形式を変更（部材区分・加工場所は受注登録画面の作り直しの PR で先に追加済み）。受付のない今の受注登録画面から登録できなくならないよう、受付をつなぐ PR 9 で行う |
+| `orders` | **既存を変更（PR 9a）** | 受付との紐付け・担当者・至急を追加。受注No. の形式を変更（部材区分・加工場所は受注登録画面の作り直しの PR で先に追加済み）。受付のない受注登録画面から登録できなくならないよう、受付をつなぐ PR 9a で行った |
 | `users` | **既存を変更** | 部署・営業所を追加（PR 3）。社員No. を一意・必須に（ログインを切り替える PR 4） |
-| `attachments` | **既存を廃止（PR 9 以降）** | `intake_files` に一本化する。参照しているコードを外したあとで drop する |
+| `attachments` | **既存を廃止（PR 9a）** | `intake_files` に一本化した。PR 9a のマイグレーションで drop した |
 | `work_unit_queue_view` | 新規ビュー | 受注登録待ち・CAD の一覧用 |
 
 コード値は enum ではなく `text`＋`check` 制約で持つ（本体と同じ）。
@@ -157,7 +157,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 - 納期：`確定` `仮納期` は日付が必須、`後報` `最短出荷` は日付が空（`orders` と同じ）
 - 受注が 1 件でもある受付には `deleted_at` を入れられない（トリガー）
 
-**トリガー**：`intakes_touch`（更新者・日時）、`intakes_log_site_change`（加工場所の変更履歴）、`intakes_notify_new`（`waiting` で追加されたらシャーリング部への通知を作る）、`intakes_prevent_deleting_ordered`（受注のある受付の削除を拒否。`orders.intake_id` を足す PR 9 で作る）
+**トリガー**：`intakes_touch`（更新者・日時）、`intakes_log_site_change`（加工場所の変更履歴）、`intakes_notify_new`（`waiting` で追加されたらシャーリング部への通知を作る）、`intakes_prevent_deleting_ordered`（受注のある受付の削除を拒否。`INTAKE_HAS_ORDERS` のエラー。PR 9a で作った）
 
 受付の納期・入れ先などは、受注の **初期値** として使う。受注登録で値を変えても、受付の値は書き換えない（加工場所だけは例外で、受注情報で変えると受付も更新する。basic-design.md「例外の運用」）。
 
@@ -249,7 +249,7 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 
 ### orders（PR 9）
 
-受注に必須の列（受付・加工区分）を先に足すと、受付のない今の受注登録画面から登録できなくなる。そのため、テストデータの受注の削除・列の追加・受注No. の切り替え（`private.issue_order_branch()`、`private.next_order_no()` とカウンターの削除、`create_order` の変更）は、受注登録画面と受付をつなぐ PR 9 でまとめて行う（下書きは `schema-draft.sql`）。
+受注に必須の列（受付・加工区分）を先に足すと、受付のない受注登録画面から登録できなくなる。そのため、テストデータの受注の削除（出荷のテストデータも含む）・列の追加・受注No. の切り替え（`private.issue_order_branch()`、`private.next_order_no()` とカウンターの削除、`create_order` の変更）は、受注登録画面と受付をつなぐ PR 9a でまとめて行った（`20261024100000_link_orders_to_intakes.sql`）。
 
 | 列 | 型 | 説明 |
 | --- | --- | --- |
@@ -259,7 +259,8 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | member_class | text | 部材区分。`NONE` `DF` `GPL` `BH` `SPL`。既定 `NONE`。**`SPL` がスプライス専用の受注**（`is_splice` は廃止）。受注登録画面の作り直しの PR で追加済み（このマイグレーションでは扱わない） |
 | site_id | uuid | 加工場所（出荷待ちの振り分けに使う）。NOT NULL。受注登録画面の作り直しの PR で追加済み（このマイグレーションでは扱わない） |
 | staff_id | uuid | 担当者（自社）。FK → `users`。画面の初期値はログイン中のユーザー。NOT NULL |
-| order_no | text | 既存の列。`{受付No.}-{枝番}` を `create_order` の中で入れる。`private.next_order_no()` の初期値は外す |
+| order_no | text | 既存の列。`{受付No.}-{枝番}` を `create_order` の中で入れる。`private.next_order_no()` の初期値は外した（NOT NULL） |
+| is_urgent | boolean | 至急。NOT NULL、既定 false。受付の至急を初期値にし、受注情報で変えられる（PR 9a で追加） |
 
 受注の入れ先は既存の `delivery_destination_id`（NULL は売り先と同じ）を使う。納期（`due_date_type` / `due_date`）・配達・工事名なども既存の列に、受注ごとの値として保存する。
 
@@ -282,8 +283,8 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | `complete_split(intake_id, no_file_kinds text[]) → text[]` | 振り分け完了。枠ごとに加工区分を作ってファイルを紐付け、図面なしの区分（`array['sakisun']` など）も作る。元データを論理削除し、**Storage から消すパスを返す**。`dispatched` にする |
 | `add_work_unit(intake_id, kind, origin, note) → uuid` | 受注登録待ちに追加（見落とし・口頭など）。振り分け完了後のみ。`closed` なら `dispatched` に戻す |
 | `add_work_unit_with_files(intake_id, kind, origin, note, files jsonb)` → uuid | 受注登録待ちに追加（PR 8。S-06b）。加工区分と、一緒に入れた図面・注文書の行（kind=`added`。`files` はファイルの id・元の名前・置き場所・種類・大きさの配列。空でもよい）を 1 つの transaction で作る。実物は呼ぶ前に Storage に置く。振り分け完了・完了の受付だけ（違えば `INTAKE_NOT_DISPATCHED` のエラー）。理由は見落とし・口頭・その他で、その他はメモ必須。置き場所が `{受付の id}/{ファイルの id}` の形でなければエラー。`closed` なら `dispatched` に戻す。事務・管理者だけ。画面からはこちらを使い、`add_work_unit` は使わない |
-| `private.issue_order_branch(intake_id) → (branch_no, order_no)` | 受注No. の枝番を採番する。`create_order` の中からだけ呼ぶ。`security definer`（PR 9） |
-| `complete_work_unit(work_unit_id)` | 起票完了（`ready` → `done`）。受注登録待ちの一覧の「起票を完了」（PR 8）と、注文内容の登録の後（PR 9）で使う。間違って作った区分を外すときも同じ関数を使い、見分ける列は持たない（PR 9 で受注と加工区分がつながれば、受注があるかどうかで見分けられる） |
+| `private.issue_order_branch(intake_id) → (branch_no, order_no)` | 受注No. の枝番を採番する（受付の `last_branch` を update で +1。行のロックで同時でも重複しない）。`create_order` の中からだけ呼ぶ。`security definer`（PR 9a） |
+| `complete_work_unit(work_unit_id)` | 起票完了（`ready` → `done`）。受注登録待ちの一覧の「起票を完了」（PR 8）と、注文内容の登録の後（PR 9a）で使う。間違って作った区分を外すときも同じ関数を使い、見分ける列は持たない（受注と加工区分がつながったため、その区分の受注があるかどうかで見分けられる） |
 | `save_intake(intake_id, info jsonb, destinations jsonb, register boolean)` → text | 受付登録（処理区分 0 新規）と変更（1 変更）（PR 5）。受注情報の列を書き、入れ先を消して入れ直し（`destinations` は納入先の id か null＝売り先と同じの配列。並び順で `seq`）、`register = true` なら続けて `register_intake` で採番する。1 つの transaction で行い、受付No. を返す。新規は受付待ちだけ（違えば `INTAKE_NOT_WAITING` のエラー＝ほかの人が先に登録した）、変更は受付登録済・振り分け完了・完了だけ。事務・管理者だけ（関数の中でもロールを確かめる） |
 | `classify_intake(intake_id, status)` → text | 受付待ち → 見積・ミルシート（受付No. を採番して返す）／対象外、対象外 → 受付待ち（PR 5）。それ以外の移り方は `INTAKE_STATUS_CHANGED` のエラー。対応中の表示も外す |
 | `delete_intake(intake_id)` | 処理区分 2 削除（PR 5）。`deleted_at` を入れる論理削除。受付登録済・振り分け完了・完了・見積の受付が対象（受付待ち・対象外は「対象外」で扱う）。受注のある受付の削除の禁止は PR 9 のトリガー |
@@ -295,9 +296,9 @@ waiting ──受付登録──→ registered ──振り分け完了──→
 | `start_cad_work(work_unit_id)` → uuid | CAD の作業開始（PR 7）。作業待ちのアイトレを作業中にし、担当を自分にする（開始日時はトリガー）。作業待ちのときだけの条件で 1 回の update で決めるため、同時に押しても 1 人に決まる。その後の担当を返す（先にほかの人が始めていたらその人）。作業待ち・作業中でなければ `CAD_STATUS_CHANGED` のエラー。事務・管理者だけ |
 | `cancel_cad_work(work_unit_id)` | 作業開始の取り消し（PR 7）。作業中 → 作業待ちに戻し、担当と開始日時を空にする。担当以外の人もできる（画面で確認のダイアログ）。作業中でなければ `CAD_STATUS_CHANGED` |
 | `add_cad_csv(work_unit_id, file_id, original_name, storage_path, mime_type, size_bytes)` → text | CAD の CSV の行を足す（PR 7）。実物は呼ぶ前に Storage に置く。作業中・CSV 登録済のアイトレだけ（作業待ちは不可）。加工区分の行をロックし、同じ名前の CSV があれば前の行を論理削除して差し替え、前の置き場所を返す（アプリが実物を消す）。insert のトリガーで作業中のアイトレが `ready` になる。拡張子 .csv 以外はエラー |
-| `remove_cad_csv(file_id)` → text | CAD の CSV を外す（PR 7）。CSV 登録済（`ready`）の間だけ。論理削除して置き場所を返す（アプリが実物を消す）。CSV が 0 件になったら作業中に戻す。担当以外の人もできる。受注のある加工区分で外せないようにする確認は PR 9 で足す |
+| `remove_cad_csv(file_id)` → text | CAD の CSV を外す（PR 7）。CSV 登録済（`ready`）の間だけ。論理削除して置き場所を返す（アプリが実物を消す）。CSV が 0 件になったら作業中に戻す。担当以外の人もできる。その加工区分の受注があれば外さない（`CAD_HAS_ORDERS`。PR 9a で足した） |
 | `publish_lead_times(dept, items jsonb, summary, message, expires_on, expected_history_id) → uuid` | 納期連絡の「ホームに公開」（PR 4b）。工程（`items` の並び順で `sort_order`。`id` が空の行は追加）・部署メッセージを書き換え、`lead_time_history` に要約を 1 行残して、その id を返す。事務・管理者だけ。部署メッセージの行をロックしてから、最新の履歴が `expected_history_id`（画面を開いた時点の最新）と違えば `LEAD_TIME_CONFLICT` のエラー（ほかの人が先に公開した）。既存の工程がすべて渡されていなければエラー（工程は削除できないため）。要相談の工程は日数を空にする。`message`・`expires_on`・`expected_history_id` は初期値 null（型の生成で省略できる引数になる） |
-| `create_order(p_order, p_items)`（本体・変更。PR 9） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
+| `create_order(p_order, p_items)`（本体・変更。PR 9a） | ヘッダーの JSON に `intake_id`・`work_unit_id`・`site_id`・`staff_id`・`is_urgent` を受け取る（`member_class` は受注登録画面の作り直しの PR で追加済み）。加工区分が受注登録待ち（`ready`）でその受付のものかを確かめ（加工区分の行をロック。違えば `WORK_UNIT_NOT_READY`）、受注の insert の前に `private.issue_order_branch()` で受注No. を決める。加工場所が受付と違えば、受付の加工場所も更新する。すべて 1 つの transaction |
 
 `private` の関数以外は `security invoker`（呼び出したユーザーの権限で実行）とし、RLS をそのまま効かせる。
 
@@ -348,6 +349,13 @@ waiting ──受付登録──→ registered ──振り分け完了──→
    - 公開するもの：`intakes`・`intake_destinations`・`intake_site_changes`・`work_units`・`intake_files`・`notifications`・`notification_reads`・`lead_time_items`・`lead_time_messages`・`lead_time_history`・`work_unit_queue_view`
    - 公開してはいけないもの：`private` スキーマ全体（`private.intake_no_counters`・`private.assign_intake_no`・既存の `private.order_no_counters`・`private.next_order_no`）。どのテーブルも `anon` に権限を付けない
 5. 確認・デモ用に、必要なら seed 006 を実行する（本番の DB では実行しない）
+
+### マイグレーションの実行の手順（PR 9a）
+
+1. SQL Editor で `20261024100000_link_orders_to_intakes.sql` を実行する（**受注・出荷のデータがすべて消える**。テストのデータだけの DB で実行する）
+2. `npm run db:types` で型を再生成する（`orders` の列・`attachments` の削除の型は、生成と同じ形で `lib/database.types.ts` に先に入れてあるため、再生成しても差は出ない想定）
+3. テーブルは増えない（`attachments` は消える）ため、Data API の設定画面での確認は不要
+4. 今の採番の関数とカウンター・`attachments` が消えたこと、登録した受注の受注No.・枝番・加工場所の変更の履歴は、seed 011（`supabase/seed/011_order_link_check.sql`。読むだけの SQL）で確かめられる
 
 ### マイグレーションの実行の手順（PR 8）
 
