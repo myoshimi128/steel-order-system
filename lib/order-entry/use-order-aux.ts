@@ -36,13 +36,18 @@ export type OrderAuxMasters = {
 //   error  : 存在しない番号だった
 export type StampCodeResult = 'toggled' | 'empty' | 'error'
 
-export function useOrderAux(masters: OrderAuxMasters, customerId: string | null) {
+// initial: 処理区分 1 変更で呼び出した受注のスタンプ（指定スタンプとの違い）とフリーコメント。新規では省略する
+export function useOrderAux(
+  masters: OrderAuxMasters,
+  customerId: string | null,
+  initial?: { overrides: StampOverrides; freeComment: string },
+) {
   // 手で付け外ししたスタンプ。得意先を変えてもそのまま残す
-  const [overrides, setOverrides] = useState<StampOverrides>({})
+  const [overrides, setOverrides] = useState<StampOverrides>(() => initial?.overrides ?? {})
   // 番号の欄に打った番号と、そのエラー
   const [stampCode, setStampCodeState] = useState('')
   const [stampCodeError, setStampCodeError] = useState<string | undefined>(undefined)
-  const [freeComment, setFreeComment] = useState('')
+  const [freeComment, setFreeComment] = useState(() => initial?.freeComment ?? '')
 
   // 得意先の指定スタンプと手での付け外しを合わせた、スタンプごとの状態（描画のたびに求める）
   const states = stampStates(

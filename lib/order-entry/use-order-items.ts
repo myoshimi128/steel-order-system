@@ -41,9 +41,13 @@ import { checkRows, validateOrderItems, type OrderItemsValidation } from './vali
 // 「*」の複写の結果。写せなかった場合は理由を返す（画面に案内を出す）
 export type CopyRowResult = { ok: true } | { ok: false; message: string }
 
-export function useOrderItems(masters: ItemMasters, context: ItemContext) {
-  // 最初の行はサーバーでも描画するため、決まった ID の行にする（item-row.ts の createInitialItemRow）
-  const [rows, setRows] = useState<ItemRowValues[]>(() => [createInitialItemRow()])
+// initialRows: 処理区分 1 変更で呼び出した受注の明細（lib/order-entry/order-to-form.ts で戻したもの）。新規では省略する
+export function useOrderItems(masters: ItemMasters, context: ItemContext, initialRows?: readonly ItemRowValues[]) {
+  // 最初の行はサーバーでも描画するため、決まった ID の行にする（item-row.ts の createInitialItemRow。
+  // 呼び出した受注の行も order-line-1 などの決まった ID にしてある）
+  const [rows, setRows] = useState<ItemRowValues[]>(() =>
+    initialRows && initialRows.length > 0 ? [...initialRows] : [createInitialItemRow()],
+  )
   // 保存しようとしたときに出たエラー（画面側の確認・サーバーからの応答）。行の key ごと
   const [submitErrors, setSubmitErrors] = useState<Record<string, ItemErrors>>({})
   // 明細全体のエラー（明細が 1 行もない など）

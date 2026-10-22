@@ -350,6 +350,13 @@ waiting ──受付登録──→ registered ──振り分け完了──→
    - 公開してはいけないもの：`private` スキーマ全体（`private.intake_no_counters`・`private.assign_intake_no`・既存の `private.order_no_counters`・`private.next_order_no`）。どのテーブルも `anon` に権限を付けない
 5. 確認・デモ用に、必要なら seed 006 を実行する（本番の DB では実行しない）
 
+### マイグレーションの実行の手順（PR 9b）
+
+1. SQL Editor で `20261025100000_add_order_edit_and_delete.sql` を実行する（`create_order` の作り直し、`update_order`・`delete_order`、送り状がある受注のトリガー）
+2. `npm run db:types` で型を再生成する（2 つの関数の型は、生成と同じ形で `lib/database.types.ts` に先に入れてあるため、再生成しても差は出ない想定）
+3. テーブルは増えないため、Data API の設定画面での確認は不要
+4. 送り状がある受注の制限は、seed 012（`supabase/seed/012_order_shipment_check.sql`。仮の送り状を入れて試し、最後に取り消す）で確かめられる。ブロックは 1 つずつ実行する
+
 ### マイグレーションの実行の手順（PR 9a）
 
 1. SQL Editor で `20261024100000_link_orders_to_intakes.sql` を実行する（**受注・出荷のデータがすべて消える**。テストのデータだけの DB で実行する）

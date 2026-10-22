@@ -44,8 +44,10 @@ type OrderHeaderProps = {
   navigation: FieldNavigation
   masters: HeaderMasterOptions
   today: string
-  // 受注登録待ちの一覧で選んだ加工区分と、その受付
+  // 受注登録待ちの一覧で選んだ加工区分と、その受付（変更では、呼び出した受注の受付と加工区分）
   intake: OrderIntakeSource
+  // 処理区分 1 変更で呼び出した受注の受注No.（新規では省略。上部に「次の受注No.」の代わりに出す）
+  editingOrderNo?: string
 }
 
 // 登録済みの受注の一覧の文（「26-1003-1（GPL）、26-1003-2（SPL）」）
@@ -59,7 +61,7 @@ function registeredOrdersText(intake: OrderIntakeSource): string {
     .join('、')
 }
 
-export function OrderHeader({ header, navigation, masters, today, intake }: OrderHeaderProps) {
+export function OrderHeader({ header, navigation, masters, today, intake, editingOrderNo }: OrderHeaderProps) {
   const { values, errors, setValue, fromIntake } = header
   const origin = WORK_UNIT_ORIGIN_LABELS[intake.origin]
   // 入れ先の一覧（受付の入れ先を先頭に並べる）
@@ -86,9 +88,9 @@ export function OrderHeader({ header, navigation, masters, today, intake }: Orde
             <span className="text-sm text-neutral-600">受付: {intake.intakeStaffName ?? '—'}</span>
           </div>
         </FormItem>
-        <FormItem label="受注No." note="登録時に採番">
+        <FormItem label="受注No." note={editingOrderNo ? '変更中の受注' : '登録時に採番'}>
           <div className="flex flex-col gap-0.5 py-1">
-            <span className="text-xl font-bold tabular-nums text-navy">{nextOrderNoText(intake)}</span>
+            <span className="text-xl font-bold tabular-nums text-navy">{editingOrderNo ?? nextOrderNoText(intake)}</span>
             <span className="text-xs text-neutral-600">この受付の受注: {registeredOrdersText(intake)}</span>
           </div>
         </FormItem>

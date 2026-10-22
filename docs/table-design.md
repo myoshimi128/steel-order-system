@@ -494,9 +494,21 @@
 
 受注の削除（受注登録画面の処理区分 2 削除）は論理削除とし、行は消さずに `deleted_at` に削除日時を入れる。`deleted_at` が入った受注は、受注一覧・現場用伝票・送り状発行などの対象から外す。誤って削除した場合の確認や、過去の受注番号の追跡ができるようにするためである。
 
-出荷実績（`shipments`）がある受注は削除できない。画面で削除を止めるだけでなく、`deleted_at` を設定する更新を DB 側でも拒否する（`before update` トリガー `orders_prevent_deleting_shipped`）。
+出荷実績（`shipments`）がある受注は、削除も修正もできない（業務の決まり「受注 → 送り状 → 仕入」の逆順でしか直せないため。basic-design.md「仕入入力」の「修正の順番」）。画面で止めるだけでなく、DB 側でも拒否する。
 
-仕入入力を作るときに、このトリガーを広げ、出荷実績（送り状）がある受注は削除だけでなく修正もできないようにする（予定。basic-design.md「仕入入力」の「修正の順番」）。あわせて、仕入がある送り状は削除できないようにする（後述「Phase2 での拡張ポイント」の「仕入」）。
+- `orders` の `before update` トリガー `orders_prevent_deleting_shipped`: 送り状がある受注では、`deleted_at` を設定する更新と、状態（`status`）・`updated_at` 以外の列の変更を拒否する（PR 9b で修正にも広げた）
+- `order_items`・`order_item_processes`・`order_stamps` の `before insert/update/delete` トリガー（`prevent_changing_shipped_order_lines`）: 送り状がある受注の明細・加工の行・スタンプの追加・変更・削除を拒否する（PR 9b）
+
+仕入入力を作るときに、仕入がある送り状は削除できないようにする（後述「Phase2 での拡張ポイント」の「仕入」）。
+
+**受注の変更・削除（update_order・delete_order。PR 9b）**
+
+- `update_order(p_order_id, p_expected_updated_at, p_order, p_items) → text`: 処理区分 1 変更。ヘッダーの列を書き換え、明細・加工の行・スタンプを消して入れ直す（入れ直しの分は物理的に消す。明細の行は受注の一部で、送り状の明細から参照される受注は先に断るため）。受注番号・枝番・受付・加工区分・登録した人（`created_by`）は変えない。加工場所を変えても受付の加工場所は変えない
+- `delete_order(p_order_id, p_expected_updated_at) → text`: 処理区分 2 削除。`deleted_at` を入れる。加工区分・受付の状態は変えない
+- どちらも、画面を開いたときの `updated_at` と今の値が違えば `ORDER_CHANGED`、送り状があれば `ORDER_HAS_SHIPMENTS`、削除済みなら `ORDER_DELETED` のエラーにする。`orders` には `updated_at` を自動で更新するトリガーがないため、この 2 つの関数で `now()` を入れる
+- `security definer`（関数所有者の権限で実行）にし、関数の中で事務・管理者かを確かめる。明細・加工の行・スタンプの削除は RLS で管理者だけに許しているため、事務が変更するときの入れ直しは所有者の権限で行う（事務に明細の削除の権限そのものは付けない）。`search_path` は空にして、テーブルはスキーマ名つきで書く
+- 明細・加工の行・スタンプの登録は、`create_order` と共通の `private.insert_order_lines(p_order_id, p_order, p_items)` で行う
+- 実装は `supabase/migrations/20261025100000_add_order_edit_and_delete.sql`
 
 ステータスは受注ヘッダーに 1 つ持つ。実務では同一受注内の明細がまとめて加工・出荷されるため、明細単位の管理は行わない。
 
@@ -527,7 +539,7 @@
 - 入力内容の確認と、重量・仕入単価の計算は、呼び出し側の Server Action（`app/orders/new/actions.ts`）で済ませてから渡す
 - 実行権限は `authenticated` にだけ付与する
 
-実装は `supabase/migrations/20260930100300_create_create_order_function.sql`（加工の登録を加えたものは `20261001100000_create_order_with_processes.sql`、フリーコメントとスタンプを加えたものは `20261003100100_add_stamp_numbers_and_save_order_aux.sql`、受付とつないだものは `20261024100000_link_orders_to_intakes.sql`）を参照。
+実装は `supabase/migrations/20260930100300_create_create_order_function.sql`（加工の登録を加えたものは `20261001100000_create_order_with_processes.sql`、フリーコメントとスタンプを加えたものは `20261003100100_add_stamp_numbers_and_save_order_aux.sql`、受付とつないだものは `20261024100000_link_orders_to_intakes.sql`、明細の登録を `private.insert_order_lines` に分けたものは `20261025100000_add_order_edit_and_delete.sql`）を参照。
 
 ### order\_items（受注明細）
 
