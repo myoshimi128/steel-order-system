@@ -69,3 +69,47 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+  現場用伝票の印刷（app/(print)/orders/print。docs/screen-design.md「現場用伝票の印刷」）。
+  用紙は A4 の横。今の伝票が横長で、現場になじみがあるため。
+  1 ページの大きさを mm で決め、画面でも印刷と同じ大きさで見せる。
+  余白（8mm）を除いた高さより 1mm 小さくして、端数で白紙のページが増えないようにする。
+  ページの分け方は lib/order-slip/slip-pages.ts で決め、1 枚ごとに改ページする。
+*/
+@page {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+.slip-sheet {
+  box-sizing: border-box;
+  width: 281mm;
+  height: 193mm;
+}
+
+@media screen {
+  /* 画面では、紙の大きさが分かるように余白と影を付ける */
+  .slip-sheet {
+    box-sizing: content-box;
+    padding: 8mm;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.15);
+  }
+}
+
+@media print {
+  /* 背景の色（至急・ショット加工の黒地など）も印刷する */
+  .slip-sheets {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .slip-sheets {
+    display: block;
+  }
+  .slip-sheet {
+    break-after: page;
+  }
+  .slip-sheet:last-child {
+    break-after: auto;
+  }
+}

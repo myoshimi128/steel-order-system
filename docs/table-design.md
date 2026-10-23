@@ -42,6 +42,7 @@
 | `shipment_items` | 出荷明細 |
 | `attachments` | 添付ファイル。**廃止**（`intake_files` に一本化。後述） |
 | `order_stamps` | 受注に付けたスタンプ |
+| `order_slip_prints` | 現場用伝票の印刷の記録 |
 
 ### 受付〜受注登録待ち
 
@@ -680,6 +681,30 @@ FAX で届いた注文書も、CAD データから出力した CSV を印刷し�
 
 材質による色分けと「材質ライン要」の印字は、材質の値から判定できるためデータとして保持せず、印刷処理側で判断する。
 
+### order_slip_prints（現場用伝票の印刷の記録）
+
+現場用伝票（現場用・単価記入用）を印刷するたびに 1 行残す（docs/screen-design.md「現場用伝票の印刷」の「印刷の記録」）。
+
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `id` | uuid | PK |
+| `order_id` | uuid | FK → `orders`。NOT NULL |
+| `copy_kind` | text | 伝票の種類。`現場用` / `単価記入用`（CHECK 制約） |
+| `order_updated_at` | timestamptz | 印刷したときの `orders.updated_at`。NOT NULL |
+| `printed_by` | uuid | FK → `users`。印刷した人。NOT NULL |
+| `printed_at` | timestamptz | 印刷した日時。既定 now() |
+
+使い道は 2 つある。
+
+- 伝票の右上に「発行 2 回目（再発行）」と出す。現場に 2 枚の伝票が回ったとき、新しい方が分かるようにするため。回数は伝票の種類ごとに数える
+- 印刷した後に受注を変更していたら、「前回の印刷の後に変更されています」と出して、印刷し直しを促す。前回の印刷の `order_updated_at` と今の `orders.updated_at` を比べる（`orders.updated_at` は `update_order`・`delete_order` だけが書き換えるため、状態 `status` の更新では変わらない）
+
+印刷の回数は数えれば分かるため、`orders` に回数の列は持たない（計算で求められる値は列に持たない方針）。
+
+**書き込みは関数だけ**: `record_order_slip_print(p_order_id, p_copy_kind)` が 1 行足し、その伝票の種類で何回目の印刷かを返す。`security definer`・`search_path` 固定で、関数の中で事務・管理者かを確かめる。印刷した人は画面から受け取らず `auth.uid()` にする。同じ受注を同時に印刷しても回数が重ならないよう、受注の行をロック（`for update`）してから数える。削除した受注は断る（`ORDER_DELETED`）。記録は消さない（削除・更新の権限は付けない）。
+
+実装は `supabase/migrations/20261026100000_add_order_slip_prints.sql`。
+
 ## リレーション
 
 ```
@@ -696,6 +721,7 @@ destinations       │            │                    └── process_types
                    │
                    ├─< shipments ──< shipment_items ──> order_items
                    ├─< order_stamps ──> stamps
+                   ├─< order_slip_prints ──> users （印刷の記録 / printed_by）
                    ├── delivery_methods （配達）
                    ├── sites （加工場所）
                    └── users （staff_id 担当者 / created_by 登録した人）
@@ -724,6 +750,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `order_items` | `shipment_items` | 1 : N | 1 明細が複数回に分けて出荷される |
 | `intakes` | `orders` | 1 : N | 1 受付から複数の受注（枝番） |
 | `work_units` | `orders` | 1 : N | 1 加工区分から複数の受注 |
+| `orders` | `order_slip_prints` | 1 : N | 現場用伝票を印刷するたびに 1 行 |
 | `intakes` | `intake_files` | 1 : N | 注文書 PDF・DXF・CSV |
 
 ### 参照の考え方
@@ -815,6 +842,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | 目安納期（`lead_time_items` など） | 参照・登録・更新 | 参照 | すべて |
 | `notifications` | 自分の部署の行を参照 | 自分の部署の行を参照 | 自分の部署の行を参照 |
 | `order_stamps` | 参照・登録・更新 | 参照 | すべて |
+| `order_slip_prints` | 参照（登録は関数 `record_order_slip_print` だけ） | 参照不可 | 参照（登録は関数だけ） |
 | `users` | 参照 | 参照 | すべて |
 | 価格系マスタ（`cutting_prices` `material_extras` `thickness_extras` `large_plate_extras` `standard_plate_prices` `special_product_prices`） | 参照不可（価格マスタの行を取り出す関数で、明細の計算に必要な行だけ取得可） | 参照不可 | すべて |
 | マスタ各種（`plate_types` `special_product_types` `unit_weights` `delivery_methods` `notices` `process_notices` `stamps` `customer_stamps` を含む） | 参照 | 参照 | すべて |
@@ -884,7 +912,7 @@ DB の関数は `security definer`（関数所有者の権限で実行）とし�
 - `order_items_factory_view` の重量の列名が、`square_weight` へのリネーム前の `unit_weight` のまま（ビューはリネーム後の列を指しているが、ビュー上の列名は古い）
 - `order_item_processes_factory_view` に `price_unit`（加工の単位）・`spec_fields`（加工の項目）がない
 
-現場ロール（factory）は MVP では運用しないため急ぎではないが、現場用伝票など現場ロールがビューを使う機能を実装する前に、新しいマイグレーションでビューを作り直す。作り直す際も、単価列（`cutting_unit_price`・`sales_unit_price`・加工の `unit_price`）は引き続き除外する。
+現場ロール（factory）は MVP では運用しないため急ぎではないが、現場ロールがビューを使う機能を実装する前に、新しいマイグレーションでビューを作り直す。現場用伝票の印刷は事務・管理者が行い（現場は紙の伝票を受け取るだけ）、テーブルを直接読むため、ビューは使わない（作り直しは、現場ロールを運用するときに行う）。作り直す際も、単価列（`cutting_unit_price`・`sales_unit_price`・加工の `unit_price`）は引き続き除外する。
 
 `orders` の「factory は参照・ステータス更新のみ」も同様に列単位の制御が必要になる。RLS の UPDATE ポリシーは更新前後の行をそれぞれ独立にしか検証できず列同士を比較できないため、`status` 列以外が変更された場合に例外を発生させる `before update` トリガー（`restrict_orders_update_for_factory`）で強制する。
 
