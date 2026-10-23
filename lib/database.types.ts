@@ -2190,14 +2190,14 @@ export type Database = {
         }
         Returns: string
       }
-      register_intake: { Args: { p_intake_id: string }; Returns: string }
-      release_intake: { Args: { p_intake_id: string }; Returns: undefined }
-      remove_cad_csv: { Args: { p_file_id: string }; Returns: string }
-      remove_split_file: { Args: { p_file_id: string }; Returns: string }
       record_order_slip_print: {
         Args: { p_copy_kind: string; p_order_id: string }
         Returns: number
       }
+      register_intake: { Args: { p_intake_id: string }; Returns: string }
+      release_intake: { Args: { p_intake_id: string }; Returns: undefined }
+      remove_cad_csv: { Args: { p_file_id: string }; Returns: string }
+      remove_split_file: { Args: { p_file_id: string }; Returns: string }
       save_intake: {
         Args: {
           p_destinations: Json
