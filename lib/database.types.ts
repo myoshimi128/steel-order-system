@@ -2187,10 +2187,7 @@ export type Database = {
         }
         Returns: string
       }
-      record_order_slip_print: {
-        Args: { p_order_id: string }
-        Returns: number
-      }
+      record_order_slip_print: { Args: { p_order_id: string }; Returns: number }
       register_intake: { Args: { p_intake_id: string }; Returns: string }
       release_intake: { Args: { p_intake_id: string }; Returns: undefined }
       remove_cad_csv: { Args: { p_file_id: string }; Returns: string }
