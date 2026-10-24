@@ -683,27 +683,26 @@ FAX で届いた注文書も、CAD データから出力した CSV を印刷し�
 
 ### order_slip_prints（現場用伝票の印刷の記録）
 
-現場用伝票（現場用・単価記入用）を印刷するたびに 1 行残す（docs/screen-design.md「現場用伝票の印刷」の「印刷の記録」）。
+現場用伝票を印刷するたびに 1 行残す（docs/screen-design.md「現場用伝票の印刷」の「印刷の記録」）。伝票は現場用の 1 種類だけなので、伝票の種類の列は持たない（単価記入用の伝票をやめたときに `copy_kind` の列を消した）。
 
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
 | `order_id` | uuid | FK → `orders`。NOT NULL |
-| `copy_kind` | text | 伝票の種類。`現場用` / `単価記入用`（CHECK 制約） |
 | `order_updated_at` | timestamptz | 印刷したときの `orders.updated_at`。NOT NULL |
 | `printed_by` | uuid | FK → `users`。印刷した人。NOT NULL |
 | `printed_at` | timestamptz | 印刷した日時。既定 now() |
 
 使い道は 2 つある。
 
-- 伝票の右上に「発行 2 回目（再発行）」と出す。現場に 2 枚の伝票が回ったとき、新しい方が分かるようにするため。回数は伝票の種類ごとに数える
+- 伝票の右上に「発行 2 回目（再発行）」と出す。現場に 2 枚の伝票が回ったとき、新しい方が分かるようにするため。回数は受注ごとに数える
 - 印刷した後に受注を変更していたら、「前回の印刷の後に変更されています」と出して、印刷し直しを促す。前回の印刷の `order_updated_at` と今の `orders.updated_at` を比べる（`orders.updated_at` は `update_order`・`delete_order` だけが書き換えるため、状態 `status` の更新では変わらない）
 
 印刷の回数は数えれば分かるため、`orders` に回数の列は持たない（計算で求められる値は列に持たない方針）。
 
-**書き込みは関数だけ**: `record_order_slip_print(p_order_id, p_copy_kind)` が 1 行足し、その伝票の種類で何回目の印刷かを返す。`security definer`・`search_path` 固定で、関数の中で事務・管理者かを確かめる。印刷した人は画面から受け取らず `auth.uid()` にする。同じ受注を同時に印刷しても回数が重ならないよう、受注の行をロック（`for update`）してから数える。削除した受注は断る（`ORDER_DELETED`）。記録は消さない（削除・更新の権限は付けない）。
+**書き込みは関数だけ**: `record_order_slip_print(p_order_id)` が 1 行足し、その受注で何回目の印刷かを返す。`security definer`・`search_path` 固定で、関数の中で事務・管理者かを確かめる。印刷した人は画面から受け取らず `auth.uid()` にする。同じ受注を同時に印刷しても回数が重ならないよう、受注の行をロック（`for update`）してから数える。削除した受注は断る（`ORDER_DELETED`）。記録は消さない（削除・更新の権限は付けない）。
 
-実装は `supabase/migrations/20261026100000_add_order_slip_prints.sql`。
+実装は `supabase/migrations/20261026100000_add_order_slip_prints.sql`（作成）と `20261027100000_drop_slip_copy_kind.sql`（`copy_kind` の列を消し、関数を受注だけを受け取る形に作り直した。単価記入用の記録は消した）。
 
 ## リレーション
 

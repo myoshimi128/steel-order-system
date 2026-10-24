@@ -4,10 +4,6 @@
 // マスタの名前（材質・種類・特殊製品など）は、読むときに受注の明細に結び付けておく。
 // 品名・寸法・重量・加工の文は保存しておらず、印刷のときに組み立てる（同じ内容を 2 か所に持たないため）。
 
-// 伝票の種類。現場用は単価を出さない。単価記入用は単価・金額を出す（事務が手で書き込む欄も兼ねる）。
-// 値は order_slip_prints.copy_kind と同じ
-export type SlipCopyKind = '現場用' | '単価記入用'
-
 // 加工の行（order_item_processes）
 export type SlipProcessSource = {
   lineNo: number
@@ -17,9 +13,6 @@ export type SlipProcessSource = {
   // 入力の形ごとの項目（{"shape": "穴", "holes_per_piece": 12, "hole_diameter": 38} など）
   specFields: Record<string, unknown> | null
   quantity: number | null
-  unitPrice: number | null
-  // 個 / kg
-  priceUnit: string
 }
 
 // 材料の行（order_items）
@@ -47,8 +40,6 @@ export type SlipItemSource = {
     name: string
     // スプライス専用の受注の明細の種別か（区分の名前は切断区分で出す）
     isSpliceOrderType: boolean
-    // 単価の根拠にする重量（角重量 / 実重量 / 使用材重量）
-    weightBasis: string
   } | null
   plateSize: string | null
   width: number | null
@@ -60,9 +51,6 @@ export type SlipItemSource = {
   squareWeight: number | null
   actualWeight: number | null
   materialWeight: number | null
-  // 仕入単価（別途見積もりは NULL）と単位（kg / 枚）
-  unitPrice: number | null
-  priceUnit: string | null
   processes: SlipProcessSource[]
 }
 
@@ -82,10 +70,6 @@ export type SlipMaterialLine = {
   lineMark: { text: string; color: string | null } | null
   // 前の材料の行と板厚が違う（この行の上に太い区切り線を引く）
   thicknessBreak: boolean
-  // 単価記入用に出す仕入単価・単位・金額。決まっていなければ null（空欄にして手で書き込む）
-  unitPrice: number | null
-  priceUnit: string | null
-  amount: number | null
 }
 
 export type SlipProcessLine = {
@@ -95,9 +79,6 @@ export type SlipProcessLine = {
   // 加工方法と加工内容（例: キリ孔 1S/ 12孔 38φ）
   text: string
   quantity: number | null
-  unitPrice: number | null
-  priceUnit: string | null
-  amount: number | null
 }
 
 export type SlipLine = SlipMaterialLine | SlipProcessLine

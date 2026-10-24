@@ -1,27 +1,14 @@
 // 現場用伝票の上部・下部に出す文の組み立てと、印刷の画面の URL（docs/screen-design.md「現場用伝票の印刷」）。
 // どれも画面や DB に依存しない純粋な関数にして、テストする。
 
-import { formatDisplayDate } from '@/lib/order-entry/date'
-import type { SlipCopyKind } from './types'
-
 // ------------------------------------------------------------
-// 伝票の種類と、印刷の画面の URL
+// 印刷の画面の URL
 // ------------------------------------------------------------
 
-// URL の ?copy= の値（field 現場用 / price 単価記入用）
-const COPY_PARAMS: Record<SlipCopyKind, string> = { 現場用: 'field', 単価記入用: 'price' }
-
-export const SLIP_COPY_KINDS: readonly SlipCopyKind[] = ['現場用', '単価記入用']
-
-// URL の ?copy= を伝票の種類にする（知らない値なら現場用）
-export function parseSlipCopy(value: string | string[] | undefined): SlipCopyKind {
-  return value === COPY_PARAMS.単価記入用 ? '単価記入用' : '現場用'
-}
-
-// 印刷の画面の URL。auto を付けると、開いたらすぐに印刷する（登録の直後に開くとき）
-export function slipPrintHref(params: { no: string; copy?: SlipCopyKind; auto?: boolean }): string {
+// 印刷の画面の URL。auto を付けると、開いたらすぐに印刷する（登録の直後に開くとき）。
+// 伝票は現場用の 1 種類だけなので、種類は URL に持たない（単価は仕入入力の画面（予定）で扱う）
+export function slipPrintHref(params: { no: string; auto?: boolean }): string {
   const search = new URLSearchParams({ no: params.no })
-  if (params.copy && params.copy !== '現場用') search.set('copy', COPY_PARAMS[params.copy])
   if (params.auto) search.set('auto', '1')
   return `/orders/print?${search.toString()}`
 }
@@ -30,13 +17,40 @@ export function slipPrintHref(params: { no: string; copy?: SlipCopyKind; auto?: 
 // 上部の項目
 // ------------------------------------------------------------
 
-// 納期。確定・仮納期は日付を出す（仮納期も印字するため、手書きは要らない）。後報・最短出荷は日付を持たない
-export function dueDateText(dueDateType: string, dueDate: string | null): string {
-  if (dueDate && (dueDateType === '確定' || dueDateType === '仮納期')) {
-    const date = formatDisplayDate(dueDate)
-    return dueDateType === '仮納期' ? `${date}（仮納期）` : date
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
+
+// 日付（YYYY-MM-DD）を「10/30（金）」にする。年は出さない（伝票は納期の近いうちに使うため）。
+// 日付だけの計算なので、時差の影響を受けないよう UTC の日付として曜日を求める（lib/intake/cad.ts と同じ）
+export function monthDayWithWeekday(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  const weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]
+  return `${month}/${day}（${weekday}）`
+}
+
+// 伝票の上部の、納期の枠に出す内容
+export type SlipDueDate = {
+  // 大きく出す文。確定・仮納期は日付（10/30（金））、後報・最短出荷は種別そのもの
+  main: string
+  // 仮納期か（「仮」の印を付け、枠を破線にして、確定と見分けられるようにする）
+  provisional: boolean
+  // 配達（宵積み など）。枠の中で日付の右に並べる
+  delivery: string
+}
+
+// 納期の枠の内容。確定・仮納期は日付を出す（仮納期も印字するため、手書きは要らない）。
+// 後報・最短出荷は日付を持たないので、日付の代わりに種別を大きく出す
+export function slipDueDate(
+  dueDateType: string,
+  dueDate: string | null,
+  deliveryMethodName: string,
+  deliveryMethodNote: string | null
+): SlipDueDate {
+  const dated = dueDate !== null && (dueDateType === '確定' || dueDateType === '仮納期')
+  return {
+    main: dated ? monthDayWithWeekday(dueDate) : dueDateType,
+    provisional: dated && dueDateType === '仮納期',
+    delivery: deliveryText(deliveryMethodName, deliveryMethodNote),
   }
-  return dueDateType
 }
 
 // 配達。フリー（文字を入力する配達方法）は入力した文字を添える

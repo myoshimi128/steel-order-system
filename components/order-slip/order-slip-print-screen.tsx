@@ -6,14 +6,13 @@
 
 import type { LoadedOrderSlip } from '@/lib/order-slip/load-order-slip'
 import type { SlipLineMarkSummary, SlipTotals } from '@/lib/order-slip/slip-lines'
-import type { SlipCopyKind, SlipLine } from '@/lib/order-slip/types'
+import type { SlipLine } from '@/lib/order-slip/types'
 import { useSlipPrint } from '@/lib/order-slip/use-slip-print'
 import { SlipSheet } from './slip-sheet'
 import { SlipToolbar } from './slip-toolbar'
 
 type OrderSlipPrintScreenProps = {
   slip: LoadedOrderSlip
-  copyKind: SlipCopyKind
   pages: readonly (readonly SlipLine[])[]
   lineMarks: readonly SlipLineMarkSummary[]
   totals: SlipTotals
@@ -25,7 +24,6 @@ type OrderSlipPrintScreenProps = {
 
 export function OrderSlipPrintScreen({
   slip,
-  copyKind,
   pages,
   lineMarks,
   totals,
@@ -33,10 +31,9 @@ export function OrderSlipPrintScreen({
   changedSinceLastPrint,
   auto,
 }: OrderSlipPrintScreenProps) {
-  const summary = slip.prints[copyKind]
+  const summary = slip.prints
   const { issueCount, printing, error, print } = useSlipPrint({
     orderId: slip.id,
-    copyKind,
     initialCount: summary.count,
     auto,
   })
@@ -45,7 +42,6 @@ export function OrderSlipPrintScreen({
     <main className="flex flex-1 flex-col gap-4 bg-canvas px-6 py-5 print:block print:bg-white print:p-0">
       <SlipToolbar
         orderNo={slip.orderNo}
-        copyKind={copyKind}
         printing={printing}
         error={error}
         lastPrintedAt={summary.lastPrintedAt}
@@ -58,7 +54,6 @@ export function OrderSlipPrintScreen({
           <SlipSheet
             key={index}
             slip={slip}
-            copyKind={copyKind}
             lines={lines}
             lineMarks={lineMarks}
             totals={totals}

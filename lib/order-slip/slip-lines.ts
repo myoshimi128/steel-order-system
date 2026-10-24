@@ -14,10 +14,8 @@
 //               加工内容は項目（spec_fields）から組み立てる（lib/order-entry/process-shapes の formatProcessSpec）
 //   板厚の区切り: 明細の並びは入力した順のまま変えず、前の材料の行と板厚が違う行に印を付ける（上に太い線を引く）。
 //               入力の段階で、現場が加工しやすい順に打っているため
-//   金額      : 単価記入用だけで使う。受注登録の画面と同じ計算（lib/pricing/amount.ts・process-row.ts）
+// 単価・金額は伝票に出さない（現場用の伝票だけを印刷する。単価は仕入入力の画面（予定）で扱う）。
 
-import { calcAmount } from '@/lib/pricing/amount'
-import { ceilToYen } from '@/lib/pricing/rounding'
 import { calcTotalWeight } from '@/lib/pricing/weight'
 import { BEND_STYLE_OPTIONS, SHEARING_IRREGULAR_CUT_LABEL, STEEL_MAKING_OPTIONS } from '@/lib/order-entry/constants'
 import { formatProcessSpec, type ProcessSpec } from '@/lib/order-entry/process-shapes'
@@ -90,30 +88,6 @@ function displayPieceWeight(item: SlipItemSource): number | null {
   return item.squareWeight
 }
 
-// 単価の根拠にした 1 枚あたりの重量（kg 単価の金額の計算に使う）。
-// 特殊製品は種別の weight_basis、それ以外は角重量（lib/pricing/calculate-price.ts と同じ）
-function billingPieceWeight(item: SlipItemSource): number | null {
-  switch (item.specialProduct?.weightBasis) {
-    case '実重量':
-      return item.actualWeight
-    case '使用材重量':
-      return item.materialWeight
-    default:
-      return item.squareWeight
-  }
-}
-
-// 材料の行の仕入金額。単価が決まっていなければ null
-function materialAmount(item: SlipItemSource): number | null {
-  if (item.unitPrice === null) return null
-  if (item.priceUnit === '枚') {
-    return calcAmount({ priceUnit: '枚', unitPrice: item.unitPrice, billingWeight: 0 }, item.quantity)
-  }
-  const billingWeight = billingPieceWeight(item)
-  if (item.priceUnit !== 'kg' || billingWeight === null) return null
-  return calcAmount({ priceUnit: 'kg', unitPrice: item.unitPrice, billingWeight }, item.quantity)
-}
-
 function materialLine(item: SlipItemSource, previousThickness: number | null): SlipMaterialLine {
   const pieceWeight = displayPieceWeight(item)
   return {
@@ -127,9 +101,6 @@ function materialLine(item: SlipItemSource, previousThickness: number | null): S
     // 材質ラインは、材質の名前ではなく、マスタにラインが登録されているかだけで決める
     lineMark: item.lineMark ? { text: item.lineMark, color: lineColorCss(item.displayColor) } : null,
     thicknessBreak: previousThickness !== null && previousThickness !== item.thickness,
-    unitPrice: item.unitPrice,
-    priceUnit: item.unitPrice === null ? null : item.priceUnit,
-    amount: materialAmount(item),
   }
 }
 
@@ -166,25 +137,12 @@ export function processText(process: SlipProcessSource): string {
   return spec === '' ? process.processTypeName : `${process.processTypeName} ${spec}`
 }
 
-// 加工の行の仕入金額（lib/order-entry/process-row.ts の calculateProcess と同じ）。
-//   個: 仕入単価 × 数量 / kg: 仕入単価 × 母材の合計重量（単価の根拠の重量。ササラは使用材重量、それ以外は角重量）
-function processAmount(process: SlipProcessSource, parent: SlipItemSource): number | null {
-  if (process.unitPrice === null || process.quantity === null) return null
-  if (process.priceUnit === '個') return ceilToYen(process.unitPrice * process.quantity)
-  const parentPiece = parent.materialWeight ?? parent.squareWeight
-  if (process.priceUnit !== 'kg' || parentPiece === null) return null
-  return ceilToYen(process.unitPrice * calcTotalWeight(parentPiece, parent.quantity))
-}
-
 function processLine(process: SlipProcessSource, parent: SlipItemSource): SlipProcessLine {
   return {
     kind: 'process',
     parentLineNo: parent.lineNo,
     text: processText(process),
     quantity: process.quantity,
-    unitPrice: process.unitPrice,
-    priceUnit: process.unitPrice === null ? null : process.priceUnit,
-    amount: processAmount(process, parent),
   }
 }
 
@@ -223,23 +181,16 @@ export function lineMarkSummaries(items: readonly SlipItemSource[]): SlipLineMar
   return summaries
 }
 
-// 伝票の下に出す合計。重量は材料の行だけ、金額は材料の行と加工の行の両方（受注登録の画面の合計と同じ）
+// 伝票の下に出す合計。重量は材料の行だけ（加工の行は重量を持たない）
 export type SlipTotals = {
   totalWeight: number
-  totalAmount: number
-  // 単価が決まっていない行の数（単価記入用で手で書き込む行）
-  unpricedCount: number
 }
 
 export function sumSlipLines(lines: readonly SlipLine[]): SlipTotals {
   let totalWeight = 0
-  let totalAmount = 0
-  let unpricedCount = 0
   for (const line of lines) {
     if (line.kind === 'material' && line.weight !== null) totalWeight += line.weight
-    if (line.amount === null) unpricedCount += 1
-    else totalAmount += line.amount
   }
   // 浮動小数点の誤差が合計で目立たないよう、重量は小数第 2 位までに丸める（item-totals.ts と同じ）
-  return { totalWeight: Math.round(totalWeight * 100) / 100, totalAmount, unpricedCount }
+  return { totalWeight: Math.round(totalWeight * 100) / 100 }
 }

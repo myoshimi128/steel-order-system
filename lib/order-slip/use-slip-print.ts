@@ -13,17 +13,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { recordSlipPrint } from '@/app/(print)/orders/print/actions'
-import type { SlipCopyKind } from './types'
 
 export function useSlipPrint(params: {
   orderId: string
-  copyKind: SlipCopyKind
-  // これまでに印刷した回数（この伝票の種類）
+  // これまでに印刷した回数
   initialCount: number
   // 開いたらすぐに印刷する（登録の直後）
   auto: boolean
 }) {
-  const { orderId, copyKind, initialCount, auto } = params
+  const { orderId, initialCount, auto } = params
   // 伝票に出す回数。印刷する前は予定の回数（これまでの回数 + 1）、印刷した後はその印刷の回数
   const [issueCount, setIssueCount] = useState(initialCount + 1)
   const [printing, setPrinting] = useState(false)
@@ -37,7 +35,7 @@ export function useSlipPrint(params: {
     setPrinting(true)
     setError(null)
     try {
-      const result = await recordSlipPrint(orderId, copyKind)
+      const result = await recordSlipPrint(orderId)
       if (!result.ok) {
         setError(result.message)
         return
@@ -49,20 +47,20 @@ export function useSlipPrint(params: {
       printingByButton.current = false
       setPrinting(false)
     }
-  }, [orderId, copyKind])
+  }, [orderId])
 
   // Ctrl+P などで印刷したときも記録する
   useEffect(() => {
     function handleBeforePrint() {
       if (printingByButton.current) return
-      void recordSlipPrint(orderId, copyKind).then((result) => {
+      void recordSlipPrint(orderId).then((result) => {
         if (result.ok) setIssueCount(result.count)
         else setError(result.message)
       })
     }
     window.addEventListener('beforeprint', handleBeforePrint)
     return () => window.removeEventListener('beforeprint', handleBeforePrint)
-  }, [orderId, copyKind])
+  }, [orderId])
 
   // 登録の直後に開いたときは、すぐに印刷する。開発中の StrictMode で effect が 2 回動いても 1 回だけにする
   const autoStarted = useRef(false)

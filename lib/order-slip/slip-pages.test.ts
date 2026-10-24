@@ -13,14 +13,11 @@ function material(lineNo: number): SlipMaterialLine {
     weight: 0.71,
     lineMark: null,
     thicknessBreak: false,
-    unitPrice: null,
-    priceUnit: null,
-    amount: null,
   }
 }
 
 function processLine(parentLineNo: number): SlipProcessLine {
-  return { kind: 'process', parentLineNo, text: 'キリ孔 1S/ 2孔 22φ', quantity: 2, unitPrice: null, priceUnit: null, amount: null }
+  return { kind: 'process', parentLineNo, text: 'キリ孔 1S/ 2孔 22φ', quantity: 2 }
 }
 
 // ページごとの行の見出し（材料の行は行番号、加工の行は p）

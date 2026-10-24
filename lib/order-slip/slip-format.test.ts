@@ -2,35 +2,49 @@ import { describe, expect, it } from 'vitest'
 import { changedSinceLastPrint } from './load-order-slip'
 import {
   deliveryText,
-  dueDateText,
   formatJapanDateTime,
   issueCountText,
   lineColorCss,
-  parseSlipCopy,
+  monthDayWithWeekday,
+  slipDueDate,
   slipPrintHref,
 } from './slip-format'
 
-describe('slipPrintHref・parseSlipCopy', () => {
-  it('現場用は copy を付けない。単価記入用は copy=price、自動の印刷は auto=1', () => {
+describe('slipPrintHref', () => {
+  it('受注No. だけ。自動の印刷は auto=1', () => {
     expect(slipPrintHref({ no: '26-1003-1' })).toBe('/orders/print?no=26-1003-1')
-    expect(slipPrintHref({ no: '26-1003-1', copy: '単価記入用' })).toBe('/orders/print?no=26-1003-1&copy=price')
     expect(slipPrintHref({ no: '26-1003-1', auto: true })).toBe('/orders/print?no=26-1003-1&auto=1')
-  })
-
-  it('知らない値は現場用', () => {
-    expect(parseSlipCopy('price')).toBe('単価記入用')
-    expect(parseSlipCopy('field')).toBe('現場用')
-    expect(parseSlipCopy(undefined)).toBe('現場用')
-    expect(parseSlipCopy(['price'])).toBe('現場用')
   })
 })
 
-describe('dueDateText・deliveryText', () => {
-  it('確定・仮納期は日付、後報・最短出荷は種別', () => {
-    expect(dueDateText('確定', '2026-10-30')).toBe('2026/10/30')
-    expect(dueDateText('仮納期', '2026-10-30')).toBe('2026/10/30（仮納期）')
-    expect(dueDateText('後報', null)).toBe('後報')
-    expect(dueDateText('最短出荷', null)).toBe('最短出荷')
+describe('monthDayWithWeekday', () => {
+  it('月/日（曜日）。月・日の 0 は付けない', () => {
+    expect(monthDayWithWeekday('2026-10-30')).toBe('10/30（金）')
+    expect(monthDayWithWeekday('2026-11-01')).toBe('11/1（日）')
+    expect(monthDayWithWeekday('2027-01-04')).toBe('1/4（月）')
+  })
+})
+
+describe('slipDueDate・deliveryText', () => {
+  it('確定は日付と配達', () => {
+    expect(slipDueDate('確定', '2026-10-30', '宵積み', null)).toEqual({
+      main: '10/30（金）',
+      provisional: false,
+      delivery: '宵積み',
+    })
+  })
+
+  it('仮納期は仮の印を付ける', () => {
+    expect(slipDueDate('仮納期', '2026-10-30', '宵積み', null)).toEqual({
+      main: '10/30（金）',
+      provisional: true,
+      delivery: '宵積み',
+    })
+  })
+
+  it('後報・最短出荷は日付の代わりに種別を出す', () => {
+    expect(slipDueDate('後報', null, '宵積み', null)).toEqual({ main: '後報', provisional: false, delivery: '宵積み' })
+    expect(slipDueDate('最短出荷', null, '自社便', null).main).toBe('最短出荷')
   })
 
   it('配達のフリーの文字を添える', () => {

@@ -7,14 +7,13 @@
 
 import type { LoadedOrderSlip } from '@/lib/order-slip/load-order-slip'
 import type { SlipLineMarkSummary, SlipTotals } from '@/lib/order-slip/slip-lines'
-import type { SlipCopyKind, SlipLine } from '@/lib/order-slip/types'
+import type { SlipLine } from '@/lib/order-slip/types'
 import { SlipHeader } from './slip-header'
 import { SlipInstructions } from './slip-instructions'
 import { SlipItemsTable } from './slip-items-table'
 
 type SlipSheetProps = {
   slip: LoadedOrderSlip
-  copyKind: SlipCopyKind
   lines: readonly SlipLine[]
   lineMarks: readonly SlipLineMarkSummary[]
   totals: SlipTotals
@@ -24,15 +23,13 @@ type SlipSheetProps = {
   pageCount: number
 }
 
-export function SlipSheet({ slip, copyKind, lines, lineMarks, totals, issueDate, issueCount, pageNo, pageCount }: SlipSheetProps) {
-  const showPrices = copyKind === '単価記入用'
+export function SlipSheet({ slip, lines, lineMarks, totals, issueDate, issueCount, pageNo, pageCount }: SlipSheetProps) {
   const isLastPage = pageNo === pageCount
 
   return (
     <section className="slip-sheet flex flex-col gap-2 bg-white text-neutral-900">
       <SlipHeader
         slip={slip}
-        copyKind={copyKind}
         issueDate={issueDate}
         issueCount={issueCount}
         pageNo={pageNo}
@@ -41,21 +38,12 @@ export function SlipSheet({ slip, copyKind, lines, lineMarks, totals, issueDate,
 
       <div className="flex min-h-0 flex-1 gap-3">
         <div className="flex min-w-0 flex-1 flex-col">
-          <SlipItemsTable lines={lines} showPrices={showPrices} />
+          <SlipItemsTable lines={lines} />
           {isLastPage ? (
-            <div className="mt-1 flex justify-end gap-6 text-sm">
+            <div className="mt-1 flex justify-end text-sm">
               <span>
                 合計重量 <span className="font-bold tabular-nums">{totals.totalWeight.toLocaleString('ja-JP', { minimumFractionDigits: 2 })}</span> kg
               </span>
-              {showPrices && (
-                <>
-                  <span>
-                    合計金額 <span className="font-bold tabular-nums">{totals.totalAmount.toLocaleString('ja-JP')}</span> 円
-                  </span>
-                  {/* 単価が決まっていない行があれば、合計に含まれていないことを添える */}
-                  {totals.unpricedCount > 0 && <span>単価未定 {totals.unpricedCount} 行（合計に含まない）</span>}
-                </>
-              )}
             </div>
           ) : (
             <p className="mt-1 text-right text-sm font-semibold">次のページに続きます</p>

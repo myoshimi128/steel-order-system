@@ -1,8 +1,8 @@
 // 現場用伝票の印刷（docs/screen-design.md「現場用伝票の印刷」）。
 //
-//   /orders/print?no=26-1003-1              現場用（単価なし）
-//   /orders/print?no=26-1003-1&copy=price   単価記入用（単価・金額あり）
-//   &auto=1                                 開いたらすぐに印刷する（受注登録の「登録して現場用伝票を印刷」から開くとき）
+//   /orders/print?no=26-1003-1   現場用伝票（単価は出さない）
+//   &auto=1                      開いたらすぐに印刷する（受注登録の「登録して現場用伝票を印刷」から開くとき）
+// 伝票は現場用の 1 種類だけ（単価記入用はやめた。単価は仕入入力の画面（予定）で扱う）。
 //
 // 印刷の画面は、共通レイアウト（ヘッダー・サイドメニュー）を付けないルートグループ app/(print)/ に置く。
 // 伝票だけを印刷するためで、印刷のときにヘッダーなどを隠す手間をなくす。
@@ -14,7 +14,6 @@ import { getCurrentUser } from '@/lib/auth'
 import { todayInJapan } from '@/lib/order-entry/date'
 import { normalizeOrderNo, orderEditHref } from '@/lib/order-entry/order-no'
 import { changedSinceLastPrint, loadOrderSlip } from '@/lib/order-slip/load-order-slip'
-import { parseSlipCopy } from '@/lib/order-slip/slip-format'
 import { buildSlipLines, lineMarkSummaries, sumSlipLines } from '@/lib/order-slip/slip-lines'
 import { paginateSlipLines } from '@/lib/order-slip/slip-pages'
 import { createClient } from '@/lib/supabase-server'
@@ -56,19 +55,17 @@ export default async function PrintOrderSlipPage({ searchParams }: PrintOrderSli
   if (!slip) return <Unavailable message={`受注No. ${orderNo} は見つかりません。`} />
   if (slip.deleted) return <Unavailable message={`受注No. ${orderNo} は削除されているため、印刷できません。`} />
 
-  const copyKind = parseSlipCopy(params.copy)
   // 伝票の行（品名・寸法・重量・加工の文・板厚の区切り）を組み立て、A4 の横のページに分ける
   const lines = buildSlipLines(slip.items)
 
   return (
     <OrderSlipPrintScreen
       slip={slip}
-      copyKind={copyKind}
       pages={paginateSlipLines(lines)}
       lineMarks={lineMarkSummaries(slip.items)}
       totals={sumSlipLines(lines)}
       issueDate={todayInJapan()}
-      changedSinceLastPrint={changedSinceLastPrint(slip.prints[copyKind], slip.updatedAt)}
+      changedSinceLastPrint={changedSinceLastPrint(slip.prints, slip.updatedAt)}
       auto={params.auto === '1'}
     />
   )

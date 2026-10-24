@@ -3,18 +3,18 @@
 //   ・上部の項目: 売り先（客先担当・営業担当）・入れ先・工事名・納期・配達・加工場所・担当者・至急・部材区分・受付No.
 //   ・明細: 材料の行（種類・材質・材質ライン・特殊製品・メーカーの名前を結び付ける）と加工の行
 //   ・下部: スタンプ（番号順）・フリーコメント・ショット加工（スプライス専用の受注でショットが有）
-//   ・印刷の記録: 伝票の種類ごとの回数と、前回の印刷（印刷した後に受注が変更されたかの判定）
+//   ・印刷の記録: 印刷した回数と、前回の印刷（印刷した後に受注が変更されたかの判定）
 // 受注・明細・印刷の記録は RLS で事務・管理者が読める。見つからなければ null。
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/database.types'
 import { WORK_UNIT_KIND_LABELS, type WorkUnitKind } from '@/lib/intake/constants'
 import { MEMBER_CLASS_OPTIONS, SPLICE_MEMBER_CLASS } from '@/lib/order-entry/constants'
-import type { SlipCopyKind, SlipItemSource, SlipProcessSource } from './types'
+import type { SlipItemSource, SlipProcessSource } from './types'
 
 type Client = SupabaseClient<Database>
 
-// 印刷の記録の要約（伝票の種類ごと）
+// 印刷の記録の要約
 export type SlipPrintSummary = {
   count: number
   // 前回の印刷の日時と、そのときの受注の更新日時
@@ -52,7 +52,7 @@ export type LoadedOrderSlip = {
   fieldNote: string | null
   stamps: { number: number; body: string }[]
   items: SlipItemSource[]
-  prints: Record<SlipCopyKind, SlipPrintSummary>
+  prints: SlipPrintSummary
 }
 
 // orders から intakes・users へは外部キーが複数あるため、使う外部キーの名前を ! の後ろに書いて選ぶ
@@ -69,14 +69,14 @@ const SLIP_COLUMNS = `
   order_items(
     line_no, cutting_method, cutting_type, plate_size, steel_making,
     width, length, outer_diameter, inner_diameter, quantity,
-    square_weight, actual_weight, material_weight, cutting_unit_price, price_unit,
+    square_weight, actual_weight, material_weight,
     products(thickness, plate_types(number, name), materials(name, default_steel_making, line_mark, display_color)),
-    special_product_types(name, is_splice_order_type, weight_basis),
+    special_product_types(name, is_splice_order_type),
     manufacturer:manufacturers!order_items_manufacturer_specified_id_fkey(name),
-    order_item_processes(line_no, spec, spec_fields, quantity, unit_price, price_unit, process_types(name))
+    order_item_processes(line_no, spec, spec_fields, quantity, process_types(name))
   ),
   order_stamps(stamps(number, body)),
-  order_slip_prints(copy_kind, printed_at, order_updated_at)
+  order_slip_prints(printed_at, order_updated_at)
 `
 
 type ProcessRow = {
@@ -84,8 +84,6 @@ type ProcessRow = {
   spec: string | null
   spec_fields: unknown
   quantity: number | null
-  unit_price: number | null
-  price_unit: string
   process_types: { name: string } | null
 }
 
@@ -103,14 +101,12 @@ type ItemRow = {
   square_weight: number | null
   actual_weight: number | null
   material_weight: number | null
-  cutting_unit_price: number | null
-  price_unit: string | null
   products: {
     thickness: number
     plate_types: { number: number; name: string } | null
     materials: { name: string; default_steel_making: string; line_mark: string | null; display_color: string | null } | null
   } | null
-  special_product_types: { name: string; is_splice_order_type: boolean; weight_basis: string } | null
+  special_product_types: { name: string; is_splice_order_type: boolean } | null
   manufacturer: { name: string } | null
   order_item_processes: ProcessRow[]
 }
@@ -140,7 +136,7 @@ type OrderRowData = {
   work_units: { kind: string } | null
   order_items: ItemRow[]
   order_stamps: { stamps: { number: number; body: string } | null }[]
-  order_slip_prints: { copy_kind: string; printed_at: string; order_updated_at: string }[]
+  order_slip_prints: { printed_at: string; order_updated_at: string }[]
 }
 
 // spec_fields は JSON（オブジェクト）のときだけ使う
@@ -155,8 +151,6 @@ function toProcess(row: ProcessRow): SlipProcessSource {
     spec: row.spec,
     specFields: specFieldsOf(row.spec_fields),
     quantity: row.quantity,
-    unitPrice: row.unit_price,
-    priceUnit: row.price_unit,
   }
 }
 
@@ -177,9 +171,7 @@ function toItem(row: ItemRow): SlipItemSource {
     thickness: row.products?.thickness ?? 0,
     steelMaking: row.steel_making,
     manufacturerName: row.manufacturer?.name ?? null,
-    specialProduct: special
-      ? { name: special.name, isSpliceOrderType: special.is_splice_order_type, weightBasis: special.weight_basis }
-      : null,
+    specialProduct: special ? { name: special.name, isSpliceOrderType: special.is_splice_order_type } : null,
     plateSize: row.plate_size,
     width: row.width,
     length: row.length,
@@ -189,26 +181,19 @@ function toItem(row: ItemRow): SlipItemSource {
     squareWeight: row.square_weight,
     actualWeight: row.actual_weight,
     materialWeight: row.material_weight,
-    unitPrice: row.cutting_unit_price,
-    priceUnit: row.price_unit,
     processes: row.order_item_processes.map(toProcess),
   }
 }
 
-// 伝票の種類ごとに、印刷の回数と前回の印刷をまとめる
-function summarizePrints(rows: OrderRowData['order_slip_prints']): Record<SlipCopyKind, SlipPrintSummary> {
-  const summary = (kind: SlipCopyKind): SlipPrintSummary => {
-    const prints = rows
-      .filter((row) => row.copy_kind === kind)
-      .sort((a, b) => a.printed_at.localeCompare(b.printed_at))
-    const last = prints[prints.length - 1]
-    return {
-      count: prints.length,
-      lastPrintedAt: last?.printed_at ?? null,
-      lastOrderUpdatedAt: last?.order_updated_at ?? null,
-    }
+// 印刷の回数と前回の印刷をまとめる
+function summarizePrints(rows: OrderRowData['order_slip_prints']): SlipPrintSummary {
+  const prints = [...rows].sort((a, b) => a.printed_at.localeCompare(b.printed_at))
+  const last = prints[prints.length - 1]
+  return {
+    count: prints.length,
+    lastPrintedAt: last?.printed_at ?? null,
+    lastOrderUpdatedAt: last?.order_updated_at ?? null,
   }
-  return { 現場用: summary('現場用'), 単価記入用: summary('単価記入用') }
 }
 
 export async function loadOrderSlip(supabase: Client, orderNo: string): Promise<LoadedOrderSlip | null> {
@@ -254,7 +239,7 @@ export async function loadOrderSlip(supabase: Client, orderNo: string): Promise<
   }
 }
 
-// 現場用の伝票の印刷の状態（受注No. で呼び出す画面で、変更を保存した後に「印刷し直す」を促すのに使う）。
+// 現場用伝票の印刷の状態（受注No. で呼び出す画面で、変更を保存した後に「印刷し直す」を促すのに使う）。
 // 受注が見つからなければ null
 export async function loadSlipPrintStatus(
   supabase: Client,
@@ -262,12 +247,12 @@ export async function loadSlipPrintStatus(
 ): Promise<{ printed: boolean; changedSinceLastPrint: boolean } | null> {
   const { data, error } = await supabase
     .from('orders')
-    .select('updated_at, order_slip_prints(copy_kind, printed_at, order_updated_at)')
+    .select('updated_at, order_slip_prints(printed_at, order_updated_at)')
     .eq('order_no', orderNo)
     .maybeSingle()
   if (error) throw new Error(`印刷の記録を読めませんでした: ${error.message}`)
   if (!data) return null
-  const summary = summarizePrints(data.order_slip_prints)['現場用']
+  const summary = summarizePrints(data.order_slip_prints)
   return { printed: summary.count > 0, changedSinceLastPrint: changedSinceLastPrint(summary, data.updated_at) }
 }
 

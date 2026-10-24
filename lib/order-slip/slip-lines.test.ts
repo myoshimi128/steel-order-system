@@ -36,8 +36,6 @@ function item(overrides: Partial<SlipItemSource> = {}): SlipItemSource {
     squareWeight: 136.7856,
     actualWeight: 136.7856,
     materialWeight: null,
-    unitPrice: null,
-    priceUnit: null,
     processes: [],
     ...overrides,
   }
@@ -50,8 +48,6 @@ function process(overrides: Partial<SlipProcessSource> = {}): SlipProcessSource 
     spec: null,
     specFields: { shape: '穴', holes_per_piece: 12, hole_diameter: 38 },
     quantity: 48,
-    unitPrice: null,
-    priceUnit: '個',
     ...overrides,
   }
 }
@@ -101,8 +97,8 @@ describe('cutRegionLabel', () => {
   })
 
   it('特殊製品は種別の名前、スプライスは切断区分', () => {
-    const betamaru = { name: 'ベタ丸', isSpliceOrderType: false, weightBasis: '実重量' }
-    const splice = { name: 'スプライス', isSpliceOrderType: true, weightBasis: '角重量' }
+    const betamaru = { name: 'ベタ丸', isSpliceOrderType: false }
+    const splice = { name: 'スプライス', isSpliceOrderType: true }
     expect(cutRegionLabel(item({ cuttingType: null, specialProduct: betamaru }))).toBe('ベタ丸')
     expect(cutRegionLabel(item({ cuttingType: '寸法切', specialProduct: splice }))).toBe('寸法切')
   })
@@ -196,26 +192,14 @@ describe('buildSlipLines', () => {
     expect(lined.kind === 'material' && lined.lineMark).toEqual({ text: '青2本', color: '#1d4ed8' })
   })
 
-  it('単価記入用の金額（kg 単価・枚単価・加工の個・kg）', () => {
+  it('合計重量は材料の行だけ（加工の行は数えない）', () => {
     const lines = buildSlipLines([
-      item({
-        lineNo: 1,
-        squareWeight: 1.23456,
-        quantity: 3,
-        unitPrice: 100.5,
-        priceUnit: 'kg',
-        processes: [
-          process({ unitPrice: 15, priceUnit: '個', quantity: 48 }),
-          process({ lineNo: 2, unitPrice: 30, priceUnit: 'kg', quantity: 3 }),
-        ],
-      }),
-      item({ lineNo: 2, unitPrice: 536, priceUnit: '枚', quantity: 2 }),
-      item({ lineNo: 3, unitPrice: null, priceUnit: null }),
+      item({ lineNo: 1, squareWeight: 1.23456, quantity: 3, processes: [process(), process({ lineNo: 2 })] }),
+      item({ lineNo: 2, quantity: 2 }),
+      item({ lineNo: 3, squareWeight: null }),
     ])
-    // 100.5 × 3.70（1.23456 × 3 を丸めた重量）= 371.85 → 372 円
-    expect(lines.map((line) => line.amount)).toEqual([372, 720, 111, 1072, null])
-    // 重量は材料の行だけ（3.70 + 273.57 + 547.14）。単価が決まっていない行は 3 行目の 1 行
-    expect(sumSlipLines(lines)).toEqual({ totalWeight: 824.41, totalAmount: 2275, unpricedCount: 1 })
+    // 3.70（1.23456 × 3 を丸めた重量）+ 273.57。重量のない 3 行目は 0 として足す
+    expect(sumSlipLines(lines)).toEqual({ totalWeight: 277.27 })
   })
 })
 

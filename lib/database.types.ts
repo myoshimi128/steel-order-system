@@ -1079,7 +1079,6 @@ export type Database = {
       }
       order_slip_prints: {
         Row: {
-          copy_kind: string
           id: string
           order_id: string
           order_updated_at: string
@@ -1087,7 +1086,6 @@ export type Database = {
           printed_by: string
         }
         Insert: {
-          copy_kind: string
           id?: string
           order_id: string
           order_updated_at: string
@@ -1095,7 +1093,6 @@ export type Database = {
           printed_by: string
         }
         Update: {
-          copy_kind?: string
           id?: string
           order_id?: string
           order_updated_at?: string
@@ -2191,7 +2188,7 @@ export type Database = {
         Returns: string
       }
       record_order_slip_print: {
-        Args: { p_copy_kind: string; p_order_id: string }
+        Args: { p_order_id: string }
         Returns: number
       }
       register_intake: { Args: { p_intake_id: string }; Returns: string }
