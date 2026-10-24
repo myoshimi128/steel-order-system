@@ -1077,6 +1077,45 @@ export type Database = {
           },
         ]
       }
+      order_slip_prints: {
+        Row: {
+          id: string
+          order_id: string
+          order_updated_at: string
+          printed_at: string
+          printed_by: string
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          order_updated_at: string
+          printed_at?: string
+          printed_by: string
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          order_updated_at?: string
+          printed_at?: string
+          printed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_slip_prints_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_slip_prints_printed_by_fkey"
+            columns: ["printed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_stamps: {
         Row: {
           id: string
@@ -2148,6 +2187,7 @@ export type Database = {
         }
         Returns: string
       }
+      record_order_slip_print: { Args: { p_order_id: string }; Returns: number }
       register_intake: { Args: { p_intake_id: string }; Returns: string }
       release_intake: { Args: { p_intake_id: string }; Returns: undefined }
       remove_cad_csv: { Args: { p_file_id: string }; Returns: string }

@@ -6,6 +6,8 @@
 //   ・この区分の起票を完了     : complete_work_unit で受注登録待ちから外し、一覧に戻る
 //   ・受注登録待ちに戻る       : 区分は一覧に残したまま戻る（あとで続きを登録する）
 // 開いたら「同じ区分で続けて登録」にカーソルを置く（Enter で続けて登録できる）。
+// 現場用伝票の印刷の画面は、登録と同時に新しいタブで開いている（order-entry-screen.tsx）。
+// ブラウザに止められて開けなかったときや、もう一度印刷したいときのために、「現場用伝票を印刷」のボタンも置く。
 
 import { useEffect, useRef } from 'react'
 
@@ -18,6 +20,10 @@ type RegisteredDialogProps = {
   onContinue: () => void
   onComplete: () => void
   onBackToQueue: () => void
+  // 登録と同時に印刷の画面を開けなかった（ブラウザに止められた）
+  printTabBlocked: boolean
+  // 印刷の画面を新しいタブで開く
+  onPrintSlip: () => void
 }
 
 export function RegisteredDialog({
@@ -28,6 +34,8 @@ export function RegisteredDialog({
   onContinue,
   onComplete,
   onBackToQueue,
+  printTabBlocked,
+  onPrintSlip,
 }: RegisteredDialogProps) {
   const continueRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -50,6 +58,27 @@ export function RegisteredDialog({
             受注No. <span className="tabular-nums text-navy">{orderNo}</span> を登録しました
           </h2>
           <p className="mt-1 text-sm text-neutral-600">続けて登録するか、受付No. {intakeNo} のこの区分の起票を完了するかを選んでください。</p>
+        </div>
+
+        {/* 現場用伝票の印刷（登録と同時に新しいタブで開いている。止められたときはここから開く） */}
+        <div
+          className={`flex items-center justify-between gap-3 rounded border px-4 py-2.5 text-sm ${
+            printTabBlocked ? 'border-attention/40 bg-attention-soft text-attention' : 'border-line bg-canvas text-neutral-700'
+          }`}
+        >
+          <span>
+            {printTabBlocked
+              ? '印刷の画面を開けませんでした（ブラウザに止められました）。右のボタンから開いてください'
+              : '現場用伝票の印刷の画面を新しいタブで開きました'}
+          </span>
+          <button
+            type="button"
+            onClick={onPrintSlip}
+            disabled={completing}
+            className="shrink-0 rounded border border-navy bg-white px-3 py-1.5 text-sm font-semibold text-navy hover:bg-navy-soft disabled:opacity-60"
+          >
+            現場用伝票を印刷
+          </button>
         </div>
 
         <div className="flex flex-col gap-2">

@@ -7,6 +7,8 @@
 // （明細の「切断・区分」の欄の「-」は行番号の複写だが、それは番号の欄だけの操作）。
 // 打った受注No. は lib/order-entry/order-no.ts でそろえ（26 1003 1 → 26-1003-1）、URL の ?type=&no= にして開き直す。
 // 処理区分で 0 新規を打つと、受注登録待ちの一覧へ戻る（新規の登録は一覧から始める）。
+// 「伝票を印刷」は、打った受注No. の現場用伝票の印刷の画面を新しいタブで開く（処理区分の 1・2 とは別の操作）。
+// 変更を保存した後は、お知らせに「現場用伝票を印刷し直す」を出す（印刷した後に変えた伝票は、現場で差し替える必要があるため）。
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -19,6 +21,7 @@ import { useFieldNavigation } from '@/lib/hooks/use-field-navigation'
 import { queueHref } from '@/lib/intake/queue'
 import { PROCESSING_TYPE_OPTIONS } from '@/lib/order-entry/constants'
 import { normalizeOrderNo, orderEditHref } from '@/lib/order-entry/order-no'
+import { openSlipPrintTab } from '@/lib/order-slip/print-tab'
 
 type OrderLookupScreenProps = {
   // 最初の処理区分（URL の ?type=）
@@ -29,13 +32,15 @@ type OrderLookupScreenProps = {
   notice: string | null
   // 呼び出せなかった理由（見つからない・削除済み・送り状がある など）
   error: string | null
+  // 変更を保存した後の、印刷し直しの案内（印刷したことがあれば changedSinceLastPrint が true）
+  reprint: { orderNo: string; printed: boolean; changedSinceLastPrint: boolean } | null
 }
 
 const SUBMIT_ID = 'order-lookup-submit'
 // 受注No. の欄の文字数の上限（26-10000-99 まで入る長さ）
 const ORDER_NO_MAX_LENGTH = 14
 
-export function OrderLookupScreen({ type, initialOrderNo, notice, error }: OrderLookupScreenProps) {
+export function OrderLookupScreen({ type, initialOrderNo, notice, error, reprint }: OrderLookupScreenProps) {
   const router = useRouter()
   const [typeCode, setTypeCode] = useState(type === 'delete' ? '2' : '1')
   const [orderNo, setOrderNo] = useState(initialOrderNo)
@@ -71,15 +76,41 @@ export function OrderLookupScreen({ type, initialOrderNo, notice, error }: Order
     router.push(orderEditHref({ type: processingType, no: normalized }))
   }
 
+  // 打った受注No. の伝票の印刷の画面を、新しいタブで開く
+  function openPrint() {
+    const normalized = normalizeOrderNo(orderNo)
+    if (!normalized) {
+      setInputError('受注No. は 26-1003-1 の形で入力してください')
+      navigation.focusField('orderNo')
+      return
+    }
+    setInputError(null)
+    if (!openSlipPrintTab(normalized)) setInputError('印刷の画面を開けませんでした（ブラウザに止められました）')
+  }
+
   return (
     <main className="flex flex-1 flex-col bg-canvas px-8 py-6" onKeyDown={navigation.handleArrowKeys}>
       <p className="text-sm text-neutral-500">登録済みの受注を受注No. で呼び出して、直したり削除したりします</p>
       <h1 className="mt-1 text-2xl font-bold text-neutral-900">受注の変更・削除</h1>
 
       {notice && (
-        <p role="status" className="mt-4 rounded border border-navy/20 bg-navy-soft px-4 py-2.5 text-sm font-semibold text-navy">
-          {notice}
-        </p>
+        <div role="status" className="mt-4 flex items-center gap-4 rounded border border-navy/20 bg-navy-soft px-4 py-2.5 text-sm text-navy">
+          <div className="flex flex-col">
+            <span className="font-semibold">{notice}</span>
+            {reprint?.changedSinceLastPrint && (
+              <span className="text-attention">前回の印刷の後に変更されています。現場用伝票を印刷し直して、現場の伝票と差し替えてください</span>
+            )}
+          </div>
+          {reprint && (
+            <button
+              type="button"
+              onClick={() => openSlipPrintTab(reprint.orderNo)}
+              className="ml-auto shrink-0 rounded border border-navy bg-white px-3 py-1.5 text-sm font-semibold text-navy hover:bg-navy-soft"
+            >
+              {reprint.printed ? '現場用伝票を印刷し直す' : '現場用伝票を印刷'}
+            </button>
+          )}
+        </div>
       )}
       {error && (
         <p role="alert" className="mt-4 rounded border border-urgent/30 bg-urgent/5 px-4 py-2.5 text-sm text-urgent">
@@ -123,6 +154,14 @@ export function OrderLookupScreen({ type, initialOrderNo, notice, error }: Order
             className="rounded border border-line bg-white px-4 py-2 text-sm text-neutral-700 hover:bg-canvas"
           >
             受注登録待ちに戻る
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={openPrint}
+            className="rounded border border-navy bg-white px-4 py-2 text-sm font-semibold text-navy hover:bg-navy-soft"
+          >
+            伝票を印刷
           </button>
           <button
             id={SUBMIT_ID}

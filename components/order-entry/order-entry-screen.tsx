@@ -14,6 +14,8 @@
 //           注文書のパネルに受付の注文書 PDF とこの区分のファイルを出す。登録すると受付No.＋枝番の受注No. が付く
 //   変更  : 処理区分 1 変更で受注No. から呼び出したときは、呼び出した受注の値（order-to-form.ts で戻したもの）を入力値にして始め、
 //           「変更を保存」で update_order に保存する（受注No.・枝番・受付は変えない。ほかの人が先に保存していたら断る）
+//   印刷  : 「登録して現場用伝票を印刷」で、押した時点で空のタブを開き、登録できたらそのタブで印刷の画面を開く
+//           （lib/order-slip/print-tab.ts。ブラウザに止められたら、登録後の画面のボタンから開く）
 //   処理区分: 新規の画面で 1 変更・2 削除を打つと受注の呼び出しの画面へ、変更の画面で 0 新規・2 削除を打つとその画面へ移る
 // ここでは画面の切り替えと保存の流れ（確認 → Server Action の呼び出し → 結果の表示 → 登録後の選択）だけを扱う。
 
@@ -36,6 +38,7 @@ import { orderEditHref } from '@/lib/order-entry/order-no'
 import type { OrderSaveFailure } from '@/lib/order-entry/prepare-order-payload'
 import type { OrderEditValues } from '@/lib/order-entry/order-to-form'
 import { useDocumentPanel } from '@/lib/order-entry/use-document-panel'
+import { openBlankPrintTab, openSlipPrintTab, showSlipInTab } from '@/lib/order-slip/print-tab'
 import { useItemCalculations } from '@/lib/order-entry/use-item-calculations'
 import { FREE_COMMENT_FIELD_ID, STAMP_CODE_FIELD_ID, useOrderAux } from '@/lib/order-entry/use-order-aux'
 import { useOrderHeader } from '@/lib/order-entry/use-order-header'
@@ -171,6 +174,8 @@ export function OrderEntryScreen({
   const [registeredOrderNo, setRegisteredOrderNo] = useState<string | null>(null)
   const [completing, startCompleting] = useTransition()
   const [completeError, setCompleteError] = useState<string | null>(null)
+  // 登録の後に印刷の画面を新しいタブで開けなかった（ブラウザに止められた）
+  const [printTabBlocked, setPrintTabBlocked] = useState(false)
   // 戻る先の受注登録待ちのタブ（加工場所を変えて登録したときは、受付の加工場所も変わるため、利用者の営業所のタブを開く）
   const queueSiteCode = header.siteChangedFromIntake ? null : intake.siteCode
 
@@ -228,6 +233,8 @@ export function OrderEntryScreen({
     const headerInput = header.toInput()
     const itemRows = items.rows
     const auxInput = aux.toInput()
+    // 新規の登録では、印刷の画面を出すタブを、ボタンを押した時点で先に開いておく（保存の後に開くと止められることがあるため）
+    const printTab = edit ? null : openBlankPrintTab()
     startTransition(async () => {
       // 変更: 受注No.・枝番・受付は変えずに保存し、受注No. の呼び出しの画面に戻って結果を知らせる
       if (edit) {
@@ -245,11 +252,16 @@ export function OrderEntryScreen({
       })
       if (response.ok) {
         setStatus({ kind: 'success', text: `受注No. ${response.orderNo} を登録しました` })
+        // 先に開いたタブで、現場用伝票の印刷の画面を開く（開いたらすぐに印刷の画面が出る）
+        if (printTab) showSlipInTab(printTab, response.orderNo)
+        setPrintTabBlocked(printTab === null)
         // 続けて登録するか・この区分の起票を完了するかを選ぶ（RegisteredDialog）
         setRegisteredOrderNo(response.orderNo)
         setCompleteError(null)
         return
       }
+      // 登録できなかったら、先に開いたタブは閉じる
+      printTab?.close()
       showSaveErrors(response)
     })
   }
@@ -453,6 +465,9 @@ export function OrderEntryScreen({
           onContinue={continueSameUnit}
           onComplete={completeAndReturn}
           onBackToQueue={() => router.push(queueHref({ site: queueSiteCode }))}
+          printTabBlocked={printTabBlocked}
+          // 印刷し直す・止められたときに開き直す（ボタンを押した直後に開くため、止められにくい）
+          onPrintSlip={() => setPrintTabBlocked(!openSlipPrintTab(registeredOrderNo, true))}
         />
       )}
     </div>

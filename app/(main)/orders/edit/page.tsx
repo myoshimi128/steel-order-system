@@ -5,6 +5,7 @@
 //   /orders/edit?type=1&no=26-1003-1   呼び出した受注を、受注登録の画面に入力値として戻して直す（OrderEntryScreen の変更）
 //   /orders/edit?type=2&no=26-1003-1   呼び出した受注の要約を出し、確かめてから論理削除する（OrderDeleteScreen）
 //   ?notice=updated / deleted          保存・削除の後に、受注No. を打つ画面で結果を知らせる
+//                                      （変更の後は、現場用伝票を印刷し直す案内も出す。前回の印刷の後に変更されたか）
 //
 // 呼び出せない受注（見つからない・削除済み・送り状がある）は、受注No. を打つ画面に理由を出す。
 // 変更・削除できるのは事務・管理者だけ（DB の関数 update_order・delete_order の中でも確かめる）。
@@ -24,11 +25,15 @@ import {
 } from '@/lib/order-entry/document-panel-state'
 import { loadOrderEntryMasters } from '@/lib/order-entry/load-order-entry-masters'
 import { loadOrderForEdit } from '@/lib/order-entry/load-order-for-edit'
+import { loadSlipPrintStatus } from '@/lib/order-slip/load-order-slip'
 import { normalizeOrderNo, orderEditNoticeText, parseOrderEditType } from '@/lib/order-entry/order-no'
 import { headerValuesFromOrder, itemRowsFromOrder, stampOverridesFor } from '@/lib/order-entry/order-to-form'
 import { SPLICE_MEMBER_CLASS } from '@/lib/order-entry/constants'
 import { designatedStampIds } from '@/lib/order-entry/stamps'
 import { createClient } from '@/lib/supabase-server'
+
+// 変更を保存した後の、印刷し直しの案内（OrderLookupScreen の reprint）
+type ReprintStatus = { orderNo: string; printed: boolean; changedSinceLastPrint: boolean } | null
 
 type EditOrderPageProps = {
   // URL の ? より後ろの値。Next.js 16 では Promise で渡される
@@ -51,17 +56,23 @@ export default async function EditOrderPage({ searchParams }: EditOrderPageProps
   const rawNo = typeof params.no === 'string' ? params.no : ''
   const notice = orderEditNoticeText(params.notice, params.no)
 
+  const supabase = await createClient()
+
   // 受注No. を打つ画面（保存・削除の後は、結果を知らせてここに戻る）
-  const lookup = (error: string | null, initialOrderNo = rawNo) => (
-    <OrderLookupScreen type={type} initialOrderNo={initialOrderNo} notice={notice} error={error} />
+  const lookup = (error: string | null, initialOrderNo = rawNo, reprint: ReprintStatus = null) => (
+    <OrderLookupScreen type={type} initialOrderNo={initialOrderNo} notice={notice} error={error} reprint={reprint} />
   )
-  if (notice) return lookup(null, '')
+  if (notice) {
+    // 変更を保存した後は、現場用伝票を印刷し直す案内を出す（印刷の記録から、前回の印刷の後に変わったかを見る）
+    const savedNo = params.notice === 'updated' ? normalizeOrderNo(rawNo) : null
+    const status = savedNo ? await loadSlipPrintStatus(supabase, savedNo) : null
+    return lookup(null, '', savedNo && status ? { orderNo: savedNo, ...status } : null)
+  }
   if (rawNo === '') return lookup(null)
 
   const orderNo = normalizeOrderNo(rawNo)
   if (!orderNo) return lookup('受注No. は 26-1003-1 の形で入力してください')
 
-  const supabase = await createClient()
   const order = await loadOrderForEdit(supabase, orderNo)
   if (!order) return lookup(`受注No. ${orderNo} は見つかりません`)
   if (order.deleted) return lookup(`受注No. ${orderNo} は削除されています`)
