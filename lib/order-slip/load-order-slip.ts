@@ -55,6 +55,18 @@ export type LoadedOrderSlip = {
   prints: SlipPrintSummary
 }
 
+// 材料の行（order_items）から読む列。送り状の画面（lib/shipments/load-shipment-order.ts）でも、
+// 品名と寸法・重量を同じ決まりで組み立てるために使う
+export const SLIP_ITEM_COLUMNS = `
+  line_no, cutting_method, cutting_type, plate_size, steel_making,
+  width, length, outer_diameter, inner_diameter, quantity,
+  square_weight, actual_weight, material_weight,
+  products(thickness, plate_types(number, name), materials(name, default_steel_making, line_mark, display_color)),
+  special_product_types(name, is_splice_order_type),
+  manufacturer:manufacturers!order_items_manufacturer_specified_id_fkey(name),
+  order_item_processes(line_no, spec, spec_fields, quantity, process_types(name))
+`
+
 // orders から intakes・users へは外部キーが複数あるため、使う外部キーの名前を ! の後ろに書いて選ぶ
 const SLIP_COLUMNS = `
   id, order_no, updated_at, deleted_at, order_date, member_class, joint_no, splice_shot, is_urgent,
@@ -66,15 +78,7 @@ const SLIP_COLUMNS = `
   staff:users!orders_staff_id_fkey(name),
   intakes!orders_intake_id_fkey(intake_no),
   work_units!orders_unit_same_intake_fkey(kind),
-  order_items(
-    line_no, cutting_method, cutting_type, plate_size, steel_making,
-    width, length, outer_diameter, inner_diameter, quantity,
-    square_weight, actual_weight, material_weight,
-    products(thickness, plate_types(number, name), materials(name, default_steel_making, line_mark, display_color)),
-    special_product_types(name, is_splice_order_type),
-    manufacturer:manufacturers!order_items_manufacturer_specified_id_fkey(name),
-    order_item_processes(line_no, spec, spec_fields, quantity, process_types(name))
-  ),
+  order_items(${SLIP_ITEM_COLUMNS}),
   order_stamps(stamps(number, body)),
   order_slip_prints(printed_at, order_updated_at)
 `
@@ -87,7 +91,8 @@ type ProcessRow = {
   process_types: { name: string } | null
 }
 
-type ItemRow = {
+// SLIP_ITEM_COLUMNS で読んだ材料の行
+export type SlipItemRow = {
   line_no: number
   cutting_method: string | null
   cutting_type: string | null
@@ -134,7 +139,7 @@ type OrderRowData = {
   staff: { name: string } | null
   intakes: { intake_no: string | null } | null
   work_units: { kind: string } | null
-  order_items: ItemRow[]
+  order_items: SlipItemRow[]
   order_stamps: { stamps: { number: number; body: string } | null }[]
   order_slip_prints: { printed_at: string; order_updated_at: string }[]
 }
@@ -154,7 +159,8 @@ function toProcess(row: ProcessRow): SlipProcessSource {
   }
 }
 
-function toItem(row: ItemRow): SlipItemSource {
+// 読んだ材料の行を、伝票の行を組み立てる形にする
+export function toSlipItem(row: SlipItemRow): SlipItemSource {
   const material = row.products?.materials ?? null
   const special = row.special_product_types
   return {
@@ -234,7 +240,7 @@ export async function loadOrderSlip(supabase: Client, orderNo: string): Promise<
       .map((stamp) => stamp.stamps)
       .filter((stamp): stamp is { number: number; body: string } => stamp !== null)
       .sort((a, b) => a.number - b.number),
-    items: row.order_items.map(toItem),
+    items: row.order_items.map(toSlipItem),
     prints: summarizePrints(row.order_slip_prints),
   }
 }
