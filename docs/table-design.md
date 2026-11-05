@@ -659,7 +659,7 @@
 
 送り状No. は `{受注No.}-{回数 2 桁}`（分納の 1 回目は `26-0001-1-01`、2 回目は `26-0001-1-02`）。番号の付け方の考え方は basic-design.md「番号の付け方」。
 
-- 回数は受注ごとのカウンター `private.shipment_no_counters`（`order_id` PK・`last_seq`）で数える。取り消しても戻さない（番号を使い回さない）。受注の列に持つと、送り状がある受注の列の変更を断るトリガーに当たるため、別のテーブルにする
+- 回数は受注ごとのカウンター `private.shipment_no_counters`（`order_id` PK・`last_seq`）で数える。取り消しても戻さない（番号を使い回さない）。受付No. のカウンターと同じく、RLS を有効にしてポリシーは作らず、`anon`・`authenticated` の権限も外す（採番の関数 `private.issue_shipment_no` は security definer で、テーブルの所有者として読み書きする）。受注の列に持つと、送り状がある受注の列の変更を断るトリガーに当たるため、別のテーブルにする
 - 採番は `private.issue_shipment_no(p_order_id, p_order_no)`。`insert ... on conflict do update` で行をロックするため、同じ受注に同時に発行しても重ならない。発行が失敗したら、カウンターの更新も取り消される
 - 100 回目からは桁を増やす（`26-0001-1-100`）
 - 画面では、ハイフンなし・空白区切りで打っても受注No. と同じ決まりでそろえる（`lib/shipments/shipment-no.ts`）

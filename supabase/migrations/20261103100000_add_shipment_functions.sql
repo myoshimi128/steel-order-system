@@ -65,6 +65,11 @@ create table private.shipment_no_counters (
 comment on table private.shipment_no_counters is
   '受注ごとの送り状の回数（送り状No. の末尾の 2 桁）。取り消しても戻さない。create_shipment からだけ書く。';
 
+-- RLS を有効にしてポリシーは作らない → 所有者以外からの読み書きはすべて拒否される。
+-- 受付No. のカウンター（private.intake_no_counters）・以前の受注番号のカウンター（private.order_no_counters。受注No. の切り替えで廃止）と同じ作り。
+-- 採番の関数 private.issue_shipment_no() は security definer（このテーブルの所有者の権限）で動き、
+-- テーブルの所有者には RLS がかからない（force row level security は付けない）ため、関数の中からは読み書きできる
+alter table private.shipment_no_counters enable row level security;
 revoke all on table private.shipment_no_counters from anon, authenticated;
 
 -- 次の送り状No. を採番する。create_shipment の中からだけ呼ぶ（security definer の関数の中なので、権限は付けない）。
