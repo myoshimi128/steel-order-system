@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.18"
   }
   public: {
     Tables: {
@@ -2155,6 +2155,16 @@ export type Database = {
         Returns: undefined
       }
       create_order: { Args: { p_items: Json; p_order: Json }; Returns: string }
+      create_shipment: {
+        Args: {
+          p_due_date?: string
+          p_expected_updated_at: string
+          p_items: Json
+          p_order_id: string
+          p_shipped_date: string
+        }
+        Returns: string
+      }
       current_user_department: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
       delete_intake: { Args: { p_intake_id: string }; Returns: undefined }
@@ -2162,6 +2172,7 @@ export type Database = {
         Args: { p_expected_updated_at: string; p_order_id: string }
         Returns: string
       }
+      delete_shipment: { Args: { p_shipment_id: string }; Returns: string }
       get_pricing_rows: {
         Args: {
           p_as_of: string

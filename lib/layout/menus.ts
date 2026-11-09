@@ -92,7 +92,7 @@ export const HOME_MENU: Menu = {
   ],
 }
 
-// シャーリング部のメニュー。今ある画面（受付登録・CAD・受注登録・納期連絡・マスタ管理）だけを押せるようにする
+// シャーリング部のメニュー。今ある画面（受付登録・CAD・受注登録・送り状発行・納期連絡・マスタ管理）だけを押せるようにする
 export const SHEARING_MENU: Menu = {
   kind: 'shearing',
   sections: [
@@ -105,7 +105,8 @@ export const SHEARING_MENU: Menu = {
         // 受注登録は受注登録待ち（起票待ちのカゴ）の一覧から始める。受注登録の画面（/orders/new）を開いている間も強調する
         { label: '受注登録', icon: 'pencil', href: '/orders/queue', activePrefix: '/orders', badge: 'orderReady' },
         { label: '加工図面発行', icon: 'image', href: null },
-        { label: '送り状発行', icon: 'ticket', href: null },
+        // 送り状発行は入口（/shipments）から、入力・確認の画面（/shipments/〇〇）を開いている間も強調する
+        { label: '送り状発行', icon: 'ticket', href: '/shipments', activePrefix: '/shipments' },
         { label: 'ミルシート作成', icon: 'sheet', href: null },
         { label: '受注管理', icon: 'list', href: null },
         { label: '納期連絡', icon: 'clock', href: '/shearing/lead-time' },

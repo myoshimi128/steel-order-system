@@ -561,7 +561,7 @@
 | `inner_diameter` | numeric | 内径（mm）。ドーナツで使用 |
 | `quantity` | integer | 数量 |
 | `square_weight` | numeric | 角重量（1 枚あたり kg）。単価計算の根拠 |
-| `actual_weight` | numeric | 実重量（1 枚あたり kg）。配送依頼用。寸法から求まるもの（寸法切・ベタ丸・ドーナツ）は自動計算、アイトレなどは送り状発行の画面で必要な行だけ手入力 |
+| `actual_weight` | numeric | 実重量（1 枚あたり kg）。配送依頼用。寸法から求まるもの（寸法切・ベタ丸・ドーナツ・定尺）は自動計算。アイトレ・ササラは NULL（送り状発行の画面で入力した実重量は、この列には書かず、送り状の明細 `shipment_items.weight` に回ごとに残す） |
 | `material_weight` | numeric | 使用材の重量（1 枚あたり kg）。ササラで使用。使用材の寸法から自動計算 |
 | `cutting_unit_price` | numeric | 仕入単価（各エキストラ加算後。枚単価の場合は保証重量を掛けた後の値）。マスタから自動計算。別途見積もりは NULL（単価未定）で登録し、仕入入力の画面で入力する（予定。basic-design.md「仕入入力」） |
 | `sales_unit_price` | numeric | 売上単価。MVP では使用しない（Phase2 の営業システム連携で扱う） |
@@ -575,7 +575,7 @@
 
 メーカーは「指定」と「実績」で確定タイミングが異なるため別カラムとする。同一カラムで兼ねると、指定のない受注に実績が入った際に客先指定があったように見えてしまう。縞板のみ、縞目の見た目が異なるため受注時に客先へ確認しており、`manufacturer_specified_id` が単位質量の参照にも使われる。
 
-重量は角重量と実重量を分けて保持する。請求は角重量で行い（材料としては四角で消費するため）、配送依頼には実重量を用いる。寸法切は両者が一致し、ベタ丸・ドーナツは外径・内径から両方を算出する。アイトレの実重量は受注入力では扱わず、送り状発行の画面で必要な行だけ手入力する。
+重量は角重量と実重量を分けて保持する。請求は角重量で行い（材料としては四角で消費するため）、配送依頼には実重量を用いる。寸法切は両者が一致し、ベタ丸・ドーナツは外径・内径から両方を算出する。アイトレ（とササラ）の実重量は受注入力では扱わず、送り状発行の画面で必要な行だけ 1 枚あたりの値を手入力する（任意）。入力した値は送り状の明細に、その回の実重量の合計として残す（`shipment_items`）。送り状がある受注の明細は変えられない（トリガー）ため、また分納の回ごとに入れられるようにするためである。
 
 画面の「切断・区分」（切断方法と区分をまとめた 2 桁の番号。例: 41 レーザー寸法切、47 レーザーベタ丸、71 定尺、9 加工）は 1 つの番号の欄だが、保存時は `cutting_method`・`cutting_type`・`special_product_type_id`・`plate_size` に振り分ける（加工は `order_item_processes` の行になる）。シャーリングの「型切り」（12）は、`cutting_type` を `アイトレ` として保存する（新しい切断区分は作らない）。スプライスは区分ではなく受注単位（部材区分 `orders.member_class = 'SPL'`）で扱う。振り分けの対応は screen-design.md「受注登録画面」を参照。
 
@@ -630,14 +630,18 @@
 
 ### shipments（出荷実績）
 
+送り状 1 枚につき 1 行。1 枚の送り状には 1 つの受注だけを載せる（同じ納入先・同じ日の受注をまとめることはしない。トラックの手配をまとめるのは、配送の依頼の一覧（PR 10b）で納入先ごとに並べて行う）。
+
 | カラム | 型 | 説明 |
 | --- | --- | --- |
 | `id` | uuid | PK |
 | `order_id` | uuid | FK → `orders` |
-| `shipment_no` | text | 送り状番号。自動採番 |
+| `shipment_no` | text | 送り状No.。`{受注No.}-{回数 2 桁}`（例: `26-0001-1-01`）。一意。`create_shipment` の中で採番する（後述「送り状の番号」） |
 | `shipped_date` | date | 出荷日 |
-| `created_by` | uuid | FK → `users` |
-| `created_at` | timestamptz |  |
+| `created_by` | uuid | FK → `users`。発行した人（`auth.uid()`） |
+| `created_at` | timestamptz | 発行した日時 |
+
+送り状の取り消しは物理削除とする（送り状の明細も消す）。取り消した送り状No. は使い回さない。
 
 ### shipment\_items（出荷明細）
 
@@ -645,11 +649,31 @@
 | --- | --- | --- |
 | `id` | uuid | PK |
 | `shipment_id` | uuid | FK → `shipments` |
-| `order_item_id` | uuid | FK → `order_items` |
-| `quantity` | integer | 出荷数量 |
-| `weight` | numeric | 出荷重量 |
+| `order_item_id` | uuid | FK → `order_items`。同じ送り状に同じ明細は 1 行だけ（一意） |
+| `quantity` | integer | 今回の出荷数量。正の数 |
+| `weight` | numeric | 今回の出荷の実重量の合計（kg、小数第 2 位まで）。受注の明細に 1 枚あたりの実重量がある行は `create_shipment` が「1 枚あたり × 数量」で求め、ない行（アイトレ・ササラ）は送り状の画面で入力した 1 枚あたりの値から求める。入力しなかった行は NULL（実重量は不明。配送の重量には角重量を代わりに使う）。入っていれば正の数 |
 
-分割出荷は出荷実績を積み上げることで表現する。残数量はカラムを持たず「受注数量 − 出荷実績の合計」として算出する。
+分割出荷は出荷実績を積み上げることで表現する。残数量はカラムを持たず「受注数量 − 出荷実績の合計」として算出する。角重量（請求の根拠）は保存せず、受注の明細の 1 枚あたりの角重量（ササラは使用材重量）× 今回の数量で求める。
+
+**送り状の番号**
+
+送り状No. は `{受注No.}-{回数 2 桁}`（分納の 1 回目は `26-0001-1-01`、2 回目は `26-0001-1-02`）。番号の付け方の考え方は basic-design.md「番号の付け方」。
+
+- 回数は受注ごとのカウンター `private.shipment_no_counters`（`order_id` PK・`last_seq`）で数える。取り消しても戻さない（番号を使い回さない）。受付No. のカウンターと同じく、RLS を有効にしてポリシーは作らず、`anon`・`authenticated` の権限も外す（採番の関数 `private.issue_shipment_no` は security definer で、テーブルの所有者として読み書きする）。受注の列に持つと、送り状がある受注の列の変更を断るトリガーに当たるため、別のテーブルにする
+- 採番は `private.issue_shipment_no(p_order_id, p_order_no)`。`insert ... on conflict do update` で行をロックするため、同じ受注に同時に発行しても重ならない。発行が失敗したら、カウンターの更新も取り消される
+- 100 回目からは桁を増やす（`26-0001-1-100`）
+- 画面では、ハイフンなし・空白区切りで打っても受注No. と同じ決まりでそろえる（`lib/shipments/shipment-no.ts`）
+
+**送り状の発行と取り消し（create_shipment・delete_shipment。PR 10a）**
+
+- `create_shipment(p_order_id, p_expected_updated_at, p_shipped_date, p_items, p_due_date default null) → text`: 送り状を発行して送り状No. を返す。`p_items` は `[{"order_item_id", "quantity", "piece_weight"}]`（`piece_weight` は実重量を入力する行の 1 枚あたりの値。省略・null は未入力）
+  - 受注の行をロック（`for update`）してから確かめる。画面を開いた後に受注が変わっていれば `ORDER_CHANGED`、削除済みなら `ORDER_DELETED`、完了なら `ORDER_COMPLETED`
+  - 受注の納期が確定でなければ、`p_due_date` で確定にして日付を入れ、`updated_at` を新しくする（なければ `DUE_DATE_REQUIRED`）。送り状がある受注の納期はトリガーで変えられないため、送り状を入れる前に行う
+  - 出荷数量の合計が受注数量を超えたら `SHIPMENT_EXCEEDS_ORDER`（今回の分を入れた後に明細ごとに確かめる）
+  - 最後に受注の状態を付け直す（`private.refresh_order_shipment_status`。全部出し終えたら `完了`、残りがあれば `配送依頼済み`）。状態の更新では `updated_at` を変えない
+- `delete_shipment(p_shipment_id) → text`: 送り状と送り状の明細を消し、受注の状態を付け直す（送り状がなくなれば `出荷待ち`）。取り消した送り状の受注No. を返す。確定にした納期とカウンターは戻さない。仕入入力を作るときに、仕入がある送り状を断る確かめをここに足す
+- どちらも `security definer`・`search_path` 空で、関数の中で事務・管理者かを確かめる。権限は `authenticated` にだけ付ける
+- 実装は `supabase/migrations/20261103100000_add_shipment_functions.sql`
 
 ### attachments（添付ファイル）【廃止】
 
@@ -798,7 +822,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | 加工の金額 | 個: 単価 × 数量、kg: 単価 × 母材の合計重量。円未満は切り上げ |
 | 受注合計 | 材料の明細金額と加工の金額の合計 |
 
-角重量・実重量は寸法と材質（縞板は単位質量）から算出できるため、入力者に選択させず自動計算する。ササラの使用材重量も、入力された使用材の寸法から自動計算する。ただしアイトレの実重量は形状が一定でないため、送り状発行の画面で必要な行だけ手入力する。
+角重量・実重量は寸法と材質（縞板は単位質量）から算出できるため、入力者に選択させず自動計算する。ササラの使用材重量も、入力された使用材の寸法から自動計算する。ただしアイトレ（とササラ）の実重量は形状が一定でないため、送り状発行の画面で必要な行だけ手入力し、送り状の明細に回ごとに残す（`shipment_items.weight`）。
 
 1 枚あたりの重量は丸めずに保証重量の判定・単価計算に使う。合計重量は 1 枚あたりの重量に枚数を掛けた後、小数第 2 位までに四捨五入する（切り捨ては行わない）。
 
@@ -821,8 +845,9 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 - `orders.member_class` は部材区分の値（`NONE` `DF` `GPL` `BH` `SPL`）に限る
 - `orders` の `intake_id` + `branch_no` に一意制約。`work_unit_id` は同じ受付の加工区分に限る
 - `users.employee_no` に一意制約・形の check 制約（英大文字と数字で 1〜10 文字）・NOT NULL
-- `shipment_items.quantity` に正数チェック
-- 出荷数量の累計が受注数量を超えないことを、アプリケーション側と DB 側の両方で検証する
+- `shipment_items.quantity` に正数チェック。`shipment_items.weight` は NULL か正の数
+- `shipments.shipment_no` に一意制約。`shipment_items` の `shipment_id` + `order_item_id` に一意制約
+- 出荷数量の累計が受注数量を超えないことを、アプリケーション側（Server Action で受注を読み直して確かめる）と DB 側（`create_shipment`）の両方で検証する
 - `orders.due_date` は `due_date_type` が `確定` `仮納期` の場合に必須
 
 ### RLS 方針
@@ -834,7 +859,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 | `orders` | 参照・登録・更新 | 参照・ステータス更新のみ | すべて |
 | `order_items` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
 | `order_item_processes` | 参照・登録・更新 | 参照（単価列を除く） | すべて |
-| `shipments` / `shipment_items` | 参照・登録・更新 | 参照不可 | すべて |
+| `shipments` / `shipment_items` | 参照（発行・取り消しは関数 `create_shipment`・`delete_shipment` だけ） | 参照不可 | 参照（発行・取り消しは関数だけ） |
 | `attachments`（廃止） | 参照・登録・更新 | 参照不可 | すべて |
 | 受付のテーブル（`intakes` `intake_destinations` `work_units` `intake_files` など） | 参照・登録・更新 | 参照不可 | すべて |
 | `sites` | 参照 | 参照 | すべて |
@@ -850,6 +875,7 @@ unit_weights          ──> plate_types / manufacturers（× 板厚）
 
 - `order_item_processes` の `unit_price`（加工単価）は `order_items` の単価列と同じ性質の情報のため、同様に現場からは隠す。
 - `shipments` / `shipment_items`（送り状）と `attachments`（注文書ファイル）は、送り状発行・ファイル管理のいずれも事務の業務であり現場の業務範囲に含まれないため、現場は参照不可とする。
+- `shipments` / `shipment_items` の書き込みは、採番・数量の確かめ・状態の付け直しを必ず通すため、関数だけにする（PR 10a で直接の登録・更新・削除のポリシーを消した）。受付より前に作ったテーブルで、Data API の設定画面で公開していたため、権限もいったんすべて外し、`authenticated` に参照だけを付け直した。取り消しは事務・管理者ができる（受注の変更・削除と同じ）。
 - `order_stamps` は現場用伝票にそのまま印字される内容であり、単価情報のような機密性もないため、現場にも参照を許可する。
 - 受付のテーブルの詳細（削除の扱い、トリガーだけが書くテーブルなど）は docs/intake/table-design.md「RLS・権限・Realtime・Storage」を参照。受付の作業は事務所の業務であり、現場の業務範囲に含まれないため、現場は参照不可とする。
 - `users` は担当者・出荷担当者などの氏名表示にどのロールからも参照できる必要があるため参照は全ロールに許可し、登録・更新は管理者のみとする。
@@ -928,7 +954,7 @@ DB の関数は `security definer`（関数所有者の権限で実行）とし�
 仕入入力の画面（basic-design.md「仕入入力」）のためのテーブルを追加する。テーブルの形は実装時に決めるが、次の情報を持つ。
 
 - 仕入No.（採番する）・仕入日・締日
-- どの送り状（または受注）の仕入か。分納のときに送り状ごとに上げるか受注ごとに上げるかは未決事項
+- どの送り状（または受注）の仕入か。分納のときに送り状ごとに上げるか受注ごとに上げるかは未決事項。送り状ごとに上げるなら、仕入No. は新しく作らず送り状No. をそのまま使う（basic-design.md「番号の付け方」）
 - 明細ごとの確定した仕入単価・仕入金額（受注明細の `cutting_unit_price`・加工の行の `unit_price` を確認・修正した値）
 
 制約として、仕入がある送り状は削除できないようにし、送り状がある受注は修正・削除できないようにする（`orders_prevent_deleting_shipped` を広げる）。修正は「仕入を削除 → 送り状を削除 → 受注を修正」の逆順でしか行えない。

@@ -64,6 +64,14 @@ describe('isMenuItemActive', () => {
     expect(item.badge).toBe('orderReady')
   })
 
+  it('送り状発行は入口を開き、入力・確認の画面でも強調する', () => {
+    const item = findItem('送り状発行')
+    expect(item.href).toBe('/shipments')
+    expect(isMenuItemActive(item, '/shipments')).toBe(true)
+    expect(isMenuItemActive(item, '/shipments/new')).toBe(true)
+    expect(isMenuItemActive(item, '/orders/new')).toBe(false)
+  })
+
   it('CAD は /cad で強調し、作業待ち・作業中の件数を出す', () => {
     const item = findItem('CAD')
     expect(isMenuItemActive(item, '/cad')).toBe(true)
@@ -102,6 +110,10 @@ describe('buildBreadcrumbs', () => {
     expect(buildBreadcrumbs('/cad')).toEqual([
       { label: 'シャーリング部', href: '/shearing' },
       { label: 'CAD', href: null },
+    ])
+    expect(buildBreadcrumbs('/shipments/view')).toEqual([
+      { label: 'シャーリング部', href: '/shearing' },
+      { label: '送り状発行', href: null },
     ])
     expect(buildBreadcrumbs('/shearing/lead-time')).toEqual([
       { label: 'シャーリング部', href: '/shearing' },
